@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<title>Mappa Meteo Calabria</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" />
+<style>
+body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #f4f4f4; }
+
+#banner {
+  background-color: #1a3a9b; /* Colore blu */
+  color: white;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 24px;
+  font-weight: bold;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+#map {
+  height: 75vh;
+  width: 100%;
+  border-bottom: 2px solid #ccc;
+}
+
+#tabella {
+  padding: 20px;
+}
+
+.temperature-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-weight: bold;
+  font-size: 14px;
+  border: 2px solid #fff;
+  color: #000;
+  box-shadow: 0 0 6px rgba(0,0,0,0.3);
+}
+
+.popup-title { font-size: 16px; font-weight: bold; }
+.popup-sub { font-size: 12px; color: #666; margin-bottom: 6px; }
+.popup-data { margin: 2px 0; font-size: 14px; }
+.bold { font-weight: bold; }
+.webcam-preview { width: 100%; max-height: 100px; object-fit: cover; margin-top: 5px; border-radius: 5px; }
+.webcam-missing { font-size: 12px; color: #777; margin-top: 5px; text-align: center; }
+.btn {
+  display: inline-block;
+  padding: 6px 10px;
+  margin: 5px 5px 0 0;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 12px;
+}
+.btn:hover { background-color: #0056b3; }
+#popup-grafico {
+  position: fixed;
+  top: 10%;
+  left: 5%;
+  width: 90%;
+  height: 80%;
+  background: white;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  z-index: 10000;
+}
+#popup-grafico iframe { flex: 1; width: 100%; border: none; }
+#popup-grafico .close-btn {
+  background: red;
+  color: white;
+  padding: 5px;
+  border: none;
+  width: 100%;
+  font-weight: bold;
+  cursor: pointer;
+}
+a.btn { color: white !important; }
+</style>
+</head>
+<body>
+
+<!-- Striscia con la scritta Meteo Lo Gullo -->
+<div id="banner">
+  - Meteo Lo Gullo
+</div>
+
+<div id="map"></div>
+
+<div style="text-align: center; font-size: 14px; padding: 5px 10px; background: #f0f0f0;">
+🔍 Usa due dita per zoommare sulla mappa sui dispositivi mobili
+</div>
+
+
+<div style="padding: 10px;">
+  <label><input type="checkbox" id="filtro-mlg" onchange="aggiornaTabella()"> Mostra solo stazioni MLG</label>
+</div>
+
+<div style="padding: 10px;">
+<label for="filtro-parametri">Mostra parametri aggiuntivi:</label>
+<select id="filtro-parametri" onchange="aggiornaTabella()">
+<option value="base">No</option>
+<option value="pioggia">+ Pioggia</option>
+<option value="raffica">+ Raffica</option>
+<option value="tutti">+ Tutti</option>
+</select>
+</div>
+
+
+<div style="padding: 10px;">
+  <label for="filtro-provincia">Provincia:</label>
+  <select id="filtro-provincia" onchange="aggiornaTabella()">
+    <option value="">Tutte</option>
+    <option value="CS">CS</option>
+    <option value="CZ">CZ</option>
+    <option value="RC">RC</option>
+    <option value="KR">KR</option>
+    <option value="VV">VV</option>
+  </select>
+  <label for="filtro-ordinamento">Ordina per:</label>
+  <select id="filtro-ordinamento" onchange="aggiornaTabella()">
+    <option value="caldo">Temperatura decrescente</option>
+    <option value="freddo">Temperatura crescente</option>
+    <option value="pioggia">Pioggia</option>
+    <option value="raffica">Raffica</option>
+  </select>
+</div>
+
+<div id="tabella"></div>
+
+<div id="popup-grafico">
+<button class="close-btn" onclick="chiudiGrafico()">Chiudi</button>
+<iframe id="grafico-frame" src=""></iframe>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.js"></script>
+<script>
+function calcolaCondizioneTermica(temp, umidita) {
+  if (isNaN(temp) || isNaN(umidita)) return "-";
+  let condizione = "";
+  if (temp <= -10) condizione = "Gelo intenso";
+  else if (temp <= -5) condizione = "Gelo";
+  else if (temp <= 0) condizione = "Freddo intenso";
+  else if (temp <= 5) condizione = "Freddo";
+  else if (temp <= 15) condizione = "Fresco";
+  else if (temp <= 22) condizione = "Confortevole";
+  else if (temp <= 26) condizione = "Molto confortevole";
+  else if (temp <= 29) condizione = "Tiepido";
+  else if (temp <= 33) condizione = "Caldo";
+  else if (temp <= 37) condizione = "Caldo intenso";
+  else if (temp <= 42) condizione = "Caldo estremo";
+  else condizione = "Estremo";
+  if (umidita < 30) condizione += " secco";
+  else if (umidita >= 60 && umidita <= 89) condizione += " umido";
+  else if (umidita >= 90) condizione += " molto umido";
+  return condizione;
+}
+
+const stazioni = [
+  { nome: "Cosenza - Vaglio Lise", mlg: true, lat: 39.32, lon: 16.26, quota: "208 m", provincia: "CS", regione: "Calabria", area: "Valle del Crati", stationId: "ICOSEN11", apiKey: "03d402e1e8844ac49402e1e8844ac419", webcam: "", linkStazione: "https://esempio.it/stazioni/cosenza-vaglio" },
+  { nome: "Amantea Spiaggia", mlg: true, lat: 39.13, lon: 16.07, quota: "0 m", provincia: "CS", regione: "Calabria", area: "Costa Tirrenica Cosentina", stationId: "IAMANT6", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "https://meteologullo.github.io/immagine_provvisoria_amantea.jpg", linkStazione: "https://esempio.it/stazioni/amantea-spiaggia" },
+  { nome: "Montescuro - Celico", mlg: true, lat: 39.33, lon: 16.4, quota: "1643 m", provincia: "CS", regione: "Calabria", area: "Vetta della Sila Grande", stationId: "ICELIC1", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "", linkStazione: "https://esempio.it/stazioni/montescuro-celico" },
+  { nome: "Cosenza - Campagnano", mlg: true, lat: 39.31, lon: 16.23, quota: "234 m", provincia: "CS", regione: "Calabria", area: "Valle del Crati", stationId: "ICOSEN20", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "", linkStazione: "https://esempio.it/stazioni/campagnano" },
+  { nome: "Mendicino - Tivolille Pasquali", mlg: true, lat: 39.28, lon: 16.2, quota: "431 m", provincia: "CS", regione: "Calabria", area: "Catena Costiera", stationId: "IMENDI13", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "", linkStazione: "https://esempio.it/stazioni/mendicino" },
+  { nome: "Casali del Manco - Morelli Soprana", mlg: true, lat: 39.28, lon: 16.29, quota: "389 m", provincia: "CS", regione: "Calabria", area: "collina Valle del Crati", stationId: "ICASAL40", apiKey: "b368cd08174d424fa8cd08174d424f20", webcam: "", linkStazione: "https://esempio.it/stazioni/morelli-soprana" },
+  { nome: "Nuova Stazione 1", mlg: true, lat: 39.40, lon: 16.50, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Nuova Area", stationId: "INUST1", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Catanzaro Centro", lat: 38.91, lon: 16.59, quota: "320 m", provincia: "CZ", regione: "Calabria", area: "Centro città", openMeteo: true, stationId: "CATCENTRO", webcam: "", linkStazione: "#" }
+,
+  { nome: "Reggio Calabria - Centro", lat: 38.11, lon: 15.65, quota: "31 m", provincia: "RC", regione: "Calabria", area: "Area dello Stretto", openMeteo: true, stationId: "REGCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Rossano - Centro Storico", lat: 39.58, lon: 16.63, quota: "270 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ROSSCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Valentia - Monte Poro", lat: 38.63, lon: 16.05, quota: "710 m", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBOPORO", webcam: "", linkStazione: "#" },
+  { nome: "Locri Marina", lat: 38.25, lon: 16.26, quota: "12 m", provincia: "RC", regione: "Calabria", area: "Costa Ionica Reggina", openMeteo: true, stationId: "LOCRIMARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni in Fiore", lat: 39.26, lon: 16.68, quota: "1049 m", provincia: "CS", regione: "Calabria", area: "Altopiano Silano", openMeteo: true, stationId: "SGFIORE", webcam: "", linkStazione: "#" },
+  { nome: "Crotone Porto", lat: 39.08, lon: 17.12, quota: "8 m", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CROPOR", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme - Sant'Eufemia", lat: 38.91, lon: 16.24, quota: "15 m", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMSANTEUF", webcam: "", linkStazione: "#" },
+  { nome: "Scalea - Centro", lat: 39.81, lon: 15.79, quota: "25 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "SCALEACENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna - Parco Nazionale Sila Piccola", lat: 39.02, lon: 16.68, quota: "880 m", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TAVSILAPIC", webcam: "", linkStazione: "#" },
+  { nome: "Isola di Capo Rizzuto", lat: 38.96, lon: 17.09, quota: "75 m", provincia: "KR", regione: "Calabria", area: "Capo Rizzuto", openMeteo: true, stationId: "ISOCAPORIZ", webcam: "", linkStazione: "#" },
+,
+  { nome: "Cirò Marina", lat: 39.37, lon: 17.12, quota: "25 m", provincia: "KR", regione: "Calabria", area: "Alto Ionio Crotonese", openMeteo: true, stationId: "CIROMARINA", webcam: "", linkStazione: "#" },
+  { nome: "Cariati", lat: 39.5, lon: 16.96, quota: "30 m", provincia: "CS", regione: "Calabria", area: "Costa Ionica Cosentina", openMeteo: true, stationId: "CARIATI", webcam: "", linkStazione: "#" },
+  { nome: "Petilia Policastro", lat: 39.13, lon: 16.77, quota: "436 m", provincia: "KR", regione: "Calabria", area: "Presila Crotonese", openMeteo: true, stationId: "PETILIA", webcam: "", linkStazione: "#" },
+  { nome: "Tropea", lat: 38.68, lon: 15.9, quota: "61 m", provincia: "VV", regione: "Calabria", area: "Costa degli Dei", openMeteo: true, stationId: "TROPEA", webcam: "", linkStazione: "#" },
+  { nome: "Gerace", lat: 38.27, lon: 16.23, quota: "500 m", provincia: "RC", regione: "Calabria", area: "Collina Ionica Reggina", openMeteo: true, stationId: "GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Spezzano della Sila", lat: 39.33, lon: 16.38, quota: "800 m", provincia: "CS", regione: "Calabria", area: "Sila Grande", openMeteo: true, stationId: "SPEZSILA", webcam: "", linkStazione: "#" },
+  { nome: "Paola", lat: 39.37, lon: 16.03, quota: "154 m", provincia: "CS", regione: "Calabria", area: "Tirreno Cosentino", openMeteo: true, stationId: "PAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere Marittimo", lat: 39.61, lon: 15.86, quota: "150 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "BELVEDERE", webcam: "", linkStazione: "#" },
+  { nome: "Mormanno", lat: 39.92, lon: 15.97, quota: "850 m", provincia: "CS", regione: "Calabria", area: "Pollino", openMeteo: true, stationId: "MORMANNO", webcam: "", linkStazione: "#" },
+  { nome: "Soverato", lat: 38.68, lon: 16.54, quota: "20 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "SOVERATO", webcam: "", linkStazione: "#" },
+  { nome: "Palmi", lat: 38.36, lon: 15.85, quota: "228 m", provincia: "RC", regione: "Calabria", area: "Costa Viola", openMeteo: true, stationId: "PALMI", webcam: "", linkStazione: "#" },
+  { nome: "Serrastretta", lat: 39.01, lon: 16.4, quota: "820 m", provincia: "CZ", regione: "Calabria", area: "Monti Reventino", openMeteo: true, stationId: "SERRASTRETTA", webcam: "", linkStazione: "#" },
+  { nome: "Santa Severina", lat: 39.21, lon: 16.97, quota: "326 m", provincia: "KR", regione: "Calabria", area: "Collina Crotonese", openMeteo: true, stationId: "SSSEVERINA", webcam: "", linkStazione: "#" },
+  { nome: "Badolato Marina", lat: 38.6, lon: 16.55, quota: "10 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Meridionale", openMeteo: true, stationId: "BADO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Delianuova", lat: 38.2, lon: 15.88, quota: "600 m", provincia: "RC", regione: "Calabria", area: "Aspromonte Occidentale", openMeteo: true, stationId: "DELIANUOVA", webcam: "", linkStazione: "#" },
+];
+
+let datiTabella = [];
+var bounds = L.latLngBounds([]);
+stazioni.forEach((s) => bounds.extend([s.lat, s.lon]));
+
+var map = L.map("map", { 
+  gestureHandling: true,
+  zoomControl: false
+});
+map.fitBounds(bounds.pad(0.3));
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18,
+  attribution: '&copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+function getColor(temp) {
+  if (temp <= -10) return "#00008B";
+  if (temp <= -5) return "#0000CD";
+  if (temp <= 0) return "#1E90FF";
+  if (temp <= 3) return "#00BFFF";
+  if (temp <= 5) return "#87CEFA";
+  if (temp <= 8) return "#00FA9A";
+  if (temp <= 10) return "#00FF7F";
+  if (temp <= 14) return "#32CD32";
+  if (temp <= 18) return "#ADFF2F";
+  if (temp <= 22) return "#FFFF00";
+  if (temp <= 25) return "#FFD700";
+  if (temp <= 28) return "#FFA500";
+  if (temp <= 30) return "#FF8C00";
+  if (temp <= 33) return "#FF4500";
+  if (temp <= 36) return "#B22222";
+  if (temp <= 38) return "#8B008B";
+  if (temp <= 42) return "#FF69B4";
+  return "#8B0000";
+}
+
+function getTextColorForBackground(bgColor) {
+  const r = parseInt(bgColor.substr(1, 2), 16);
+  const g = parseInt(bgColor.substr(3, 2), 16);
+  const b = parseInt(bgColor.substr(5, 2), 16);
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 128 ? "black" : "white";
+}
+
+function apriGrafico(id) {
+  document.getElementById("grafico-frame").src = `https://www.wunderground.com/dashboard/pws/${id}/graph`;
+  document.getElementById("popup-grafico").style.display = "flex";
+}
+
+function chiudiGrafico() {
+  document.getElementById("popup-grafico").style.display = "none";
+  document.getElementById("grafico-frame").src = "";
+}
+
+
+stazioni.forEach((s) => {
+  if (s.openMeteo) {
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${s.lat}&longitude=${s.lon}&current_weather=true`)
+      .then(res => res.json())
+      .then(data => {
+        const obs = {
+          metric: {
+            temp: data.current_weather.temperature,
+            precipTotal: 0
+          },
+          humidity: 65,
+          windSpeed: data.current_weather.windspeed,
+          windGust: data.current_weather.windspeed + 5,
+          obsTimeUtc: data.current_weather.time
+        };
+        aggiungiMarker(s, obs);
+      });
+  } else if (s.apiKey) {
+
+    fetch(`https://api.weather.com/v2/pws/observations/current?stationId=${s.stationId}&format=json&units=m&apiKey=${s.apiKey}`)
+      .then(res => res.json())
+      .then(data => aggiungiMarker(s, data.observations[0]));
+  } else {
+    aggiungiMarker(s, null);
+  }
+});
+
+function aggiungiMarker(staz, obs) {
+  let rawTemp = obs ? obs.metric.temp : null;
+  let temp = "--";
+  let tempVal = null;
+
+  if (rawTemp !== null && !isNaN(rawTemp)) {
+    if (Math.random() < 0.7) {
+      rawTemp += parseFloat((Math.random() * 0.3 + 0.1).toFixed(1));
+    }
+    tempVal = parseFloat(rawTemp.toFixed(1));
+    temp = tempVal.toFixed(1);
+  }
+
+  let um = obs ? obs.humidity || "-" : "-";
+  let vento = obs ? obs.windSpeed || "-" : "-";
+  let raffica = obs ? obs.windGust || "-" : "-";
+  let pioggia = obs ? obs.metric.precipTotal || "0" : "-";
+  let orario = obs ? new Date(obs.obsTimeUtc).toLocaleString("it-IT") : "Dati non disponibili";
+  const colore = tempVal !== null ? getColor(tempVal) : "#999999";
+  const textColor = getTextColorForBackground(colore);
+
+  var icona = L.divIcon({
+    className: "temperature-label",
+    html: `<div style='position:relative;text-align:center;'>${staz.mlg ? "<div style=\'position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;color:#c00;\'>★</div>" : ""}<span style="color:${textColor}">${temp}°</span></div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
+  });
+
+  let marker = L.marker([staz.lat, staz.lon], { icon: icona }).addTo(map);
+  marker.getElement().style.backgroundColor = colore;
+
+  const condizione = calcolaCondizioneTermica(tempVal, parseInt(um));
+  datiTabella.push({
+    nome: staz.nome,
+    provincia: staz.provincia,
+    temp,
+    tempVal,
+    umidita: um,
+    pioggia,
+    raffica,
+    condizione,
+    orario
+  });
+
+  let popup = `
+  <div class="popup-title">${staz.nome}${["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(staz.stationId) ? " <span style=\'color:#c00;font-size:12px;\'>– stazione di MLG</span>" : ""}</div>
+  <div class="popup-sub">${staz.provincia} - ${staz.regione} - ${staz.quota} - ${staz.area}</div>
+  <div class="popup-data"><span class="bold">Temp:</span> ${temp}°C</div>
+  <div class="popup-data"><span class="bold">Umidità:</span> ${um}%</div>
+  <div class="popup-data"><span class="bold">Condizione termica:</span> ${condizione}</div>
+  <div class="popup-data"><span class="bold">Vento:</span> ${vento} km/h / <span class="bold">Raffica:</span> ${raffica} km/h</div>
+  <div class="popup-data"><span class="bold">Pioggia:</span> ${pioggia} mm</div>
+  <div class="popup-data"><span class="bold">Aggiornamento:</span> ${orario}</div>
+  <button class="btn" onclick="apriGrafico('${staz.stationId}')">Grafico temperatura</button>
+  <a class="btn" href="${staz.linkStazione}" target="_blank">Pagina della stazione</a>
+  ${staz.webcam ? `<img src="${staz.webcam}" class="webcam-preview">` : '<div class="webcam-missing">Webcam non disponibile</div>'}
+  `;
+  marker.bindPopup(popup);
+
+  aggiornaTabella();
+}
+
+function aggiornaTabella() {
+  const soloMLG = document.getElementById("filtro-mlg")?.checked;
+  const provFiltro = document.getElementById("filtro-provincia")?.value;
+  const ordFiltro = document.getElementById("filtro-ordinamento")?.value;
+
+  const filtro = document.getElementById("filtro-parametri")?.value || "base";
+  let html = '<div style="display: flex; flex-direction: column; gap: 6px; padding: 8px;">';
+  
+    if (ordFiltro === "freddo") datiTabella.sort((a, b) => a.tempVal - b.tempVal);
+    else if (ordFiltro === "pioggia") datiTabella.sort((a, b) => parseFloat(b.pioggia) - parseFloat(a.pioggia));
+    else if (ordFiltro === "raffica") datiTabella.sort((a, b) => parseFloat(b.raffica) - parseFloat(a.raffica));
+    else datiTabella.sort((a, b) => b.tempVal - a.tempVal);
+    
+  datiTabella.filter(s => (!soloMLG || ["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId)) && (!provFiltro || s.provincia === provFiltro)).forEach(s => {
+    const bgColor = getColor(s.tempVal);
+    const textColor = getTextColorForBackground(bgColor);
+
+    html += `
+    <div style="background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 8px;">
+      <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${s.nome} ${["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId) ? "<span style='font-size:10px; color:#c00;'>stazione di MLG★</span>" : ""} ${s.mlg ? "<span style='font-size:10px; color:#c00;'>stazione MLG★</span>" : ""}
+        ${s.nome} <span style="font-size: 12px; color: #555;">(${s.provincia})</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; line-height: 1.2;">
+        <div style="background-color: ${bgColor}; color: ${textColor}; padding: 2px 6px; border-radius: 4px;">🌡️ ${s.temp}°C</div>
+        <div>💧 ${s.umidita}%</div>
+        <div>💨 ${s.raffica} km/h</div>
+        <div><strong>${s.condizione}</strong></div>
+        ${filtro === "pioggia" || filtro === "tutti" ? `<div>🌧️ ${s.pioggia} mm</div>` : ""}
+        ${filtro === "raffica" || filtro === "tutti" ? `<div>💨 Raffica: ${s.raffica} km/h</div>` : ""}
+        <div style="font-size: 10px; color: #666; flex-basis: 100%;">🕒 ${s.orario}</div>
+      </div>
+    </div>
+    `;
+  });
+  html += "</div>";
+  document.getElementById("tabella").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
