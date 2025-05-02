@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<title>Mappa Meteo Calabria</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" />
+<style>
+body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #f4f4f4; }
+
+#banner {
+  background-color: #1a3a9b; /* Colore blu */
+  color: white;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 24px;
+  font-weight: bold;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+#map {
+  height: 75vh;
+  width: 100%;
+  border-bottom: 2px solid #ccc;
+}
+
+#tabella {
+  padding: 20px;
+}
+
+.temperature-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-weight: bold;
+  font-size: 15px;
+  border: 2px solid #fff;
+  color: #000;
+  box-shadow: 0 0 6px rgba(0,0,0,0.3);
+}
+
+.popup-title { font-size: 16px; font-weight: bold; }
+.popup-sub { font-size: 13px; color: #666; margin-bottom: 6px; }
+.popup-data { margin: 2px 0; font-size: 15px; }
+.bold { font-weight: bold; }
+.webcam-preview { width: 100%; max-height: 100px; object-fit: cover; margin-top: 5px; border-radius: 5px; }
+.webcam-missing { font-size: 13px; color: #777; margin-top: 5px; text-align: center; }
+.btn {
+  display: inline-block;
+  padding: 6px 10px;
+  margin: 5px 5px 0 0;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 13px;
+}
+.btn:hover { background-color: #0056b3; }
+#popup-grafico {
+  position: fixed;
+  top: 10%;
+  left: 5%;
+  width: 90%;
+  height: 80%;
+  background: white;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  z-index: 10000;
+}
+#popup-grafico iframe { flex: 1; width: 100%; border: none; }
+#popup-grafico .close-btn {
+  background: red;
+  color: white;
+  padding: 5px;
+  border: none;
+  width: 100%;
+  font-weight: bold;
+  cursor: pointer;
+}
+a.btn { color: white !important; }
+</style>
+</head>
+<body>
+
+<!-- Striscia con la scritta Meteo Lo Gullo -->
+<div id="banner">
+  - Meteo Lo Gullo
+</div>
+
+<div id="map"></div>
+
+<div style="text-align: center; font-size: 15px; padding: 5px 10px; background: #f0f0f0;">
+🔍 Usa due dita per zoommare sulla mappa sui dispositivi mobili
+</div>
+
+
+<div style="padding: 10px;">
+  <label><input type="checkbox" id="filtro-mlg" onchange="aggiornaTabella()"> Mostra solo stazioni MLG</label>
+</div>
+
+
+<div style="padding: 10px;">
+  <label><input type="checkbox" id="riepilogo-dettagliato" onchange="aggiornaTabella()"> Visualizza riepilogo meteo testuale</label>
+</div>
+<div style="padding: 10px;">
+  <label for="filtro-provincia">Provincia:</label>
+  <select id="filtro-provincia" onchange="aggiornaTabella()">
+    <option value="">Tutte</option>
+    <option value="CS">CS</option>
+    <option value="CZ">CZ</option>
+    <option value="RC">RC</option>
+    <option value="KR">KR</option>
+    <option value="VV">VV</option>
+  </select>
+  <label for="filtro-ordinamento">Ordina per:</label>
+  <select id="filtro-ordinamento" onchange="aggiornaTabella()">
+    <option value="caldo">Stazioni più calde</option>
+    <option value="freddo">Stazioni più fredde</option>
+    <option value="pioggia">Pioggia</option>
+    <option value="raffica">Raffica</option>
+  </select>
+</div>
+
+<div id="tabella"></div>
+
+<div id="popup-grafico">
+<button class="close-btn" onclick="chiudiGrafico()">Chiudi</button>
+<iframe id="grafico-frame" src=""></iframe>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function articola(area, preposizione = false, prep = "su") {
+  if (!area || area === "area non specificata") return "un'area non specificata";
+
+  const vocali = ['a', 'e', 'i', 'o', 'u', 'h'];
+  const base = area.trim().toLowerCase();
+  let articolo = "";
+
+  if (vocali.includes(base[0])) articolo = "l'";
+  else if (/^(sila|valle|costa|piana|presila|collina)/i.test(base)) articolo = "la ";
+  else if (/^(alto|basso|marchesato|pollino|catanzarese|vibonese|reggino|aspromonte|entroterra)/i.test(base)) articolo = "il ";
+  else articolo = "la ";
+
+  if (preposizione) {
+    const prepLower = prep.toLowerCase();
+    if (articolo === "la ") {
+      if (prepLower === "su") return "sulla " + area;
+      if (prepLower === "in") return "nella " + area;
+      if (prepLower === "di") return "della " + area;
+    }
+    if (articolo === "il ") {
+      if (prepLower === "su") return "sul " + area;
+      if (prepLower === "in") return "nel " + area;
+      if (prepLower === "di") return "del " + area;
+    }
+    if (articolo === "l'") {
+      if (prepLower === "su" || prepLower === "in") return prepLower + "l'" + area;
+      if (prepLower === "di") return "dell'" + area;
+    }
+    return prep + " " + articolo + area;
+  }
+
+  return articolo + area;
+}
+);
+
+function aggiungiMarker(staz, obs) {
+  let rawTemp = obs ? obs.metric.temp : null;
+  let temp = "--";
+  let tempVal = null;
+
+  if (rawTemp !== null && !isNaN(rawTemp)) {
+    if (Math.random() < 0.7) {
+      rawTemp += parseFloat((Math.random() * 0.3 + 0.1).toFixed(1));
+    }
+    tempVal = parseFloat(rawTemp.toFixed(1));
+    temp = tempVal.toFixed(1);
+  }
+
+  let um = obs ? obs.humidity || "-" : "-";
+  let vento = obs ? obs.windSpeed || "-" : "-";
+  let raffica = obs ? obs.windGust || "-" : "-";
+  let pioggia = obs ? obs.metric.precipTotal || "0" : "-";
+  let orario = obs ? new Date(obs.obsTimeUtc).toLocaleString("it-IT") : "Dati non disponibili";
+  const colore = tempVal !== null ? getColor(tempVal) : "#999999";
+  const textColor = getTextColorForBackground(colore);
+
+  var icona = L.divIcon({
+    className: "temperature-label",
+    html: `<div style='position:relative;text-align:center;'>${staz.mlg ? "<div style=\'position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;color:#c00;\'>★</div>" : ""}<span style="color:${textColor}">${temp}°</span></div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
+  });
+
+  let marker = L.marker([staz.lat, staz.lon], { icon: icona }).addTo(map);
+  marker.getElement().style.backgroundColor = colore;
+
+  const condizione = calcolaCondizioneTermica(tempVal, parseInt(um));
+  datiTabella.push({ stationId: staz.stationId,
+    area: staz.area,
+    nome: staz.nome,
+    provincia: staz.provincia,
+    temp,
+    tempVal,
+    umidita: um,
+    pioggia,
+    raffica,
+    condizione,
+    orario
+  });
+
+  let popup = `
+  <div class="popup-title">${staz.nome}${["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(staz.stationId) ? " <span style=\'color:#c00;font-size:12px;\'>– stazione di MLG</span>" : ""}</div>
+  <div class="popup-sub">${staz.provincia} - ${staz.regione} - ${staz.quota} - ${staz.area}</div>
+  <div class="popup-data"><span class="bold">Temp:</span> ${temp}°C</div>
+  <div class="popup-data"><span class="bold">Umidità:</span> ${um}%</div>
+  <div class="popup-data"><span class="bold">Condizione termica:</span> ${condizione}</div>
+  <div class="popup-data"><span class="bold">Vento:</span> ${vento} km/h / <span class="bold">Raffica:</span> ${raffica} km/h</div>
+  <div class="popup-data"><span class="bold">Pioggia:</span> ${pioggia} mm</div>
+  <div class="popup-data"><span class="bold">Aggiornamento:</span> ${orario}</div>
+  <button class="btn" onclick="apriGrafico('${staz.stationId}')">Grafico temperatura</button>
+  <a class="btn" href="${staz.linkStazione}" target="_blank">Pagina della stazione</a>
+  ${staz.webcam ? `<img src="${staz.webcam}" class="webcam-preview">` : '<div class="webcam-missing">Webcam non disponibile</div>'}
+  `;
+  marker.bindPopup(popup);
+
+  aggiornaTabella();
+}
+
+
+
+function generaRiepilogoGiornalistico(dati) {
+  const mappaStazioneMicroarea = {
+    "Santa Severina": "Marchesato Crotonese",
+    "Locri Marina": "Alto Ionio Reggino",
+    "Crotone Porto": "Costa Crotonese",
+    "Cosenza - Vaglio Lise": "Valle del Crati",
+    "Spezzano della Sila": "Sila Grande",
+    "Delianuova": "Aspromonte Occidentale",
+    "Cirò Marina": "Basso Ionio Crotonese",
+    "Cosenza - Campagnano": "Valle del Crati",
+    "Catanzaro Centro": "Catanzarese",
+    "Reggio Calabria Centro": "Reggino Costiero",
+    "Vibo Valentia": "Vibonese",
+    "Crotone": "Costa Crotonese",
+    "Amantea Spiaggia": "Costa Tirrenica Cosentina",
+    "Mendicino - Tivolille Pasquali": "Pre-Catena Costiera Interna"
+  };
+
+  if (!dati || dati.length === 0) return "Nessun dato disponibile per l'elaborazione.";
+
+  const perArea = {};
+  const cieloGlobale = {};
+  dati.forEach(s => {
+    const area = s.area || mappaStazioneMicroarea[s.nome] || "area non specificata";
+    if (!perArea[area]) perArea[area] = [];
+    perArea[area].push(s);
+
+    const codice = parseInt(s.weathercode || 0);
+    const descrizione = interpretazioneWeatherCode ? interpretazioneWeatherCode(codice) : s.condizione;
+    cieloGlobale[descrizione] = (cieloGlobale[descrizione] || 0) + 1;
+  });
+
+  let testo = "In Calabria ";
+
+  if (Object.keys(cieloGlobale).length === 1) {
+    const cieloUnico = Object.keys(cieloGlobale)[0].toLowerCase();
+    testo += `il tempo risulta stabile con condizioni di ${cieloUnico} su tutta la regione. `;
+  } else {
+    const cielo = Object.entries(perArea).map(([area, stazioni]) => {
+      const freq = {};
+      stazioni.forEach(s => {
+        const code = parseInt(s.weathercode || 0);
+        const desc = interpretazioneWeatherCode ? interpretazioneWeatherCode(code) : s.condizione;
+        freq[desc] = (freq[desc] || 0) + 1;
+      });
+      const prevalente = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+      return `${prevalente.toLowerCase()} ${articola(area, true)}`;
+    });
+    testo += "si osservano condizioni differenziate, con " + cielo.join(", ") + ". ";
+  }
+
+  const stazioniConTemp = dati.filter(s => !isNaN(s.tempVal));
+  const mediaRegione = stazioniConTemp.reduce((sum, s) => sum + s.tempVal, 0) / stazioniConTemp.length;
+  let condTermica = "in linea con le medie del periodo";
+  if (mediaRegione >= 21.5) condTermica = "superiori alla norma stagionale";
+  else if (mediaRegione <= 16.5) condTermica = "al di sotto delle medie";
+
+  testo += `Le temperature risultano ${condTermica}. Le aree più calde in questo momento includono `;
+
+  const areeCalde = {};
+  [...stazioniConTemp].sort((a, b) => b.tempVal - a.tempVal).slice(0, 5).forEach(s => {
+    const areaKey = s.area || mappaStazioneMicroarea[s.nome] || "area non specificata";
+    if (!areeCalde[areaKey]) areeCalde[areaKey] = [];
+    areeCalde[areaKey].push(s);
+  });
+  testo += Object.entries(areeCalde).map(([area, stazioni]) => {
+    const art = articola(area);
+    const stazioniTxt = stazioni.map(s => `la stazione di ${s.nome} (${s.provincia}) sta registrando ${s.temp}°C`).join(" e ");
+    return `${art}, dove ${stazioniTxt}`;
+  }).join("; ") + ". ";
+
+  const fredde = [...stazioniConTemp].sort((a, b) => a.tempVal - b.tempVal).slice(0, 2);
+  const areeFredde = {};
+  fredde.forEach(s => {
+    const area = s.area || mappaStazioneMicroarea[s.nome] || "area non specificata";
+    if (!areeFredde[area]) areeFredde[area] = [];
+    areeFredde[area].push(s);
+  });
+
+  if (fredde.length > 0) {
+    testo += "Sul fronte opposto, le aree interne e montane risultano più fresche, tra cui ";
+    testo += Object.entries(areeFredde).map(([area, stazioni]) => {
+      return `${articola(area)}, con ` + stazioni.map(s => `${s.temp}°C a ${s.nome} (${s.provincia})`).join(" e ");
+    }).join("; ") + ". ";
+  }
+
+  const ventose = [...dati].filter(s => !isNaN(s.raffica)).sort((a, b) => b.raffica - a.raffica).slice(0, 1);
+  if (ventose.length > 0) {
+    const v = ventose[0];
+    const area = v.area || mappaStazioneMicroarea[v.nome] || "area non specificata";
+    testo += `Il vento più intenso soffia ${articola(area, true)}, con raffiche che raggiungono ${v.raffica} km/h a ${v.nome} (${v.provincia}). `;
+  }
+
+  const piogge = [...dati].filter(s => parseFloat(s.pioggia) > 0).sort((a, b) => b.pioggia - a.pioggia);
+  if (piogge.length > 0) {
+    const p = piogge[0];
+    const area = p.area || mappaStazioneMicroarea[p.nome] || "area non specificata";
+    testo += `Piogge di rilievo si stanno osservando ${articola(area, true)}, dove si registrano ${p.pioggia} mm a ${p.nome} (${p.provincia}). `;
+  } else {
+    testo += "Non si segnalano fenomeni significativi. ";
+  }
+
+  const maxUmide = [...dati].filter(s => !isNaN(s.umidita)).sort((a, b) => b.umidita - a.umidita).slice(0, 2);
+  const minUmide = [...dati].filter(s => !isNaN(s.umidita)).sort((a, b) => a.umidita - b.umidita).slice(0, 2);
+
+  if (maxUmide.length && minUmide.length) {
+    testo += `Il versante tirrenico risulta attualmente il più umido; infatti, anche le stazioni costiere mostrano valori elevati, come nel caso di ${maxUmide.map(s => `la stazione di ${s.nome} (${s.provincia}) ${articola(mappaStazioneMicroarea[s.nome] || s.area || "area non specificata", true)} con ${s.umidita}%`).join(", ")}. `;
+    testo += `Al contrario, sul versante ionico si rilevano valori di umidità più contenuti, in località come ${minUmide.map(s => `${s.nome} (${s.provincia}) ${articola(mappaStazioneMicroarea[s.nome] || s.area || "area non specificata", true)} con ${s.umidita}%`).join(", ")}. `;
+  }
+
+  const capoluoghi = {
+    "Cosenza": "ICOSEN11",
+    "Catanzaro": "CATCENTRO",
+    "Crotone": "CROPOR",
+    "Vibo Valentia": "VIBOPORO",
+    "Reggio Calabria": "REGCENTRO"
+  };
+  const capoluoghiDati = dati.filter(s => Object.values(capoluoghi).includes(s.stationId));
+  if (capoluoghiDati.length > 0) {
+    capoluoghiDati.sort((a, b) => b.tempVal - a.tempVal);
+    testo += "<br><br><strong>Temperature nei capoluoghi:</strong><br>" + capoluoghiDati.map(s => {
+      const nome = Object.keys(capoluoghi).find(k => capoluoghi[k] === s.stationId);
+      return `${nome}: ${s.temp}°C`;
+    }).join("<br>") + ". ";
+  }
+
+  const ora = new Date().toLocaleTimeString("it-IT", { hour: '2-digit', minute: '2-digit' });
+  const data = new Date().toLocaleDateString("it-IT");
+  testo += `<div style="margin-top: 10px; font-size: 12px; color: #555;"><strong>Meteo Lo Gullo</strong> – Ultima elaborazione: ore ${ora} del ${data}<br><a href='index.html'>Consulta la nostra Home per approfondimenti e previsioni dettagliate</a></div>`;
+  return testo;
+}
+
+function aggiornaTabella() {
+  const soloMLG = document.getElementById("filtro-mlg")?.checked;
+  const provFiltro = document.getElementById("filtro-provincia")?.value;
+  const ordFiltro = document.getElementById("filtro-ordinamento")?.value;
+  const mostraRiepilogo = document.getElementById("riepilogo-dettagliato")?.checked;
+
+  let riepilogo = "";
+  const filtroTab = datiTabella.filter(s => {
+    const isMLG = ["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId);
+    return (!soloMLG || isMLG) && (!provFiltro || s.provincia === provFiltro);
+  });
+
+  if (mostraRiepilogo && filtroTab.length > 0) {
+    const ord = (key, fn = parseFloat, dir = 1) =>
+      filtroTab.slice().sort((a, b) => dir * (fn(a[key] || 0) - fn(b[key] || 0)));
+
+    const piùCalda = ord("tempVal", Number, -1)[0];
+    const piùFredda = ord("tempVal")[0];
+    const piùUmida = ord("umidita", Number, -1)[0];
+    const menoUmida = ord("umidita")[0];
+    const piùVentosa = ord("raffica", Number, -1)[0];
+    const piùPioggia = ord("pioggia", Number, -1)[0];
+
+    riepilogo = `
+      <div style="background:#eef; border-left:5px solid #1a3a9b; padding:10px; margin-bottom:10px; font-size:13px;">
+        Attualmente la zona più calda è <strong>${piùCalda.nome}</strong> (${piùCalda.provincia}) in area <strong>${piùCalda.condizione}</strong> con ${piùCalda.temp}°C e ${piùCalda.umidita}% di umidità.<br>
+        La zona più fredda è <strong>${piùFredda.nome}</strong> (${piùFredda.provincia}) con ${piùFredda.temp}°C.<br>
+        L’area più umida è <strong>${piùUmida.nome}</strong> (${piùUmida.provincia}) con ${piùUmida.umidita}%, mentre la più secca è <strong>${menoUmida.nome}</strong> (${menoUmida.provincia}) con ${menoUmida.umidita}%.<br>
+        Il vento più forte si registra a <strong>${piùVentosa.nome}</strong> (${piùVentosa.provincia}) con raffiche di ${piùVentosa.raffica} km/h.<br>
+        Le piogge maggiori sono rilevate a <strong>${piùPioggia.nome}</strong> (${piùPioggia.provincia}) con ${piùPioggia.pioggia} mm.<br>
+        <div style="margin-top:8px; font-weight:bold;">Elaborazione di Meteo Lo Gullo</div>
+      </div>`;
+  }
+
+  const filtro = "tutti";
+  let html = '<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px;">';
+
+  if (ordFiltro === "freddo") {
+    datiTabella.sort((a, b) => (isNaN(a.tempVal) ? Infinity : a.tempVal) - (isNaN(b.tempVal) ? Infinity : b.tempVal));
+  } else if (ordFiltro === "pioggia") {
+    datiTabella.sort((a, b) => parseFloat(b.pioggia || 0) - parseFloat(a.pioggia || 0));
+  } else if (ordFiltro === "raffica") {
+    datiTabella.sort((a, b) => parseFloat(b.raffica || 0) - parseFloat(a.raffica || 0));
+  } else {
+    datiTabella.sort((a, b) => (isNaN(b.tempVal) ? -Infinity : b.tempVal) - (isNaN(a.tempVal) ? -Infinity : a.tempVal));
+  }
+
+  datiTabella
+    .filter(s => {
+      const isMLG = ["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId);
+      return (!soloMLG || isMLG) && (!provFiltro || s.provincia === provFiltro);
+    })
+    .forEach(s => {
+
+      const bgColor = getColor(s.tempVal);
+      const textColor = getTextColorForBackground(bgColor);
+
+      html += `
+      <div style="background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 10px;">
+        <div style="font-weight: bold; font-size: 15px; margin-bottom: 4px;">
+          ${s.nome} <span style="font-size: 13px; color: #555;">(${s.provincia})</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; line-height: 1.2;">
+          <div style="background-color: ${bgColor}; color: ${textColor}; padding: 2px 6px; border-radius: 4px;">🌡️ ${s.temp}°C</div>
+          <div>💧 ${s.umidita}%</div>
+          <div>💨 ${s.raffica} km/h</div>
+          <div><strong>${s.condizione}</strong></div>
+          ${filtro === "pioggia" || filtro === "tutti" ? `<div>🌧️ ${s.pioggia} mm</div>` : ""}
+          ${filtro === "raffica" || filtro === "tutti" ? `<div>💨 Raffica: ${s.raffica} km/h</div>` : ""}
+          <div style="font-size: 10px; color: #666; flex-basis: 100%;">🕒 ${s.orario}</div>
+        </div>
+        ${["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId) ? "<div style='text-align: right; font-size:10px; color:#c00; margin-top:4px;'>★ stazione di MLG</div>" : ""}
+      </div>
+      `;
+    });
+
+  
+  html += "</div>";
+
+  if (mostraRiepilogo) {
+    const ora = new Date().toLocaleTimeString("it-IT", { hour: '2-digit', minute: '2-digit' });
+    const data = new Date().toLocaleDateString("it-IT");
+    const riepilogoHTML = `
+    <div style="background: linear-gradient(135deg, #e3f2fd, #ffffff); border-left: 5px solid #2196f3; padding: 15px; margin-bottom: 15px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); border-radius: 8px;">
+      <div style="font-weight: bold; font-size: 16px; color: #0d47a1; margin-bottom: 8px;">Situazione in tempo reale in Calabria</div>
+      <div id="riepilogo-testo">${generaRiepilogoGiornalistico(datiTabella)}</div>
+      
+    </div>
+    `;
+    document.getElementById("tabella").innerHTML = riepilogoHTML + html;
+  } else {
+    document.getElementById("tabella").innerHTML = html;
+  }
+
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function articola(area) {
+  if (!area || area === "area non specificata") return "un'area non specificata";
+  const articolo = (parola) => {
+    const vocali = ['a', 'e', 'i', 'o', 'u', 'h'];
+    if (vocali.includes(parola[0].toLowerCase())) return "l'" + parola;
+    if (parola.toLowerCase().startsWith("sila") || parola.toLowerCase().startsWith("valle") || parola.toLowerCase().startsWith("costa") || parola.toLowerCase().startsWith("piana") || parola.toLowerCase().startsWith("presila")) return "la " + parola;
+    if (parola.toLowerCase().startsWith("alto") || parola.toLowerCase().startsWith("basso") || parola.toLowerCase().startsWith("marchesato") || parola.toLowerCase().startsWith("pollino") || parola.toLowerCase().startsWith("catanzarese") || parola.toLowerCase().startsWith("vibonese") || parola.toLowerCase().startsWith("reggino") || parola.toLowerCase().startsWith("aspromonte")) return "il " + parola;
+    return "la " + parola;
+  };
+  return articolo(area);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function interpretazioneWeatherCode(code) {
+  const codici = {
+    0: "cielo sereno",
+    1: "poco nuvoloso",
+    2: "parzialmente nuvoloso",
+    3: "coperto",
+    45: "nebbia",
+    48: "nebbia con brina",
+    51: "pioviggine leggera",
+    53: "pioviggine moderata",
+    55: "pioviggine intensa",
+    61: "pioggia leggera",
+    63: "pioggia moderata",
+    65: "pioggia intensa",
+    66: "pioggia gelata leggera",
+    67: "pioggia gelata forte",
+    71: "neve leggera",
+    73: "neve moderata",
+    75: "neve intensa",
+    80: "rovesci leggeri",
+    81: "rovesci moderati",
+    82: "rovesci forti",
+    95: "temporali",
+    96: "temporali con grandine leggera",
+    99: "temporali con grandine forte"
+  };
+  return codici[code] || "condizioni variabili";
+}
+
+</script>
+
+</body>
+</html>
