@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Popola Firebase Meteo</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDasXnVu7uIEjpwtQ-XbVilREGmAZSBjVE",
+      authDomain: "meteo-estremami.firebaseapp.com",
+      projectId: "meteo-estremami",
+      storageBucket: "meteo-estremami.appspot.com",
+      messagingSenderId: "469441159034",
+      appId: "1:469441159034:web:b687adef4a7a742499c0c3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const stazioni = [
+      "ICOSEN11", "IAMANT6", "ICELIC1", "ICOSEN20", "IMENDI13", "ICASAL40",
+      "CATCENTRO", "REGCENTRO", "ROSSCENTRO", "VIBOPORO", "LOCRIMARINA", "SGFIORE"
+    ];
+
+    async function popolaDati() {
+      const now = new Date();
+      for (let i = 0; i < stazioni.length; i++) {
+        const t = Math.random() * 25 + 5; // Temperatura tra 5 e 30
+        const u = Math.floor(Math.random() * 50 + 40); // Umidità tra 40 e 90
+        const p = Math.random() < 0.2 ? (Math.random() * 10).toFixed(1) : 0; // Pioggia
+        const r = Math.floor(Math.random() * 30); // Raffica
+        await addDoc(collection(db, "osservazioni"), {
+          stationId: stazioni[i],
+          temperatura: parseFloat(t.toFixed(1)),
+          umidita: u,
+          pioggia: parseFloat(p),
+          raffica: r,
+          timestamp: Timestamp.fromDate(now)
+        });
+        console.log("Dati salvati per:", stazioni[i]);
+      }
+      alert("Dati inseriti su Firebase!");
+    }
+
+    window.onload = popolaDati;
+  </script>
+</head>
+<body>
+  <h2>Popolamento dati meteo in corso...</h2>
+</body>
+</html>
