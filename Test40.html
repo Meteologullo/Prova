@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Test Estremi Firestore</title>
+  <style>#map { height: 100vh; }</style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA7Q5giCKKXZdrGFHa4PShKvD7oO_vVm58",
+      authDomain: "meteo-estremami.firebaseapp.com",
+      projectId: "meteo-estremami"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const map = L.map("map").setView([39, 16.5], 8);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap"
+      }).addTo(map);
+
+      const snap = await getDocs(collection(db, "osservazioni"));
+      snap.forEach((doc) => {
+        const data = doc.data();
+        console.log("Dati ricevuti:", data);
+
+        if (!data.latitudine || !data.longitudine) return;
+
+        const popup = `
+          <b>Stazione:</b> ${data.stationId || '--'}<br>
+          <b>Temperatura:</b> ${data.temperatura ?? '--'} °C<br>
+          <b>Massima:</b> ${data.massima ?? '--'} °C<br>
+          <b>Minima:</b> ${data.minima ?? '--'} °C<br>
+          <b>Umidità:</b> ${data.umidita ?? '--'}%<br>
+          <b>Pioggia:</b> ${data.pioggia ?? '--'} mm<br>
+          <b>Raffica:</b> ${data.raffica ?? '--'} km/h<br>
+        `;
+
+        const marker = L.marker([data.latitudine, data.longitudine]).addTo(map);
+        marker.bindPopup(popup);
+      });
+    });
+  </script>
+</head>
+<body>
+  <div id="map"></div>
+</body>
+</html>
