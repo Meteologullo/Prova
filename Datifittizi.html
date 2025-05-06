@@ -1,0 +1,70 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Anteprima Meteo Funzionante</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+    #contenitore-inferiore { position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid #ccc; max-height: 400px; overflow-y: auto; transition: all 0.3s ease; }
+    #contenitore-inferiore.aperto { max-height: 90vh; }
+    #card-preview-wrapper { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .card.compact-extreme { display: flex; justify-content: space-between; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 10px 14px; font-weight: bold; }
+    .card .valore { color: #c00; }
+    #anteprima-toggle { position: fixed; bottom: 0; left: 0; right: 0; background: #007bff; color: white; text-align: center; padding: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div id="anteprima-toggle" onclick="scrollaInBasso()">Apri Anteprima</div>
+
+<div id="contenitore-inferiore">
+  <div id="card-preview-wrapper"></div>
+</div>
+
+<script>
+const stazioni = [
+  { stationId: "STAZ1", nome: "Cosenza Centro", provincia: "CS", mlg: true },
+  { stationId: "STAZ2", nome: "Catanzaro Lido", provincia: "CZ", mlg: true },
+  { stationId: "STAZ3", nome: "Reggio Calabria", provincia: "RC", mlg: false },
+  { stationId: "STAZ4", nome: "Vibo Marina", provincia: "VV", mlg: false }
+];
+
+const datiTabella = [
+  { stationId: "STAZ1", temp: 28.3, tempVal: 28.3 },
+  { stationId: "STAZ2", temp: 27.1, tempVal: 27.1 },
+  { stationId: "STAZ3", temp: 29.5, tempVal: 29.5 },
+  { stationId: "STAZ4", temp: 30.2, tempVal: 30.2 }
+];
+
+function aggiornaTabella() {
+  const wrapper = document.getElementById("card-preview-wrapper");
+  wrapper.innerHTML = "";
+
+  datiTabella.forEach(d => {
+    const staz = stazioni.find(s => s.stationId === d.stationId);
+    if (!staz) return;
+
+    const card = document.createElement("div");
+    card.className = "card compact-extreme";
+    card.innerHTML = `
+      <span class="nome">${staz.nome}</span>
+      <span class="valore">${d.temp}°</span>
+    `;
+    wrapper.appendChild(card);
+  });
+
+  console.log(`Card generate: ${datiTabella.length}`);
+}
+
+function scrollaInBasso() {
+  const contenitore = document.getElementById("contenitore-inferiore");
+  contenitore.classList.toggle("aperto");
+  if (contenitore.classList.contains("aperto")) {
+    aggiornaTabella();
+  }
+}
+</script>
+
+</body>
+</html>
