@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Meteo Lo Gullo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="stile.css">
+  <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet"/>
+  <link href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" rel="stylesheet"/>
+</head>
+<body>
+  <div id="banner">- Meteo Lo Gullo</div>
+  <div id="sidebar">
+    <button class="sidebar-btn" onclick="visualizzaAttuali()">T°C</button>
+    <button class="sidebar-btn" onclick="visualizzaEstremi('max')">MAX</button>
+    <button class="sidebar-btn" onclick="visualizzaEstremi('min')">MIN</button>
+    <button class="sidebar-btn" onclick="visualizzaUmidita()">UR%</button>
+    <button class="sidebar-btn" onclick="visualizzaRaffiche()">RAF</button>
+    <button class="sidebar-btn" onclick="visualizzaPioggia()">MM</button>
+  </div>
+  <div id="map"></div>
+  <div id="tabella"></div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
