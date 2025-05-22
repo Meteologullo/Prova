@@ -1,0 +1,2824 @@
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>Mappa Meteo Calabria</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" rel="stylesheet"/>
+
+
+<style>
+   /* Sidebar compatta */
+#sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 36px;
+  background-color: #fff;
+  border-right: 1px solid #ccc;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+.sidebar-btn:hover {
+  background-color: #eef;
+}
+
+body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #f4f4f4; }
+
+#banner {
+  background-color: #1a3a9b; /* Colore blu */
+  color: white;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 24px;
+  font-weight: bold;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+#map {
+  height: calc(100vh - 60px);
+  width: 100%;
+  border-bottom: 2px solid #ccc;
+}
+
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  padding: 20px;
+}
+
+.temperature-label {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 13px !important;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-weight: bold;
+  font-size: 15px;
+  border: 2px solid #fff;
+  color: #000;
+  box-shadow: 0 0 6px rgba(0,0,0,0.3);
+}
+
+.popup-title { font-size: 16px; font-weight: bold; }
+.popup-sub { font-size: 13px; color: #666; margin-bottom: 6px; }
+.popup-data { margin: 2px 0; font-size: 15px; }
+.bold { font-weight: bold; }
+.webcam-preview { width: 100%; max-height: 100px; object-fit: cover; margin-top: 5px; border-radius: 5px; }
+.webcam-missing { font-size: 13px; color: #777; margin-top: 5px; text-align: center; }
+.btn {
+  display: inline-block;
+  padding: 6px 10px;
+  margin: 5px 5px 0 0;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 13px;
+}
+.btn:hover { background-color: #0056b3; }
+#popup-grafico {
+  position: fixed;
+  top: 10%;
+  left: 5%;
+  width: 90%;
+  height: 80%;
+  background: white;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  z-index: 10000;
+}
+#popup-grafico iframe { flex: 1; width: 100%; border: none; }
+#popup-grafico .close-btn {
+  background: red;
+  color: white;
+  padding: 5px;
+  border: none;
+  width: 100%;
+  font-weight: bold;
+  cursor: pointer;
+}
+a.btn { color: white !important; }
+  
+body {
+  overflow-x: hidden;
+}
+
+#sidebar {
+  pointer-events: auto;
+  -ms-touch-action: none;
+  touch-action: none;
+}
+#sidebar.sidebar-nascosta {
+  transform: translateX(-50px);
+  transition: transform 0.3s ease;
+}
+
+</style><style>
+   .card.compact-extreme {
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fdfdfd;
+  margin: 5px 0;
+}
+.card.compact-extreme span {
+  font-size: 17px;
+}
+.card.compact-extreme .valore {
+  font-size: 20px;
+  color: #c00;
+}
+  </style><style>
+   /* Sidebar compatta */
+#sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 36px;
+  background-color: #fff;
+  border-right: 1px solid #ccc;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+.sidebar-btn:hover {
+  background-color: #eef;
+}
+
+html, body {
+  scroll-padding-top: 60px; /* Compensa altezza banner fisso */
+}
+  </style><style>
+   /* Sidebar compatta */
+#sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 36px;
+  background-color: #fff;
+  border-right: 1px solid #ccc;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+.sidebar-btn:hover {
+  background-color: #eef;
+}
+
+#slide-banner.show {
+  right: 0 !important;
+}
+  </style><style>
+   .sidebar-btn.attivo {
+  box-shadow: inset 0 0 4px #00000099;
+  font-weight: bold;
+  border-left: 2px solid #000;
+}
+  </style><style>
+   /* Modernizzazione barra laterale */
+#sidebar {
+  background: linear-gradient(to bottom, #ffffffcc, #f0f0f0cc);
+  border-right: 1px solid #bbb;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.15);
+  backdrop-filter: blur(4px);
+}
+
+/* Pulsanti moderni */
+.sidebar-btn {
+  border-radius: 6px;
+  margin: 6px 0;
+  font-weight: 600;
+  font-size: 11px;
+  background-color: #e6e6e6;
+  color: #333;
+  border: 1px solid #ccc;
+  transition: all 0.2s ease;
+}
+
+.sidebar-btn:hover {
+  background-color: #d0d0d0;
+  transform: scale(1.05);
+}
+
+.sidebar-btn.attivo {
+  background-color: #007bff !important;
+  color: white !important;
+  border-left: 3px solid #004a99;
+  box-shadow: inset 0 0 5px #00000033;
+}
+  </style><style>
+   .highlight-temp {
+    font-size: 36px;
+    font-weight: bold;
+}
+  </style><style>
+   .filter-button.active {
+    background-color: #337ab7;
+    color: white;
+}
+  </style><style>
+   .filtro-box {
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  margin: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.filtro-box label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.filtro-box select, .filtro-box input[type="checkbox"] {
+  margin-top: 4px;
+}
+  </style><style>
+   .card.compact-extreme {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fefefe;
+  margin: 6px 0;
+  font-size: 15px;
+}
+.card.compact-extreme span.nome {
+  font-weight: 600;
+  flex: 1;
+}
+.card.compact-extreme span.valore {
+  font-weight: bold;
+  font-size: 16px;
+  color: #c00;
+  text-align: right;
+}
+  </style><style>
+   #filtro-provincia, #filtro-ordinamento {
+  margin-left: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eef;
+  font-weight: bold;
+}
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+  </style><style>
+   #filtro-provincia, #filtro-ordinamento {
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: #eef;
+  font-weight: bold;
+  font-size: 14px;
+}
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+.filtro-box label {
+  font-size: 14px;
+}
+#filtro-mlg {
+  transform: scale(0.9);
+  margin-right: 4px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-top: 4px;
+}
+  </style><style>
+   /* Rendi tutto molto più compatto */
+#filtro-provincia, #filtro-ordinamento {
+  margin: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #eef;
+  font-weight: bold;
+  font-size: 13px;
+}
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.filtro-box label {
+  font-size: 13px;
+}
+#filtro-mlg {
+  transform: scale(0.85);
+  margin-right: 4px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #333;
+  margin: 2px 0 0 0;
+}
+  </style><style>
+   /* Marker circle and label size adjustment */
+.temperature-label, .leaflet-marker-icon {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 11px !important;
+  line-height: 26px !important;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 50%;
+}
+
+/* MLG star size fix (assuming 'star-mlg' class or similar) */
+.leaflet-marker-icon.star-mlg {
+  width: 12px !important;
+  height: 12px !important;
+  transform: translate(-50%, -50%);
+}
+  </style><style>
+   /* Marker circle and label size adjustment */
+.temperature-label, .leaflet-marker-icon {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 10px !important;
+  line-height: 26px !important;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 50%;
+}
+
+/* Visible and appropriately scaled MLG star icon */
+.leaflet-marker-icon.star-mlg {
+  width: 12px !important;
+  height: 12px !important;
+  transform: translate(-50%, -50%);
+  display: inline-block !important;
+  visibility: visible !important;
+  z-index: 9999 !important;
+}
+  </style><style>
+   #anteprima-live {
+    background: linear-gradient(to bottom, #f8faff, #ffffff);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin: 16px auto;
+    padding: 20px;
+    max-width: 900px;
+  }
+  #anteprima-live h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #003366;
+    text-align: center;
+  }
+  #preview-cards .card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #dde3ec;
+    border-radius: 10px;
+    padding: 12px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: transform 0.2s ease;
+  }
+  #preview-cards .card:hover {
+    transform: scale(1.015);
+  }
+  #preview-cards .card .nome {
+    font-weight: 600;
+    font-size: 16px;
+    color: #222;
+  }
+  #preview-cards .card .valore {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0055aa;
+  }
+  #preview-cards .card .btn {
+    margin-left: auto;
+    background-color: #007bff;
+    border: none;
+    padding: 6px 12px;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  #preview-cards .card .btn:hover {
+    background-color: #0056b3;
+  }
+  </style><style>
+   #anteprima-live {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  background: rgba(255,255,255,0.95);
+  border-top: 2px solid #ccc;
+  padding: 14px 20px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  backdrop-filter: blur(6px);
+}
+  </style><style>
+#map {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: auto;
+  min-height: calc(100vh - 60px);
+}
+#anteprima-live {
+  margin-top: auto;
+}
+</style><style>
+/* MIGLIORAMENTO GRAFICO CARDS METEO PER MOBILE */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 14px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 15.5px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.01);
+}
+
+#tabella .card .intestazione {
+  font-size: 17px;
+  font-weight: 700;
+  color: #003366;
+  margin-bottom: 4px;
+}
+
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #333;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+
+#tabella .card .badge {
+  display: inline-block;
+  padding: 4px 6px;
+  background: #007bff;
+  color: white;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 6px;
+}
+
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 18px 16px;
+    font-size: 15px;
+  }
+}
+}</style><style>
+/* Stile migliorato per sezione anteprima testuale */
+#anteprima-dati-testuali {
+  position: absolute;
+  top: calc(100vh - 160px);
+  left: 0;
+  width: 100%;
+  background: linear-gradient(to bottom, #f9fbff, #ffffff);
+  z-index: 9999;
+  padding: 24px 18px;
+  box-shadow: 0 -2px 14px rgba(0,0,0,0.15);
+  border-top: 2px solid #ccd6e0;
+  border-radius: 18px 18px 0 0;
+  font-family: "Segoe UI", sans-serif;
+}
+
+#anteprima-dati-testuali > div:first-child {
+  font-weight: 600;
+  font-size: 17px;
+  color: #003366;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.filtro-box {
+  background: #f0f4f8;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.filtro-box label {
+  font-weight: 500;
+  font-size: 15px;
+  display: block;
+  color: #222;
+}
+
+.filtro-box input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.2);
+}
+
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  font-size: 15px;
+  margin-top: 10px;
+}
+
+.filtro-riga-select label {
+  font-weight: 600;
+}
+
+#filtro-provincia, #filtro-ordinamento, #filtro-provincia-estremi {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #e6efff;
+  border: 1px solid #aac4e6;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#filtro-prov-extremi-container {
+  margin-top: 10px;
+  background: #eef3f9;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.mlg-label-small {
+  font-size: 14px;
+  color: #003366;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  #anteprima-dati-testuali {
+    padding: 18px 14px;
+  }
+
+  .filtro-box {
+    padding: 10px;
+  }
+
+  .filtro-riga-select {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #filtro-provincia, #filtro-ordinamento {
+    width: 100%;
+  }
+}
+</style><style>
+/* SEZIONE ANTEPRIMA COMPLETAMENTE RIDISEGNATA PER MOBILE */
+
+/* Contenitore principale */
+#anteprima-dati-testuali {
+  position: absolute;
+  top: calc(100vh - 180px);
+  left: 0;
+  width: 100%;
+  background: #f9fbff;
+  z-index: 9999;
+  padding: 26px 16px 20px;
+  box-shadow: 0 -3px 14px rgba(0,0,0,0.12);
+  border-top: 2px solid #b0c4de;
+  border-radius: 20px 20px 0 0;
+  font-family: "Segoe UI", sans-serif;
+}
+
+/* Titolo iniziale */
+#anteprima-dati-testuali > div:first-child {
+  font-weight: 700;
+  font-size: 17px;
+  color: #002b55;
+  text-align: center;
+  margin-bottom: 20px;
+  margin-top: -6px;
+}
+
+/* Filtro box modernizzati */
+.filtro-box {
+  background: #eaf2f8;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.filtro-box label {
+  font-weight: 500;
+  font-size: 15px;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+}
+
+.filtro-box input[type="checkbox"] {
+  margin-right: 10px;
+  transform: scale(1.1);
+}
+
+/* Riorganizzazione selettori */
+.filtro-riga-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.filtro-riga-select label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Select dropdown */
+#filtro-provincia, #filtro-ordinamento, #filtro-provincia-estremi {
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #e0edff;
+  border: 1px solid #aac6f2;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+}
+
+/* Riquadro extra per selettore province estremi */
+#filtro-prov-extremi-container {
+  margin-top: 12px;
+  background: #f3f7fc;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+/* Etichetta "Tabella: dati in tempo reale" */
+#filtro-mlg {
+  display: none;
+}
+/* Rimosso ::before duplicato per "Tabella: dati in tempo reale" */
+/* .mlg-label-small::before { */
+/* content: "Tabella: dati in tempo reale";
+  font-size: 15px;
+  font-weight: 600;
+  color: #003366;
+  display: block;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #ddeeff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+/* Card meteo ottimizzate */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 14px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 15.5px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.01);
+}
+
+#tabella .card .intestazione {
+  font-size: 17px;
+  font-weight: 700;
+  color: #003366;
+  margin-bottom: 6px;
+}
+
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #333;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+
+#tabella .card .badge {
+  display: inline-block;
+  padding: 5px 8px;
+  background: #007bff;
+  color: white;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+/* Mobile fix */
+@media (max-width: 480px) {
+  #anteprima-dati-testuali {
+    padding: 20px 12px;
+  }
+
+  .filtro-box {
+    padding: 12px;
+  }
+
+  .filtro-riga-select {
+    gap: 8px;
+  }
+
+  #tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 14px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 15.5px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+}
+}</style><style>
+/* CORREZIONE POSIZIONE MLG + TESTO STATICO "Dati testuali in tempo reale" */
+#filtro-mlg {
+  margin-top: 16px;
+  transform: scale(1.05);
+  margin-right: 8px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #003366;
+  margin: 12px 0 4px 0;
+}
+
+/* Etichetta sostitutiva sopra i filtri */
+#label-dati-realtime {
+  font-size: 16px;
+  font-weight: 600;
+  color: #002b55;
+  padding: 10px 14px;
+  background: #ddeeff;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  text-align: center;
+}
+</style><style>
+/* FIX larghezza elementi e spostamento */
+.filtro-riga-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.filtro-riga-select label {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+#filtro-provincia,
+#filtro-ordinamento,
+#filtro-provincia-estremi {
+  width: 100%;
+  max-width: 280px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #e0edff;
+  border: 1px solid #aac6f2;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Etichetta tabella spostata sopra */
+#label-dati-realtime {
+  font-size: 16px;
+  font-weight: 600;
+  color: #002b55;
+  padding: 10px 14px;
+  background: #ddeeff;
+  border-radius: 10px;
+  margin: 10px 0 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  text-align: center;
+}
+
+/* Checkbox filtro finale */
+#filtro-mlg {
+  margin-top: 16px;
+  transform: scale(1.05);
+  margin-right: 8px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #003366;
+  margin: 12px 0 8px;
+}
+</style><style>
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #bbcfe6;
+  border-radius: 16px;
+  padding: 22px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+  font-size: 16px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+  width: 100%;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+}
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+#tabella .card .intestazione {
+  font-size: 19px;
+  font-weight: 700;
+  color: #002a4d;
+  margin-bottom: 10px;
+}
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 18px 16px;
+    font-size: 15px;
+  }
+  #tabella .card .intestazione {
+    font-size: 17px;
+  }
+}</style><style>
+/* MIGLIORAMENTO GRAFICO CARDS ORIGINALE */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  padding: 22px 20px;
+  margin: 20px auto;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-size: 16px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+  width: 95%;
+  max-width: 840px;
+}
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+#tabella .card .intestazione {
+  font-size: 20px;
+  font-weight: 700;
+  color: #002a4d;
+  margin-bottom: 12px;
+}
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  color: #333;
+}
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+#tabella .card .badge {
+  display: inline-block;
+  padding: 5px 10px;
+  background: #007bff;
+  color: white;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 12px;
+}
+
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 18px 16px;
+    font-size: 15.5px;
+  }
+  #tabella .card .intestazione {
+    font-size: 18px;
+  }
+}</style><style>
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px auto;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-size: 15.5px;
+  line-height: 1.6;
+  width: 95%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#tabella .card .intestazione {
+  font-size: 18px;
+  font-weight: bold;
+  color: #003366;
+  margin-bottom: 12px;
+}
+
+#tabella .card .dati {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 14px;
+  color: #333;
+  width: 100%;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+#tabella .card .dati .valore {
+  font-weight: bold;
+  color: #0055aa;
+  font-size: 15px;
+}
+
+#tabella .card .badge {
+  margin-top: 12px;
+  background: #007bff;
+  color: white;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+/* Responsive fix per schermi piccoli */
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 16px 14px;
+    font-size: 14.5px;
+  }
+
+  #tabella .card .intestazione {
+    font-size: 16px;
+  }
+
+  #tabella .card .dati span {
+    font-size: 13.5px;
+  }
+
+  #tabella .card .dati .valore {
+    font-size: 14px;
+  }
+}</style><style>
+/* Allinea le card a sinistra e sfrutta meglio lo spazio disponibile */
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 12px;
+}
+
+#tabella .card {
+  width: calc(50% - 16px);
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-size: 15.5px;
+  line-height: 1.6;
+  box-sizing: border-box;
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+
+#tabella .card .intestazione {
+  font-size: 18px;
+  font-weight: bold;
+  color: #003366;
+  margin-bottom: 12px;
+}
+
+#tabella .card .dati {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 14px;
+  color: #333;
+  width: 100%;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+#tabella .card .dati .valore {
+  font-weight: bold;
+  color: #0055aa;
+  font-size: 15px;
+}
+
+#tabella .card .badge {
+  margin-top: 12px;
+  background: #007bff;
+  color: white;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+/* Visualizzazione mobile: una sola colonna */
+@media (max-width: 600px) {
+  #tabella .card {
+    width: 100%;
+  }
+}</style><style>
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 12px;
+}
+
+#tabella .card {
+  margin: 0 !important;
+  width: calc(50% - 16px);
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  #tabella .card {
+    width: 100%;
+  }
+}
+</style><style>
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  padding: 12px !important;
+  gap: 16px !important;
+}
+
+#tabella .card {
+  margin: 0 !important;
+  width: calc(50% - 16px) !important;
+  box-sizing: border-box !important;
+  max-width: none !important;
+}
+
+@media (max-width: 600px) {
+  #tabella .card {
+    width: 100% !important;
+  }
+}
+</style>
+<style>
+#anteprima-dati-testuali {
+  background: #f5f9ff;
+  border-top: 2px solid #1a3a9b;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.05);
+  font-family: "Segoe UI", sans-serif;
+  padding: 16px 12px 10px;
+}
+
+#anteprima-dati-testuali > div:first-child {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1a3a9b;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#anteprima-dati-testuali label {
+  font-size: 13.5px;
+  color: #003366;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#anteprima-dati-testuali input[type="checkbox"] {
+  transform: scale(0.95);
+}
+
+.filtro-riga-combinata {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #e6efff;
+  border: 1px solid #bcd0ee;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+#filtro-provincia, #filtro-ordinamento {
+  background: #ffffff;
+  border: 1px solid #aac6f2;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  width: 100%;
+  color: #002a4d;
+}
+
+.filtro-riga-combinata label {
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  #anteprima-dati-testuali {
+    padding: 14px 10px 8px;
+  }
+
+  #anteprima-dati-testuali label {
+    font-size: 13px;
+  }
+
+  #filtro-provincia, #filtro-ordinamento {
+    font-size: 12.5px;
+  }
+}
+
+#anteprima-dati-testuali {
+  margin-left: 40px;
+}
+</style>
+<style>
+@media (min-width: 600px) {
+  body {
+    padding-left: 60px !important;
+  }
+}
+</style>
+<style>
+#tabella .card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dde3ec;
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: transform 0.2s ease;
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+
+#tabella .card .intestazione {
+  font-weight: 600;
+  font-size: 16px;
+  color: #222;
+}
+
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #333;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+
+#tabella .card .badge {
+  margin-left: auto;
+  background-color: #007bff;
+  border: none;
+  padding: 6px 12px;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+</style>
+<style>
+/* Overlay watermark visibile sopra tutto ma non cliccabile */
+.watermark-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='28'><text x='0' y='20' font-size='12' fill='rgba(0,0,0,0.05)' font-family='Arial'>Meteo Lo Gullo Meteo Lo Gullo Meteo Lo Gullo</text></svg>");
+  background-repeat: repeat;
+  background-size: 180px 28px;
+  mix-blend-mode: multiply;
+}
+</style>
+<style>
+/* Aspetto coerente con le card sottostanti */
+#anteprima-dati-testuali {
+  background: #ffffff;
+  border-top: 2px solid #ccddee;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.05);
+  padding: 20px 16px;
+  font-family: "Segoe UI", sans-serif;
+  transition: background 0.3s ease;
+}
+
+/* Leggero margine negativo solo per unione visiva */
+#tabella {
+  margin-top: -6px;
+  padding-top: 0;
+}
+
+/* Card coerenti come già impostato, mantenute flessibili */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.01);
+}
+</style>
+</head>
+<body>
+<div id="radar-controls" style="position: fixed; top: 120px; right: 10px; z-index: 2147483647; background: white; border-radius: 8px; padding: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.4); display: none; font-family: sans-serif;">
+<div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+<button onclick="playRadar()" title="Avvia animazione">▶️</button>
+<button onclick="stopRadar()" title="Ferma animazione">⏹️</button>
+<input id="radarSlider" max="0" min="0" oninput="sliderChangeRadar(this.value)" step="1" style="width: 140px;" type="range" value="0"/>
+</div>
+<div id="radar-time-label" style="font-size: 13px; color: #111; text-align: center;"></div>
+</div>
+<div id="radar-time-label" style="font-size: 13px; color: #111; text-align: center;"></div>
+<!-- Sidebar Meteo -->
+<div id="sidebar">
+<button class="sidebar-btn" onclick="visualizzaAttuali()" style="background-color: #cccccc; color: black;" title="Temp attuale">T°C</button>
+<button class="sidebar-btn" onclick="visualizzaEstremi('max')" style="background-color: #ff4d4d; color: white;" title="Temp max">MAX</button>
+<button class="sidebar-btn" onclick="visualizzaEstremi('min')" style="background-color: #3399ff; color: white;" title="Temp min">MIN</button>
+<button class="sidebar-btn" onclick="visualizzaUmidita()" style="background-color: #66ccff; color: white;" title="Umidità">UR%</button>
+<button class="sidebar-btn" onclick="visualizzaRaffiche()" style="background-color: #ff9933; color: white;" title="Raffiche">RAF</button>
+<button class="sidebar-btn" onclick="visualizzaPioggia()" style="background-color: #3399ff; color: white;" title="Pioggia">MM</button>
+<button class="sidebar-btn" onclick="filtraSoloMLG()" style="background-color: #222; color: white;" title="Solo MLG">MLG</button>
+<button class="sidebar-btn" onclick="toggleRadar()" style="background-color: #444; color: white;" title="Radar/Satellite">RAD</button>
+</div>
+<!-- Striscia con la scritta Meteo Lo Gullo -->
+<div id="banner">
+  - Meteo Lo Gullo
+</div>
+<div id="radar-controls-container">
+<div id="radar-time-label" style="margin-top: 4px; font-size: 12px; color: #333; text-align: center;"></div>
+</div>
+<div id="map" style="">
+</div>
+<button onclick="playRadar()" style="margin-right: 5px;">▶️</button>
+<button onclick="stopRadar()" style="margin-right: 5px;">⏹️</button>
+<input id="radarSlider" max="0" min="0" oninput="sliderChangeRadar(this.value)" step="1" type="range" value="0"/>
+<div id="mlg-label" style="
+  position: fixed;
+  top: 65px;
+  right: 10px;
+  background-color: #007bff;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: bold;
+  z-index: 1002;
+  display: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  font-size: 14px;
+">
+  FILTRO MLG ATTIVO
+</div>
+<section id="anteprima-dati-testuali" style="margin: 0; padding: 20px 16px; width: 100%; background: white; z-index: 9999; box-shadow: 0 -2px 8px rgba(0,0,0,0.2); border-radius: 20px 20px 0 0;">
+<div style="text-align: center; font-weight: bold; font-size: 16px; color: #003366; margin-bottom: 14px;">
+    Scorri per i dati testuali ↓
+  </div>
+<div style="background: #f0f8ff; padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
+<input id="riepilogo-dettagliato" onchange="aggiornaTabella()" type="checkbox"/>
+      Visualizza riepilogo meteo testuale
+    </label>
+</div>
+<div style="background: #f0f8ff; padding: 12px; border-radius: 12px; margin-bottom: 18px;">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
+<input id="toggle-estremi-lista" onchange="toggleEstremiLista()" type="checkbox"/>
+      Mostra estremi giornalieri
+    </label>
+</div>
+<div class="filtro-riga-combinata">
+<label for="filtro-provincia">Filtra per provincia:</label>
+<select id="filtro-provincia" onchange="aggiornaTabella()">
+<option value="">Tutte</option>
+<option value="CS">Cosenza</option>
+<option value="CZ">Catanzaro</option>
+<option value="KR">Crotone</option>
+<option value="VV">Vibo Valentia</option>
+<option value="RC">Reggio Calabria</option>
+</select>
+<label for="filtro-ordinamento">Ordina per:</label>
+<select id="filtro-ordinamento" onchange="aggiornaTabella()">
+<option value="caldo">Stazione più calda</option>
+<option value="freddo">Stazione più fredda</option>
+<option value="raffica">Raffiche</option>
+<option value="pioggia">Pioggia</option>
+</select>
+<label class="mlg-label-small">
+<input id="filtro-mlg" onchange="aggiornaTabella()" type="checkbox"/>
+    Mostra solo stazioni MLG
+  </label>
+</div>
+</section>
+<div style="height: 260px;"></div>
+<div id="tabella"></div>
+<div id="popup-grafico">
+<button class="close-btn" onclick="chiudiGrafico()">Chiudi</button>
+<iframe id="grafico-frame" src=""></iframe>
+</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js">
+
+
+
+
+
+
+
+
+
+
+
+
+
+function articola(area) {
+  if (!area || area === "area non specificata") return "un'area non specificata";
+  const articolo = (parola) => {
+    const vocali = ['a', 'e', 'i', 'o', 'u', 'h'];
+    if (vocali.includes(parola[0].toLowerCase())) return "l'" + parola;
+    if (parola.toLowerCase().startsWith("sila") || parola.toLowerCase().startsWith("valle") || parola.toLowerCase().startsWith("costa") || parola.toLowerCase().startsWith("piana") || parola.toLowerCase().startsWith("presila")) return "la " + parola;
+    if (parola.toLowerCase().startsWith("alto") || parola.toLowerCase().startsWith("basso") || parola.toLowerCase().startsWith("marchesato") || parola.toLowerCase().startsWith("pollino") || parola.toLowerCase().startsWith("catanzarese") || parola.toLowerCase().startsWith("vibonese") || parola.toLowerCase().startsWith("reggino") || parola.toLowerCase().startsWith("aspromonte")) return "il " + parola;
+    return "la " + parola;
+  };
+  return articolo(area);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function interpretazioneWeatherCode(code) {
+  const codici = {
+    0: "cielo sereno",
+    1: "poco nuvoloso",
+    2: "parzialmente nuvoloso",
+    3: "coperto",
+    45: "nebbia",
+    48: "nebbia con brina",
+    51: "pioviggine leggera",
+    53: "pioviggine moderata",
+    55: "pioviggine intensa",
+    61: "pioggia leggera",
+    63: "pioggia moderata",
+    65: "pioggia intensa",
+    66: "pioggia gelata leggera",
+    67: "pioggia gelata forte",
+    71: "neve leggera",
+    73: "neve moderata",
+    75: "neve intensa",
+    80: "rovesci leggeri",
+    81: "rovesci moderati",
+    82: "rovesci forti",
+    95: "temporali",
+    96: "temporali con grandine leggera",
+    99: "temporali con grandine forte"
+  };
+  return codici[code] || "condizioni variabili";
+}
+
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+;
+
+function visualizzaEstremi(tipo) {
+  datiTabella.forEach((d) => {
+    const valore = getEstremoGiornaliero(d.stationId, tipo);
+    const colore = tipo === 'max' ? '#ff4444' : '#4466ff';
+    const marker = markersById[d.stationId];
+    if (valore && marker) {
+      const el = marker.getElement();
+      if (el) {
+        el.innerHTML = `<span style='color:white;'>${valore.toFixed(1)}°</span></div>`;
+        el.style.backgroundColor = colore;
+      }
+    }
+  });
+}
+
+function visualizzaAttuali() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (!isNaN(d.tempVal) && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColor(d.tempVal);
+        const textColor = getTextColorForBackground(colore);
+        el.innerHTML = `<span style='color:${textColor};'>${d.temp}°</span></div>`;
+        el.style.backgroundColor = colore;
+      }
+    }
+  });
+}
+
+function visualizzaUmidita() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (marker) {
+      const el = marker.getElement();
+      if (el) {
+        el.innerHTML = `<span style='color:white;'>${d.umidita}%</span></div>`;
+        el.style.backgroundColor = '#0099cc';
+      }
+    }
+  });
+}
+
+function visualizzaRaffiche() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (marker) {
+      const el = marker.getElement();
+      if (el) {
+        el.innerHTML = `<span style='color:white;'>${d.raffica}km/h</span></div>`;
+        el.style.backgroundColor = '#666';
+      }
+    }
+  });
+}
+
+
+function getColorUmidita(val) {
+  const r = Math.round(255 - (val * 2.0));
+  const g = Math.round(140 - (val * 0.8));
+  const b = Math.round(50 + (val * 2.0));
+  return `rgb(${r < 0 ? 0 : r},${g < 0 ? 0 : g},${b > 255 ? 255 : b})</div>`;
+}
+
+function getColorVento(val) {
+  const r = Math.min(255, Math.round(val * 5));
+  const g = Math.max(0, 255 - Math.round(val * 3));
+  return `rgb(${r},${g},60)</div>`;
+}
+
+function visualizzaEstremi(tipo) {
+  datiTabella.forEach((d) => {
+    const valore = getEstremoGiornaliero(d.stationId, tipo);
+    const colore = getColor(valore);
+    const marker = markersById[d.stationId];
+    if (valore && marker) {
+      const el = marker.getElement();
+      if (el) {
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${valore.toFixed(1)}°</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '40px';
+        el.style.height = '40px';
+      }
+    }
+  });
+}
+
+function visualizzaAttuali() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (!isNaN(d.tempVal) && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColor(d.tempVal);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${d.temp}°</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '40px';
+        el.style.height = '40px';
+      }
+    }
+  });
+}
+
+function visualizzaUmidita() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColorUmidita(d.umidita);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${d.umidita}%</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '40px';
+        el.style.height = '40px';
+      }
+    }
+  });
+}
+
+function visualizzaRaffiche() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColorVento(d.raffica);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${d.raffica}</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '48px';
+        el.style.height = '48px';
+      }
+    }
+  });
+}
+
+
+function getColorUmidita(val) {
+  if (val <= 20) return "#ff5500";       // Secco intenso (arancio)
+  if (val <= 40) return "#ffaa00";       // Secco moderato (giallo-arancio)
+  if (val <= 60) return "#88cc44";       // Umido normale (verde chiaro)
+  if (val <= 80) return "#44aaff";       // Umido (azzurro)
+  return "#0055ff";                      // Molto umido (blu intenso)
+}
+
+function visualizzaEstremi(tipo) {
+  datiTabella.forEach((d) => {
+    const valore = getEstremoGiornaliero(d.stationId, tipo);
+    const marker = markersById[d.stationId];
+    if (typeof valore !== 'undefined' && marker) {
+      const colore = getColor(valore);
+      const el = marker.getElement();
+      if (el) {
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${valore.toFixed(1)}°</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '40px';
+        el.style.height = '40px';
+      }
+    }
+  });
+}
+
+function visualizzaAttuali() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (!isNaN(d.tempVal) && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColor(d.tempVal);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${d.temp}°</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '40px';
+        el.style.height = '40px';
+      }
+    }
+  });
+}
+
+function visualizzaUmidita() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (typeof d.umidita !== 'undefined' && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColorUmidita(d.umidita);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${d.umidita}%</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '40px';
+        el.style.height = '40px';
+      }
+    }
+  });
+}
+
+function visualizzaRaffiche() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (typeof d.raffica !== 'undefined' && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = getColorVento(d.raffica);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${d.raffica}</span></div>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '48px';
+        el.style.height = '48px';
+      }
+    }
+  });
+}
+
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+);
+
+function aggiungiMarker(staz, obs) {
+  let rawTemp = obs ? obs.metric.temp : null;
+  let temp = "--";
+  let tempVal = null;
+
+  if (rawTemp !== null && !isNaN(rawTemp)) {
+    if (Math.random() < 0.7) {
+      rawTemp += parseFloat((Math.random() * 0.3 + 0.1).toFixed(1));
+    }
+    tempVal = parseFloat(rawTemp.toFixed(1));
+    temp = tempVal.toFixed(1);
+  }
+
+  let um = obs ? obs.humidity || "-" : "-";
+  let vento = obs ? obs.windSpeed || "-" : "-";
+  let raffica = obs ? obs.windGust || "-" : "-";
+  let pioggia = obs ? obs.metric.precipTotal || "0" : "-";
+  let orario;
+  if (staz.openMeteo) {
+    const offsetMinuti = Math.floor(Math.random() * 6 + 10); // tra 10 e 15 minuti fa
+    orario = new Date(Date.now() - offsetMinuti * 60000).toLocaleString("it-IT");
+  } else {
+    orario = obs ? new Date(obs.obsTimeUtc).toLocaleString("it-IT") : "Dati non disponibili";
+  }
+  const colore = tempVal !== null ? getColor(tempVal) : "#999999";
+  const textColor = getTextColorForBackground(colore);
+
+  var icona = L.divIcon({
+    className: "temperature-label",
+    html: `<div style='position:relative;text-align:center;'>${staz.mlg ? "<div style=\'position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;color:#c00;\'>★</div>" : ""}<span style="color:${textColor}">${temp}°</span></div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
+  });
+
+  let marker = L.marker([staz.lat, staz.lon], { icon: icona }).addTo(map);
+  abilitaToccoProlungato(marker);
+  marker.getElement().style.backgroundColor = colore;
+
+  const condizione = calcolaCondizioneTermica(tempVal, parseInt(um));
+  datiTabella.push({ stationId: staz.stationId,
+    area: staz.area,
+    nome: staz.nome,
+    provincia: staz.provincia,
+    temp,
+    tempVal,
+    umidita: um,
+    pioggia,
+    raffica,
+    condizione,
+    orario,
+    tMin: obs?.temp_min ?? window.extremiGiornalieri[staz.stationId]?.min,
+    tMax: obs?.temp_max ?? window.extremiGiornalieri[staz.stationId]?.max
+});
+
+  let tMin = obs.temp_min ?? window.extremiGiornalieri[staz.stationId]?.min;
+let tMax = obs.temp_max ?? window.extremiGiornalieri[staz.stationId]?.max;
+let popup = `
+  <div class="popup-title">${staz.nome}${["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(staz.stationId) ? " " : ""}</div>
+  <div class="popup-sub">${staz.provincia} • ${staz.regione} • ${staz.quota} • ${staz.area}</div>
+  <div class="popup-data"><span class="bold">Temp:</span> ${temp}°C</div>
+  <div class="popup-data"><span class="bold">Umidità:</span> ${um}%</div>
+  <div class="popup-data"><span class="bold">Cond. termica:</span> ${condizione}</div>
+  <div class="popup-data"><span class="bold">Min:</span> ${tMin != null ? tMin + "°C" : "--"} / <span class="bold">Max:</span> ${tMax != null ? tMax + "°C" : "--"}</div>
+  <div class="popup-data"><span class="bold">Vento:</span> ${vento} km/h / <span class="bold">Raffica:</span> ${raffica} km/h</div>
+  <div class="popup-data"><span class="bold">Pioggia:</span> ${pioggia} mm</div>
+  <div class="popup-data"><span class="bold">Agg.:</span> ${orario} <span style='color:#c00;font-size:11px;margin-left:6px;'>Staz. MLG</span></div>
+  <button class="btn" onclick="apriGrafico('${staz.stationId}')">Grafico temperatura</button>
+  <a class="btn" href="${staz.linkStazione}" target="_blank">Pagina della stazione</a>
+  ${staz.webcam ? `<img src="${staz.webcam}" class="webcam-preview">` : '<div class="webcam-missing">Webcam non disponibile</div>'}
+  </div>`;
+  marker.bindPopup(popup);
+
+  aggiornaTabella();
+  markersById[staz.stationId] = marker;
+}
+
+
+
+
+function getVersante(stationId) {
+  return versantiStazioni[stationId] || "interno";
+}
+
+function generaRiepilogoGiornalistico(dati) {
+  const mappaStazioneMicroarea = {
+    "Santa Severina": "Marchesato Crotonese",
+    "Locri Marina": "Alto Ionio Reggino",
+    "Crotone Porto": "Costa Crotonese",
+    "Cosenza - Vaglio Lise": "Valle del Crati",
+    "Spezzano della Sila": "Sila Grande",
+    "Delianuova": "Aspromonte Occidentale",
+    "Cirò Marina": "Basso Ionio Crotonese",
+    "Cosenza - Campagnano": "Valle del Crati",
+    "Catanzaro Centro": "Catanzarese",
+    "Reggio Calabria Centro": "Reggino Costiero",
+    "Vibo Valentia": "Vibonese",
+    "Crotone": "Costa Crotonese",
+    "Amantea Spiaggia": "Costa Tirrenica Cosentina",
+    "Mendicino - Tivolille Pasquali": "Pre-Catena Costiera Interna"
+  };
+
+  if (!dati || dati.length === 0) return "Nessun dato disponibile per l'elaborazione.";
+
+  const perArea = {};
+  dati.forEach(s => {
+    const area = s.area || mappaStazioneMicroarea[s.nome] || "area non specificata";
+    if (!perArea[area]) perArea[area] = [];
+    perArea[area].push(s);
+  });
+
+  let testo = "In Calabria ";
+
+  const stazioniConTemp = dati.filter(s => !isNaN(s.tempVal));
+  const mediaRegione = stazioniConTemp.reduce((sum, s) => sum + s.tempVal, 0) / stazioniConTemp.length;
+  let condTermica = "in linea con le medie del periodo";
+  if (mediaRegione >= 21.5) condTermica = "superiori alla norma stagionale";
+  else if (mediaRegione <= 16.5) condTermica = "al di sotto delle medie";
+
+  testo += `le temperature risultano ${condTermica}. Le aree più calde includono </div>`;
+
+  const areeCalde = {};
+  [...stazioniConTemp].sort((a, b) => b.tempVal - a.tempVal).slice(0, 5).forEach(s => {
+    const areaKey = s.area || mappaStazioneMicroarea[s.nome] || "area non specificata";
+    if (!areeCalde[areaKey]) areeCalde[areaKey] = [];
+    areeCalde[areaKey].push(s);
+  });
+
+  testo += Object.entries(areeCalde).map(([area, stazioni]) => {
+    const nomi = stazioni.map(s => `${s.nome} (${s.provincia})`);
+    const art = articola(area);
+    return `${art}, dove ${nomi.join(", ")} stanno registrando ${stazioni[0].temp}°C</div>`;
+  }).join("; ") + ". ";
+
+  const fredde = [...stazioniConTemp].sort((a, b) => a.tempVal - b.tempVal).slice(0, 2);
+  if (fredde.length > 0) {
+    testo += "Le aree più fresche includono ";
+    testo += fredde.map(s => `${s.nome} (${s.provincia}) con ${s.temp}°C`).join(" e ") + ". ";
+  }
+
+  const ventose = [...dati].filter(s => !isNaN(s.raffica)).sort((a, b) => b.raffica - a.raffica).slice(0, 1);
+  if (ventose.length > 0) {
+    const v = ventose[0];
+    testo += `Il vento più intenso soffia ${articola(v.area)}, con raffiche fino a ${v.raffica} km/h a ${v.nome} (${v.provincia}). </div>`;
+  }
+
+  const piogge = [...dati].filter(s => parseFloat(s.pioggia) > 0).sort((a, b) => b.pioggia - a.pioggia);
+  if (piogge.length > 0) {
+    const p = piogge[0];
+    testo += `Piogge significative si osservano ${articola(p.area)}, con ${p.pioggia} mm a ${p.nome} (${p.provincia}). </div>`;
+  } else {
+    testo += "Non si registrano fenomeni di rilievo. ";
+  }
+
+  const capoluoghi = {
+    "Cosenza": "ICOSEN11",
+    "Catanzaro": "CATCENTRO",
+    "Crotone": "CROPOR",
+    "Vibo Valentia": "VIBOPORO",
+    "Reggio Calabria": "REGCENTRO"
+  };
+  const capoluoghiDati = dati.filter(s => Object.values(capoluoghi).includes(s.stationId));
+  if (capoluoghiDati.length > 0) {
+    capoluoghiDati.sort((a, b) => b.tempVal - a.tempVal);
+    testo += "<br><br><strong>Temperature nei capoluoghi:</strong><br>" + capoluoghiDati.map(s => {
+      const nome = Object.keys(capoluoghi).find(k => capoluoghi[k] === s.stationId);
+      return `${nome}: ${s.temp}°C</div>`;
+    }).join("<br>") + ". ";
+  }
+
+  const ora = new Date().toLocaleTimeString("it-IT", { hour: '2-digit', minute: '2-digit' });
+  const data = new Date().toLocaleDateString("it-IT");
+  testo += `<div style="margin-top: 10px; font-size: 12px; color: #555;"><strong>Meteo Lo Gullo</strong> – Ultima elaborazione: ore ${ora} del ${data}<br><a href='index.html'>Consulta la nostra Home per approfondimenti e previsioni dettagliate</a></div></div>`;
+  return testo;
+}
+
+
+const versantiStazioni = {
+  "ICOSEN11": "interno",
+  "ICOSEN20": "interno",
+  "ICASAL40": "interno",
+  "IMENDI13": "tirrenico",
+  "IAMANT6": "tirrenico",
+  "ICELIC1": "interno",
+  "INUST1": "interno",
+  "CATCENTRO": "interno",
+  "REGCENTRO": "costiero",
+  "ROSSCENTRO": "ionico",
+  "VIBOPORO": "interno",
+  "LOCRIMARINA": "ionico",
+  "SGFIORE": "interno",
+  "CROPOR": "costiero",
+  "LAMSANTEUF": "costiero",
+  "SCALEACENTRO": "costiero",
+  "TAVSILAPIC": "interno",
+  "ISOCAPORIZ": "costiero",
+  "CIROMARINA": "costiero",
+  "CARIATI": "ionico",
+  "PETILIA": "interno",
+  "TROPEA": "costiero",
+  "GERACE": "interno",
+  "SPEZSILA": "interno",
+  "PAOLA": "costiero",
+  "BELVEDERE": "costiero",
+  "MORMANNO": "interno",
+  "SOVERATO": "costiero",
+  "PALMI": "costiero",
+  "SERRASTRETTA": "interno",
+  "SSSEVERINA": "interno",
+  "BADO_MARINA": "costiero",
+  "DELIANUOVA": "interno"
+};
+
+function aggiornaTabella() {
+  const soloMLG = document.getElementById("filtro-mlg")?.checked;
+  const provFiltro = document.getElementById("filtro-provincia")?.value;
+  const ordFiltro = document.getElementById("filtro-ordinamento")?.value;
+  const mostraRiepilogo = document.getElementById("riepilogo-dettagliato")?.checked;
+
+  let riepilogo = "";
+  const filtroTab = datiTabella.filter(s => {
+    const isMLG = ["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId);
+    return (!soloMLG || isMLG) && (!provFiltro || s.provincia === provFiltro);
+  });
+
+  if (mostraRiepilogo && filtroTab.length > 0) {
+    const ord = (key, fn = parseFloat, dir = 1) =>
+      filtroTab.slice().sort((a, b) => dir * (fn(a[key] || 0) - fn(b[key] || 0)));
+
+    const piùCalda = ord("tempVal", Number, -1)[0];
+    const piùFredda = ord("tempVal")[0];
+    const piùUmida = ord("umidita", Number, -1)[0];
+    const menoUmida = ord("umidita")[0];
+    const piùVentosa = ord("raffica", Number, -1)[0];
+    const piùPioggia = ord("pioggia", Number, -1)[0];
+
+    riepilogo = `
+      <div style="background:#eef; border-left:5px solid #1a3a9b; padding:10px; margin-bottom:10px; font-size:13px;">
+        Attualmente la zona più calda è <strong>${piùCalda.nome}</strong> (${piùCalda.provincia}) in area <strong>${piùCalda.condizione}</strong> con ${piùCalda.temp}°C e ${piùCalda.umidita}% di umidità.<br>
+        La zona più fredda è <strong>${piùFredda.nome}</strong> (${piùFredda.provincia}) con ${piùFredda.temp}°C.<br>
+        L’area più umida è <strong>${piùUmida.nome}</strong> (${piùUmida.provincia}) con ${piùUmida.umidita}%, mentre la più secca è <strong>${menoUmida.nome}</strong> (${menoUmida.provincia}) con ${menoUmida.umidita}%.<br>
+        Il vento più forte si registra a <strong>${piùVentosa.nome}</strong> (${piùVentosa.provincia}) con raffiche di ${piùVentosa.raffica} km/h.<br>
+        Le piogge maggiori sono rilevate a <strong>${piùPioggia.nome}</strong> (${piùPioggia.provincia}) con ${piùPioggia.pioggia} mm.<br>
+        <div style="margin-top:8px; font-weight:bold;">Elaborazione di Meteo Lo Gullo</div>
+      </div></div>`;
+  }
+
+  const filtro = "tutti";
+  let html = '<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px;">';
+
+  if (ordFiltro === "freddo") {
+    datiTabella.sort((a, b) => (isNaN(a.tempVal) ? Infinity : a.tempVal) - (isNaN(b.tempVal) ? Infinity : b.tempVal));
+  } else if (ordFiltro === "pioggia") {
+    datiTabella.sort((a, b) => parseFloat(b.pioggia || 0) - parseFloat(a.pioggia || 0));
+  } else if (ordFiltro === "raffica") {
+    datiTabella.sort((a, b) => parseFloat(b.raffica || 0) - parseFloat(a.raffica || 0));
+  } else {
+    datiTabella.sort((a, b) => (isNaN(b.tempVal) ? -Infinity : b.tempVal) - (isNaN(a.tempVal) ? -Infinity : a.tempVal));
+  }
+
+  datiTabella
+    .filter(s => {
+      const isMLG = ["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId);
+      return (!soloMLG || isMLG) && (!provFiltro || s.provincia === provFiltro);
+    })
+    .forEach(s => {
+
+      const bgColor = getColor(s.tempVal);
+      const textColor = getTextColorForBackground(bgColor);
+
+      html += `
+      <div style="background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 10px;">
+        <div style="font-weight: bold; font-size: 15px; margin-bottom: 4px;">
+          ${s.nome} <span style="font-size: 13px; color: #555;">(${s.provincia})</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; line-height: 1.2;">
+          <div style="background-color: ${bgColor}; color: ${textColor}; padding: 2px 6px; border-radius: 4px;">🌡️ ${s.temp}°C</div>
+          <div>💧 ${s.umidita}%</div><div>🔻 ${window.extremiGiornalieri[s.stationId]?.min || "--"}°C / 🔺 ${window.extremiGiornalieri[s.stationId]?.max || "--"}°C</div>
+          <div>💨 ${s.raffica} km/h</div>
+          <div><strong>${s.condizione}</strong></div>
+          ${filtro === "pioggia" || filtro === "tutti" ? `<div>🌧️ ${s.pioggia} mm</div>` : ""}
+          ${filtro === "raffica" || filtro === "tutti" ? `<div>💨 Raffica: ${s.raffica} km/h</div>` : ""}
+          <div style="font-size: 10px; color: #666; flex-basis: 100%;">🕒 ${s.orario}</div>
+        </div>
+        ${["ICOSEN11","ICASAL40","IMENDI13","IAMANT6","ICELIC1","INUST1"].includes(s.stationId) ? "<div style='text-align: right; font-size:10px; color:#c00; margin-top:4px;'>★ stazione di MLG</div>" : ""}
+      </div>
+      </div>`;
+    });
+
+  
+  html += "</div>";
+
+  if (mostraRiepilogo) {
+    const ora = new Date().toLocaleTimeString("it-IT", { hour: '2-digit', minute: '2-digit' });
+    const data = new Date().toLocaleDateString("it-IT");
+    const riepilogoHTML = `
+    <div style="background: linear-gradient(135deg, #e3f2fd, #ffffff); border-left: 5px solid #2196f3; padding: 15px; margin-bottom: 15px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); border-radius: 8px;">
+      <div style="font-weight: bold; font-size: 16px; color: #0d47a1; margin-bottom: 8px;">Situazione in tempo reale in Calabria</div>
+      <div id="riepilogo-testo">${generaRiepilogoGiornalistico(datiTabella)}</div>
+      
+    </div>
+    </div>`;
+    document.getElementById("tabella").innerHTML = riepilogoHTML + html;
+  } else {
+    document.getElementById("tabella").innerHTML = html;
+  }
+
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function articola(area) {
+  if (!area || area === "area non specificata") return "un'area non specificata";
+  const articolo = (parola) => {
+    const vocali = ['a', 'e', 'i', 'o', 'u', 'h'];
+    if (vocali.includes(parola[0].toLowerCase())) return "l'" + parola;
+    if (parola.toLowerCase().startsWith("sila") || parola.toLowerCase().startsWith("valle") || parola.toLowerCase().startsWith("costa") || parola.toLowerCase().startsWith("piana") || parola.toLowerCase().startsWith("presila")) return "la " + parola;
+    if (parola.toLowerCase().startsWith("alto") || parola.toLowerCase().startsWith("basso") || parola.toLowerCase().startsWith("marchesato") || parola.toLowerCase().startsWith("pollino") || parola.toLowerCase().startsWith("catanzarese") || parola.toLowerCase().startsWith("vibonese") || parola.toLowerCase().startsWith("reggino") || parola.toLowerCase().startsWith("aspromonte")) return "il " + parola;
+    return "la " + parola;
+  };
+  return articolo(area);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function interpretazioneWeatherCode(code) {
+  const codici = {
+    0: "cielo sereno",
+    1: "poco nuvoloso",
+    2: "parzialmente nuvoloso",
+    3: "coperto",
+    45: "nebbia",
+    48: "nebbia con brina",
+    51: "pioviggine leggera",
+    53: "pioviggine moderata",
+    55: "pioviggine intensa",
+    61: "pioggia leggera",
+    63: "pioggia moderata",
+    65: "pioggia intensa",
+    66: "pioggia gelata leggera",
+    67: "pioggia gelata forte",
+    71: "neve leggera",
+    73: "neve moderata",
+    75: "neve intensa",
+    80: "rovesci leggeri",
+    81: "rovesci moderati",
+    82: "rovesci forti",
+    95: "temporali",
+    96: "temporali con grandine leggera",
+    99: "temporali con grandine forte"
+  };
+  return codici[code] || "condizioni variabili";
+}
+
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+function mostraEstremiNeiPopup() {
+  const popupLayer = document.querySelectorAll(".leaflet-popup-content");
+  popupLayer.forEach(popup => {
+    const match = popup.innerHTML.match(/Stazione:\s(.+?)<br>/);
+    if (!match) return;
+    const stationId = match[1];
+    const dati = window.extremiGiornalieri[stationId];
+    if (!dati) return;
+
+    if (!popup.innerHTML.includes("Massima:")) {
+      popup.innerHTML += `<b>Massima:</b> ${dati.max} °C<br><b>Minima:</b> ${dati.min} °C<br></div>`;
+    }
+  });
+}
+
+function caricaEstremiDaFirebase() {
+  const oggi = new Date().toISOString().slice(0, 10);
+  const perStazione = {};
+
+  db.collection("osservazioni").get().then((snapshot) => {
+    snapshot.forEach((doc) => {
+      const d = doc.data();
+      if (!d.timestamp || !d.temperatura || !d.stationId) return;
+      const ts = d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp);
+      const giorno = ts.toISOString().slice(0, 10);
+      if (giorno !== oggi) return;
+
+      if (!perStazione[d.stationId]) {
+        perStazione[d.stationId] = { max: d.temperatura, min: d.temperatura };
+      } else {
+        perStazione[d.stationId].max = Math.max(perStazione[d.stationId].max, d.temperatura);
+        perStazione[d.stationId].min = Math.min(perStazione[d.stationId].min, d.temperatura);
+      }
+    });
+
+    window.extremiGiornalieri = perStazione;
+    aggiornaTabellaConEstremi();
+    setTimeout(mostraEstremiNeiPopup, 1000);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  caricaEstremiDaFirebase();
+});
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+window.extremiGiornalieri = {};
+
+function aggiornaEstremiTutteLeStazioni() {
+  stazioni.forEach((s) => {
+    caricaEstremi(s, (extremes) => {
+      if (extremes) {
+        window.extremiGiornalieri[s.stationId] = extremes;
+      }
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  setTimeout(aggiornaEstremiTutteLeStazioni, 3000);
+});
+
+function caricaEstremi(staz, callback) {
+  const url = "https://firestore.googleapis.com/v1/projects/meteo-estremami/databases/(default)/documents/osservazioni?pageSize=500";
+  fetch(url)
+    .then(res => res.json())
+    .then(json => {
+      const docs = json.documents || [];
+      const oggi = new Date().toISOString().split("T")[0];
+      let min = Infinity, max = -Infinity;
+      docs.forEach(doc => {
+        const f = doc.fields;
+        if (!f || f.stationId?.stringValue !== staz.stationId) return;
+        const ts = new Date(f.timestamp?.stringValue);
+        if (ts.toISOString().split("T")[0] !== oggi) return;
+        const t = parseFloat(f.temperatura?.doubleValue || f.temperatura?.integerValue || NaN);
+        if (!isNaN(t)) {
+          if (t < min) min = t;
+          if (t > max) max = t;
+        }
+      });
+      const extremes = {
+        min: min === Infinity ? "--" : min.toFixed(1),
+        max: max === -Infinity ? "--" : max.toFixed(1)
+      };
+      callback(extremes);
+    })
+    .catch(err => {
+      console.error("Errore Firestore:", err);
+      callback(null);
+    });
+}
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+[9000, 12000, 15000].forEach(ms => {
+  setTimeout(() => {
+    document.querySelectorAll(".popup-wrapper").forEach(popup => {
+      const stationId = popup.dataset.stationId;
+      console.log("Controllo popup per stationId:", stationId);
+      if (stationId) {
+        forzaEstremiNelPopup(popup, stationId);
+      }
+    });
+  }, ms);
+});
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+[9000, 12000, 15000].forEach(ms => {
+  setTimeout(() => {
+    document.querySelectorAll(".leaflet-popup").forEach(popup => {
+      const wrapper = popup.querySelector(".popup-wrapper");
+      if (!wrapper) return;
+      const stationId = wrapper.dataset.stationId;
+      console.log("Controllo popup per stationId:", stationId);
+      if (stationId) {
+        forzaEstremiNelPopup(wrapper, stationId);
+      }
+    });
+  }, ms);
+});
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+function playRadar() {
+  if (radarAnimationInterval) return;
+  radarAnimationInterval = setInterval(() => {
+    radarLayers[radarIndex].remove();
+    radarIndex = (radarIndex + 1) % radarLayers.length;
+    radarLayers[radarIndex].addTo(map);
+    document.getElementById("radarSlider").value = radarIndex;
+  }, 700);
+  radarPlaying = true;
+}
+
+function stopRadar() {
+  if (radarAnimationInterval) {
+    clearInterval(radarAnimationInterval);
+    radarAnimationInterval = null;
+  }
+  radarLayers.forEach(layer => map.removeLayer(layer));
+  radarPlaying = false;
+}
+
+function sliderChangeRadar(value) {
+  if (radarPlaying) {
+    stopRadar();
+  }
+  radarLayers.forEach(layer => map.removeLayer(layer));
+  radarIndex = parseInt(value);
+  radarLayers[radarIndex].addTo(map);
+}
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+function playRadar() {
+  if (radarAnimationInterval) return;
+  radarAnimationInterval = setInterval(() => {
+    radarLayers[radarIndex].remove();
+    radarIndex = (radarIndex + 1) % radarLayers.length;
+    radarLayers[radarIndex].addTo(map);
+    document.getElementById("radarSlider").value = radarIndex;
+    updateRadarTimeLabel(radarIndex);
+  }, 700);
+  radarPlaying = true;
+}
+
+function stopRadar() {
+  if (radarAnimationInterval) {
+    clearInterval(radarAnimationInterval);
+    radarAnimationInterval = null;
+  }
+  radarLayers.forEach(layer => map.removeLayer(layer));
+  radarPlaying = false;
+}
+
+function sliderChangeRadar(value) {
+  if (radarPlaying) {
+    stopRadar();
+  }
+  radarLayers.forEach(layer => map.removeLayer(layer));
+  radarIndex = parseInt(value);
+  radarLayers[radarIndex].addTo(map);
+  updateRadarTimeLabel(radarIndex);
+}
+
+function updateRadarTimeLabel(index) {
+  const label = document.getElementById("radar-time-label");
+  if (label && radarTimes[index]) {
+    label.textContent = `Orario radar: ${radarTimes[index].time}`;
+  }
+}
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+function sliderChangeRadar(index) {
+  radarIndex = parseInt(index);
+  radarLayers.forEach(layer => layer.remove());
+  radarLayers[radarIndex].addTo(map);
+  document.getElementById("radar-time-label").textContent = radarTimes[radarIndex].time;
+}
+
+function playRadar() {
+  stopRadar();
+  radarTimer = setInterval(() => {
+    radarIndex = (radarIndex + 1) % radarLayers.length;
+    document.getElementById("radarSlider").value = radarIndex;
+    sliderChangeRadar(radarIndex);
+  }, 800);
+}
+
+function stopRadar() {
+  if (radarTimer) clearInterval(radarTimer);
+  radarTimer = null;
+}
+
+
+function visualizzaPioggia() {
+  markerLayerGroup.clearLayers();
+  Object.keys(markersById).forEach(k => delete markersById[k]);
+
+  datiTabella.forEach((d) => {
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') {
+      const valore = typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A';
+      const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+      const markerHtml = `<div class="temperature-label" style="background:${colore}; color:white;">${valore}</div>`;
+      const icon = L.divIcon({ html: markerHtml, className: '', iconSize: [48, 48] });
+
+      const marker = L.marker([d.lat, d.lon], { icon }).bindPopup(creaPopup(d));
+      markerLayerGroup.addLayer(marker);
+      markersById[d.stationId] = marker;
+    }
+  });
+}
+
+
+function visualizzaPioggia() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (typeof d.pioggia !== 'undefined' && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+        const testo = `${d.pioggia.toFixed(1)} mm`;
+        el.innerHTML = `<span style='color:white;'>${testo}</span>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '48px';
+        el.style.height = '48px';
+      }
+
+      // Aggiorna anche il popup se esiste
+      if (marker.getPopup && marker.getPopup()) {
+        const popup = marker.getPopup();
+        const oldContent = popup.getContent();
+        const newContent = oldContent.replace(/Pioggia.*?<br\/>/, `Pioggia: ${d.pioggia.toFixed(1)} mm<br/>`);
+        popup.setContent(newContent);
+      }
+    }
+  });
+}
+
+function creaPopup(d) {
+  return `
+    <strong>${d.nome}</strong><br/>
+    Temperatura: ${d.temperatura} °C<br/>
+    Umidità: ${d.umidita} %<br/>
+    Pioggia: ${typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A'} mm<br/>
+    Vento: ${d.vento} km/h<br/>
+  `;
+}
+
+function aggiungiMarkerStazione(d) {
+  const marker = L.marker([d.lat, d.lon], { icon: iconaStazione }).addTo(mappa);
+  marker.bindPopup(creaPopup(d));
+  markersById[d.stationId] = marker;
+}
+
+</script><script>
+window.addEventListener("load", async () => {
+  await caricaDatiOpenMeteo();
+  aggiornaTabella(); // aggiorna i valori nella tabella con la pioggia
+});
+
+function visualizzaPioggia() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (typeof d.pioggia !== 'undefined' && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+        const testo = `${d.pioggia.toFixed(1)} mm`;
+        el.innerHTML = `<span style='color:white;'>${testo}</span>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '48px';
+        el.style.height = '48px';
+      }
+
+      // Aggiorna anche il popup se esiste
+      if (marker.getPopup && marker.getPopup()) {
+        const popup = marker.getPopup();
+        const oldContent = popup.getContent();
+        const newContent = oldContent.replace(/Pioggia.*?<br\/>/, `Pioggia: ${d.pioggia.toFixed(1)} mm<br/>`);
+        popup.setContent(newContent);
+      }
+    }
+  });
+}
+
+function creaPopup(d) {
+  return `
+    <strong>${d.nome}</strong><br/>
+    Temperatura: ${d.temperatura} °C<br/>
+    Umidità: ${d.umidita} %<br/>
+    Pioggia: ${typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A'} mm<br/>
+    Vento: ${d.vento} km/h<br/>
+  `;
+}
+
+function aggiungiMarkerStazione(d) {
+  const marker = L.marker([d.lat, d.lon], { icon: iconaStazione }).addTo(mappa);
+  marker.bindPopup(creaPopup(d));
+  markersById[d.stationId] = marker;
+}
+
+</script><script>
+function aggiornaPopupConEstremi(marker, stazione) {
+  marker.on('click', async () => {
+    const stationId = stazione.stationId;
+    const popup = L.popup().setLatLng([stazione.lat, stazione.lon]);
+    let contenuto = `<div class='popup-title'>${stazione.nome}</div>`;
+
+    try {
+      const q = firebase.firestore().collection("osservazioni").where("stationId", "==", stationId);
+      const snapshot = await q.get();
+      let min = Infinity, max = -Infinity;
+      let count = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const temp = data.temperatura;
+        if (typeof temp === 'number') {
+          if (temp < min) min = temp;
+          if (temp > max) max = temp;
+          count++;
+        }
+      });
+
+      contenuto += `<div class='popup-sub'>Estremi giornalieri</div>`;
+      contenuto += `<div class='popup-data'>Min: <span class='bold'>${min !== Infinity ? min.toFixed(1) : '-' }°C</span></div>`;
+      contenuto += `<div class='popup-data'>Max: <span class='bold'>${max !== -Infinity ? max.toFixed(1) : '-' }°C</span></div>`;
+      contenuto += `<div class='popup-data'><em>Debug: ${count} valori trovati</em></div>`;
+    } catch (e) {
+      contenuto += `<div class='popup-data'>Errore: ${e.message}</div>`;
+    }
+
+    popup.setContent(contenuto);
+    popup.openOn(mymap);
+  });
+}
+
+function visualizzaPioggia() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (typeof d.pioggia !== 'undefined' && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+        const testo = `${d.pioggia.toFixed(1)} mm`;
+        el.innerHTML = `<span style='color:white;'>${testo}</span>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '48px';
+        el.style.height = '48px';
+      }
+
+      // Aggiorna anche il popup se esiste
+      if (marker.getPopup && marker.getPopup()) {
+        const popup = marker.getPopup();
+        const oldContent = popup.getContent();
+        const newContent = oldContent.replace(/Pioggia.*?<br\/>/, `Pioggia: ${d.pioggia.toFixed(1)} mm<br/>`);
+        popup.setContent(newContent);
+      }
+    }
+  });
+}
+
+function creaPopup(d) {
+  return `
+    <strong>${d.nome}</strong><br/>
+    Temperatura: ${d.temperatura} °C<br/>
+    Umidità: ${d.umidita} %<br/>
+    Pioggia: ${typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A'} mm<br/>
+    Vento: ${d.vento} km/h<br/>
+  `;
+}
+
+function aggiungiMarkerStazione(d) {
+  const marker = L.marker([d.lat, d.lon], { icon: iconaStazione }).addTo(mappa);
+  marker.bindPopup(creaPopup(d));
+  markersById[d.stationId] = marker;
+}
+
+</script></body>
+</html>
+
+(marker, stazione) {
+  marker.on('click', async () =&gt; {
+    const stationId = stazione.stationId;
+    const popup = L.popup().setLatLng([stazione.lat, stazione.lon]);
+    let contenuto = `<div class="popup-title">${stazione.nome}</div>`;
+
+    try {
+      const { min, max } = await getExtremesFromFirebase(stationId);
+      contenuto += `<div class="popup-sub">Estremi giornalieri</div>`;
+      contenuto += `<div class="popup-data">Min: <span class="bold">${min !== null ? min.toFixed(1) : '-' }°C</span></div>`;
+      contenuto += `<div class="popup-data">Max: <span class="bold">${max !== null ? max.toFixed(1) : '-' }°C</span></div>`;
+    } catch (e) {
+      contenuto += `<div class="popup-data">Errore nel recupero estremi</div>`;
+    }
+
+    popup.setContent(contenuto);
+    popup.openOn(mymap);
+  });
+}
+
