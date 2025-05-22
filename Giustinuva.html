@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>Mappa Meteo Calabria</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" rel="stylesheet"/>
+<style>
+   /* Sidebar compatta */
+#sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 36px;
+  background-color: #fff;
+  border-right: 1px solid #ccc;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+.sidebar-btn:hover {
+  background-color: #eef;
+}
+
+body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #f4f4f4; }
+
+#banner {
+  background-color: #1a3a9b; /* Colore blu */
+  color: white;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 24px;
+  font-weight: bold;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+#map {
+  height: calc(100vh - 60px);
+  width: 100%;
+  border-bottom: 2px solid #ccc;
+}
+
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  padding: 20px;
+}
+
+.temperature-label {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 13px !important;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-weight: bold;
+  font-size: 15px;
+  border: 2px solid #fff;
+  color: #000;
+  box-shadow: 0 0 6px rgba(0,0,0,0.3);
+}
+
+.popup-title { font-size: 16px; font-weight: bold; }
+.popup-sub { font-size: 13px; color: #666; margin-bottom: 6px; }
+.popup-data { margin: 2px 0; font-size: 15px; }
+.bold { font-weight: bold; }
+.webcam-preview { width: 100%; max-height: 100px; object-fit: cover; margin-top: 5px; border-radius: 5px; }
+.webcam-missing { font-size: 13px; color: #777; margin-top: 5px; text-align: center; }
+.btn {
+  display: inline-block;
+  padding: 6px 10px;
+  margin: 5px 5px 0 0;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 13px;
+}
+.btn:hover { background-color: #0056b3; }
+#popup-grafico {
+  position: fixed;
+  top: 10%;
+  left: 5%;
+  width: 90%;
+  height: 80%;
+  background: white;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  z-index: 10000;
+}
+#popup-grafico iframe { flex: 1; width: 100%; border: none; }
+#popup-grafico .close-btn {
+  background: red;
+  color: white;
+  padding: 5px;
+  border: none;
+  width: 100%;
+  font-weight: bold;
+  cursor: pointer;
+}
+a.btn { color: white !important; }
+  
+body {
+  overflow-x: hidden;
+}
+
+#sidebar {
+  pointer-events: auto;
+  -ms-touch-action: none;
+  touch-action: none;
+}
+#sidebar.sidebar-nascosta {
+  transform: translateX(-50px);
+  transition: transform 0.3s ease;
+}
+
+</style><style>
+   .card.compact-extreme {
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fdfdfd;
+  margin: 5px 0;
+}
+.card.compact-extreme span {
+  font-size: 17px;
+}
+.card.compact-extreme .valore {
+  font-size: 20px;
+  color: #c00;
+}
+  </style><style>
+   /* Sidebar compatta */
+#sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 36px;
+  background-color: #fff;
+  border-right: 1px solid #ccc;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+.sidebar-btn:hover {
+  background-color: #eef;
+}
+
+html, body {
+  scroll-padding-top: 60px; /* Compensa altezza banner fisso */
+}
+  </style><style>
+   /* Sidebar compatta */
+#sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 36px;
+  background-color: #fff;
+  border-right: 1px solid #ccc;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+.sidebar-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+.sidebar-btn:hover {
+  background-color: #eef;
+}
+
+#slide-banner.show {
+  right: 0 !important;
+}
+  </style><style>
+   .sidebar-btn.attivo {
+  box-shadow: inset 0 0 4px #00000099;
+  font-weight: bold;
+  border-left: 2px solid #000;
+}
+  </style><style>
+   /* Modernizzazione barra laterale */
+#sidebar {
+  background: linear-gradient(to bottom, #ffffffcc, #f0f0f0cc);
+  border-right: 1px solid #bbb;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.15);
+  backdrop-filter: blur(4px);
+}
+
+/* Pulsanti moderni */
+.sidebar-btn {
+  border-radius: 6px;
+  margin: 6px 0;
+  font-weight: 600;
+  font-size: 11px;
+  background-color: #e6e6e6;
+  color: #333;
+  border: 1px solid #ccc;
+  transition: all 0.2s ease;
+}
+
+.sidebar-btn:hover {
+  background-color: #d0d0d0;
+  transform: scale(1.05);
+}
+
+.sidebar-btn.attivo {
+  background-color: #007bff !important;
+  color: white !important;
+  border-left: 3px solid #004a99;
+  box-shadow: inset 0 0 5px #00000033;
+}
+  </style><style>
+   .highlight-temp {
+    font-size: 36px;
+    font-weight: bold;
+}
+  </style><style>
+   .filter-button.active {
+    background-color: #337ab7;
+    color: white;
+}
+  </style><style>
+   .filtro-box {
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  margin: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.filtro-box label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.filtro-box select, .filtro-box input[type="checkbox"] {
+  margin-top: 4px;
+}
+  </style><style>
+   .card.compact-extreme {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fefefe;
+  margin: 6px 0;
+  font-size: 15px;
+}
+.card.compact-extreme span.nome {
+  font-weight: 600;
+  flex: 1;
+}
+.card.compact-extreme span.valore {
+  font-weight: bold;
+  font-size: 16px;
+  color: #c00;
+  text-align: right;
+}
+  </style><style>
+   #filtro-provincia, #filtro-ordinamento {
+  margin-left: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eef;
+  font-weight: bold;
+}
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+  </style><style>
+   #filtro-provincia, #filtro-ordinamento {
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: #eef;
+  font-weight: bold;
+  font-size: 14px;
+}
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+.filtro-box label {
+  font-size: 14px;
+}
+#filtro-mlg {
+  transform: scale(0.9);
+  margin-right: 4px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-top: 4px;
+}
+  </style><style>
+   /* Rendi tutto molto più compatto */
+#filtro-provincia, #filtro-ordinamento {
+  margin: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #eef;
+  font-weight: bold;
+  font-size: 13px;
+}
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.filtro-box label {
+  font-size: 13px;
+}
+#filtro-mlg {
+  transform: scale(0.85);
+  margin-right: 4px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #333;
+  margin: 2px 0 0 0;
+}
+  </style><style>
+   /* Marker circle and label size adjustment */
+.temperature-label, .leaflet-marker-icon {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 11px !important;
+  line-height: 26px !important;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 50%;
+}
+
+/* MLG star size fix (assuming 'star-mlg' class or similar) */
+.leaflet-marker-icon.star-mlg {
+  width: 12px !important;
+  height: 12px !important;
+  transform: translate(-50%, -50%);
+}
+  </style><style>
+   /* Marker circle and label size adjustment */
+.temperature-label, .leaflet-marker-icon {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 10px !important;
+  line-height: 26px !important;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 50%;
+}
+
+/* Visible and appropriately scaled MLG star icon */
+.leaflet-marker-icon.star-mlg {
+  width: 12px !important;
+  height: 12px !important;
+  transform: translate(-50%, -50%);
+  display: inline-block !important;
+  visibility: visible !important;
+  z-index: 9999 !important;
+}
+  </style><style>
+   #anteprima-live {
+    background: linear-gradient(to bottom, #f8faff, #ffffff);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin: 16px auto;
+    padding: 20px;
+    max-width: 900px;
+  }
+  #anteprima-live h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #003366;
+    text-align: center;
+  }
+  #preview-cards .card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #dde3ec;
+    border-radius: 10px;
+    padding: 12px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: transform 0.2s ease;
+  }
+  #preview-cards .card:hover {
+    transform: scale(1.015);
+  }
+  #preview-cards .card .nome {
+    font-weight: 600;
+    font-size: 16px;
+    color: #222;
+  }
+  #preview-cards .card .valore {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0055aa;
+  }
+  #preview-cards .card .btn {
+    margin-left: auto;
+    background-color: #007bff;
+    border: none;
+    padding: 6px 12px;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  #preview-cards .card .btn:hover {
+    background-color: #0056b3;
+  }
+  </style><style>
+   #anteprima-live {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  background: rgba(255,255,255,0.95);
+  border-top: 2px solid #ccc;
+  padding: 14px 20px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  backdrop-filter: blur(6px);
+}
+  </style><style>
+#map {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: auto;
+  min-height: calc(100vh - 60px);
+}
+#anteprima-live {
+  margin-top: auto;
+}
+</style><style>
+/* MIGLIORAMENTO GRAFICO CARDS METEO PER MOBILE */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 14px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 15.5px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.01);
+}
+
+#tabella .card .intestazione {
+  font-size: 17px;
+  font-weight: 700;
+  color: #003366;
+  margin-bottom: 4px;
+}
+
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #333;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+
+#tabella .card .badge {
+  display: inline-block;
+  padding: 4px 6px;
+  background: #007bff;
+  color: white;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 6px;
+}
+
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 18px 16px;
+    font-size: 15px;
+  }
+}
+}</style><style>
+/* Stile migliorato per sezione anteprima testuale */
+#anteprima-dati-testuali {
+  position: absolute;
+  top: calc(100vh - 160px);
+  left: 0;
+  width: 100%;
+  background: linear-gradient(to bottom, #f9fbff, #ffffff);
+  z-index: 9999;
+  padding: 24px 18px;
+  box-shadow: 0 -2px 14px rgba(0,0,0,0.15);
+  border-top: 2px solid #ccd6e0;
+  border-radius: 18px 18px 0 0;
+  font-family: "Segoe UI", sans-serif;
+}
+
+#anteprima-dati-testuali > div:first-child {
+  font-weight: 600;
+  font-size: 17px;
+  color: #003366;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.filtro-box {
+  background: #f0f4f8;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.filtro-box label {
+  font-weight: 500;
+  font-size: 15px;
+  display: block;
+  color: #222;
+}
+
+.filtro-box input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.2);
+}
+
+.filtro-riga-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  font-size: 15px;
+  margin-top: 10px;
+}
+
+.filtro-riga-select label {
+  font-weight: 600;
+}
+
+#filtro-provincia, #filtro-ordinamento, #filtro-provincia-estremi {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #e6efff;
+  border: 1px solid #aac4e6;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#filtro-prov-extremi-container {
+  margin-top: 10px;
+  background: #eef3f9;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.mlg-label-small {
+  font-size: 14px;
+  color: #003366;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  #anteprima-dati-testuali {
+    padding: 18px 14px;
+  }
+
+  .filtro-box {
+    padding: 10px;
+  }
+
+  .filtro-riga-select {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #filtro-provincia, #filtro-ordinamento {
+    width: 100%;
+  }
+}
+</style><style>
+/* SEZIONE ANTEPRIMA COMPLETAMENTE RIDISEGNATA PER MOBILE */
+
+/* Contenitore principale */
+#anteprima-dati-testuali {
+  position: absolute;
+  top: calc(100vh - 180px);
+  left: 0;
+  width: 100%;
+  background: #f9fbff;
+  z-index: 9999;
+  padding: 26px 16px 20px;
+  box-shadow: 0 -3px 14px rgba(0,0,0,0.12);
+  border-top: 2px solid #b0c4de;
+  border-radius: 20px 20px 0 0;
+  font-family: "Segoe UI", sans-serif;
+}
+
+/* Titolo iniziale */
+#anteprima-dati-testuali > div:first-child {
+  font-weight: 700;
+  font-size: 17px;
+  color: #002b55;
+  text-align: center;
+  margin-bottom: 20px;
+  margin-top: -6px;
+}
+
+/* Filtro box modernizzati */
+.filtro-box {
+  background: #eaf2f8;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.filtro-box label {
+  font-weight: 500;
+  font-size: 15px;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+}
+
+.filtro-box input[type="checkbox"] {
+  margin-right: 10px;
+  transform: scale(1.1);
+}
+
+/* Riorganizzazione selettori */
+.filtro-riga-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.filtro-riga-select label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Select dropdown */
+#filtro-provincia, #filtro-ordinamento, #filtro-provincia-estremi {
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #e0edff;
+  border: 1px solid #aac6f2;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+}
+
+/* Riquadro extra per selettore province estremi */
+#filtro-prov-extremi-container {
+  margin-top: 12px;
+  background: #f3f7fc;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+/* Etichetta "Tabella: dati in tempo reale" */
+#filtro-mlg {
+  display: none;
+}
+/* Rimosso ::before duplicato per "Tabella: dati in tempo reale" */
+/* .mlg-label-small::before { */
+/* content: "Tabella: dati in tempo reale";
+  font-size: 15px;
+  font-weight: 600;
+  color: #003366;
+  display: block;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #ddeeff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+/* Card meteo ottimizzate */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 14px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 15.5px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.01);
+}
+
+#tabella .card .intestazione {
+  font-size: 17px;
+  font-weight: 700;
+  color: #003366;
+  margin-bottom: 6px;
+}
+
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #333;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+
+#tabella .card .badge {
+  display: inline-block;
+  padding: 5px 8px;
+  background: #007bff;
+  color: white;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+/* Mobile fix */
+@media (max-width: 480px) {
+  #anteprima-dati-testuali {
+    padding: 20px 12px;
+  }
+
+  .filtro-box {
+    padding: 12px;
+  }
+
+  .filtro-riga-select {
+    gap: 8px;
+  }
+
+  #tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 14px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 15.5px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+}
+}</style><style>
+/* CORREZIONE POSIZIONE MLG + TESTO STATICO "Dati testuali in tempo reale" */
+#filtro-mlg {
+  margin-top: 16px;
+  transform: scale(1.05);
+  margin-right: 8px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #003366;
+  margin: 12px 0 4px 0;
+}
+
+/* Etichetta sostitutiva sopra i filtri */
+#label-dati-realtime {
+  font-size: 16px;
+  font-weight: 600;
+  color: #002b55;
+  padding: 10px 14px;
+  background: #ddeeff;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  text-align: center;
+}
+</style><style>
+/* FIX larghezza elementi e spostamento */
+.filtro-riga-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.filtro-riga-select label {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+#filtro-provincia,
+#filtro-ordinamento,
+#filtro-provincia-estremi {
+  width: 100%;
+  max-width: 280px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #e0edff;
+  border: 1px solid #aac6f2;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Etichetta tabella spostata sopra */
+#label-dati-realtime {
+  font-size: 16px;
+  font-weight: 600;
+  color: #002b55;
+  padding: 10px 14px;
+  background: #ddeeff;
+  border-radius: 10px;
+  margin: 10px 0 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  text-align: center;
+}
+
+/* Checkbox filtro finale */
+#filtro-mlg {
+  margin-top: 16px;
+  transform: scale(1.05);
+  margin-right: 8px;
+}
+.mlg-label-small {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #003366;
+  margin: 12px 0 8px;
+}
+</style><style>
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #bbcfe6;
+  border-radius: 16px;
+  padding: 22px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+  font-size: 16px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+  width: 100%;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+}
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+#tabella .card .intestazione {
+  font-size: 19px;
+  font-weight: 700;
+  color: #002a4d;
+  margin-bottom: 10px;
+}
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 18px 16px;
+    font-size: 15px;
+  }
+  #tabella .card .intestazione {
+    font-size: 17px;
+  }
+}</style><style>
+/* MIGLIORAMENTO GRAFICO CARDS ORIGINALE */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  padding: 22px 20px;
+  margin: 20px auto;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-size: 16px;
+  line-height: 1.7;
+  transition: transform 0.2s ease;
+  width: 95%;
+  max-width: 840px;
+}
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+#tabella .card .intestazione {
+  font-size: 20px;
+  font-weight: 700;
+  color: #002a4d;
+  margin-bottom: 12px;
+}
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  color: #333;
+}
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+#tabella .card .badge {
+  display: inline-block;
+  padding: 5px 10px;
+  background: #007bff;
+  color: white;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 12px;
+}
+
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 18px 16px;
+    font-size: 15.5px;
+  }
+  #tabella .card .intestazione {
+    font-size: 18px;
+  }
+}</style><style>
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px auto;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-size: 15.5px;
+  line-height: 1.6;
+  width: 95%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#tabella .card .intestazione {
+  font-size: 18px;
+  font-weight: bold;
+  color: #003366;
+  margin-bottom: 12px;
+}
+
+#tabella .card .dati {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 14px;
+  color: #333;
+  width: 100%;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+#tabella .card .dati .valore {
+  font-weight: bold;
+  color: #0055aa;
+  font-size: 15px;
+}
+
+#tabella .card .badge {
+  margin-top: 12px;
+  background: #007bff;
+  color: white;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+/* Responsive fix per schermi piccoli */
+@media (max-width: 480px) {
+  #tabella .card {
+    padding: 16px 14px;
+    font-size: 14.5px;
+  }
+
+  #tabella .card .intestazione {
+    font-size: 16px;
+  }
+
+  #tabella .card .dati span {
+    font-size: 13.5px;
+  }
+
+  #tabella .card .dati .valore {
+    font-size: 14px;
+  }
+}</style><style>
+/* Allinea le card a sinistra e sfrutta meglio lo spazio disponibile */
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 12px;
+}
+
+#tabella .card {
+  width: calc(50% - 16px);
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-size: 15.5px;
+  line-height: 1.6;
+  box-sizing: border-box;
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+
+#tabella .card .intestazione {
+  font-size: 18px;
+  font-weight: bold;
+  color: #003366;
+  margin-bottom: 12px;
+}
+
+#tabella .card .dati {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 14px;
+  color: #333;
+  width: 100%;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+#tabella .card .dati .valore {
+  font-weight: bold;
+  color: #0055aa;
+  font-size: 15px;
+}
+
+#tabella .card .badge {
+  margin-top: 12px;
+  background: #007bff;
+  color: white;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+/* Visualizzazione mobile: una sola colonna */
+@media (max-width: 600px) {
+  #tabella .card {
+    width: 100%;
+  }
+}</style><style>
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 12px;
+}
+
+#tabella .card {
+  margin: 0 !important;
+  width: calc(50% - 16px);
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  #tabella .card {
+    width: 100%;
+  }
+}
+</style><style>
+#tabella {
+  padding-bottom: 260px; /* Evita sovrapposizione con la sezione fissa */
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  padding: 12px !important;
+  gap: 16px !important;
+}
+
+#tabella .card {
+  margin: 0 !important;
+  width: calc(50% - 16px) !important;
+  box-sizing: border-box !important;
+  max-width: none !important;
+}
+
+@media (max-width: 600px) {
+  #tabella .card {
+    width: 100% !important;
+  }
+}
+</style>
+<style>
+#anteprima-dati-testuali {
+  background: #f5f9ff;
+  border-top: 2px solid #1a3a9b;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.05);
+  font-family: "Segoe UI", sans-serif;
+  padding: 16px 12px 10px;
+}
+
+#anteprima-dati-testuali > div:first-child {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1a3a9b;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#anteprima-dati-testuali label {
+  font-size: 13.5px;
+  color: #003366;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#anteprima-dati-testuali input[type="checkbox"] {
+  transform: scale(0.95);
+}
+
+.filtro-riga-combinata {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #e6efff;
+  border: 1px solid #bcd0ee;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+#filtro-provincia, #filtro-ordinamento {
+  background: #ffffff;
+  border: 1px solid #aac6f2;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  width: 100%;
+  color: #002a4d;
+}
+
+.filtro-riga-combinata label {
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  #anteprima-dati-testuali {
+    padding: 14px 10px 8px;
+  }
+
+  #anteprima-dati-testuali label {
+    font-size: 13px;
+  }
+
+  #filtro-provincia, #filtro-ordinamento {
+    font-size: 12.5px;
+  }
+}
+
+#anteprima-dati-testuali {
+  margin-left: 40px;
+}
+</style>
+<style>
+@media (min-width: 600px) {
+  body {
+    padding-left: 60px !important;
+  }
+}
+</style>
+<style>
+#tabella .card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dde3ec;
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: transform 0.2s ease;
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+#tabella .card:hover {
+  transform: scale(1.015);
+}
+
+#tabella .card .intestazione {
+  font-weight: 600;
+  font-size: 16px;
+  color: #222;
+}
+
+#tabella .card .dati {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #333;
+}
+
+#tabella .card .dati span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+#tabella .card .dati .valore {
+  font-weight: 600;
+  color: #0055aa;
+}
+
+#tabella .card .badge {
+  margin-left: auto;
+  background-color: #007bff;
+  border: none;
+  padding: 6px 12px;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+</style>
+<style>
+/* Overlay watermark visibile sopra tutto ma non cliccabile */
+.watermark-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='28'><text x='0' y='20' font-size='12' fill='rgba(0,0,0,0.05)' font-family='Arial'>Meteo Lo Gullo Meteo Lo Gullo Meteo Lo Gullo</text></svg>");
+  background-repeat: repeat;
+  background-size: 180px 28px;
+  mix-blend-mode: multiply;
+}
+</style>
+<style>
+/* Aspetto coerente con le card sottostanti */
+#anteprima-dati-testuali {
+  background: #ffffff;
+  border-top: 2px solid #ccddee;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.05);
+  padding: 20px 16px;
+  font-family: "Segoe UI", sans-serif;
+  transition: background 0.3s ease;
+}
+
+/* Leggero margine negativo solo per unione visiva */
+#tabella {
+  margin-top: -6px;
+  padding-top: 0;
+}
+
+/* Card coerenti come già impostato, mantenute flessibili */
+#tabella .card {
+  background: #ffffff;
+  border: 1px solid #ccddee;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease;
+}
+
+#tabella .card:hover {
+  transform: scale(1.01);
+}
+</style>
+</head>
+<body>
+<div id="radar-controls" style="position: fixed; top: 120px; right: 10px; z-index: 2147483647; background: white; border-radius: 8px; padding: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.4); display: none; font-family: sans-serif;">
+<div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+<button onclick="playRadar()" title="Avvia animazione">▶️</button>
+<button onclick="stopRadar()" title="Ferma animazione">⏹️</button>
+<input id="radarSlider" max="0" min="0" oninput="sliderChangeRadar(this.value)" step="1" style="width: 140px;" type="range" value="0"/>
+</div>
+<div id="radar-time-label" style="font-size: 13px; color: #111; text-align: center;"></div>
+</div>
+<div id="radar-time-label" style="font-size: 13px; color: #111; text-align: center;"></div>
+<!-- Sidebar Meteo -->
+<div id="sidebar">
+<button class="sidebar-btn" onclick="visualizzaAttuali()" style="background-color: #cccccc; color: black;" title="Temp attuale">T°C</button>
+<button class="sidebar-btn" onclick="visualizzaEstremi('max')" style="background-color: #ff4d4d; color: white;" title="Temp max">MAX</button>
+<button class="sidebar-btn" onclick="visualizzaEstremi('min')" style="background-color: #3399ff; color: white;" title="Temp min">MIN</button>
+<button class="sidebar-btn" onclick="visualizzaUmidita()" style="background-color: #66ccff; color: white;" title="Umidità">UR%</button>
+<button class="sidebar-btn" onclick="visualizzaRaffiche()" style="background-color: #ff9933; color: white;" title="Raffiche">RAF</button>
+<button class="sidebar-btn" onclick="visualizzaPioggia()" style="background-color: #3399ff; color: white;" title="Pioggia">MM</button>
+<button class="sidebar-btn" onclick="filtraSoloMLG()" style="background-color: #222; color: white;" title="Solo MLG">MLG</button>
+<button class="sidebar-btn" onclick="toggleRadar()" style="background-color: #444; color: white;" title="Radar/Satellite">RAD</button>
+</div>
+<!-- Striscia con la scritta Meteo Lo Gullo -->
+<div id="banner">
+  - Meteo Lo Gullo
+</div>
+<div id="radar-controls-container">
+<div id="radar-time-label" style="margin-top: 4px; font-size: 12px; color: #333; text-align: center;"></div>
+</div>
+<div id="map" style="">
+</div>
+<button onclick="playRadar()" style="margin-right: 5px;">▶️</button>
+<button onclick="stopRadar()" style="margin-right: 5px;">⏹️</button>
+<input id="radarSlider" max="0" min="0" oninput="sliderChangeRadar(this.value)" step="1" type="range" value="0"/>
+<div id="mlg-label" style="
+  position: fixed;
+  top: 65px;
+  right: 10px;
+  background-color: #007bff;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: bold;
+  z-index: 1002;
+  display: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  font-size: 14px;
+">
+  FILTRO MLG ATTIVO
+</div>
+<section id="anteprima-dati-testuali" style="margin: 0; padding: 20px 16px; width: 100%; background: white; z-index: 9999; box-shadow: 0 -2px 8px rgba(0,0,0,0.2); border-radius: 20px 20px 0 0;">
+<div style="text-align: center; font-weight: bold; font-size: 16px; color: #003366; margin-bottom: 14px;">
+    Scorri per i dati testuali ↓
+  </div>
+<div style="background: #f0f8ff; padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
+<input id="riepilogo-dettagliato" onchange="aggiornaTabella()" type="checkbox"/>
+      Visualizza riepilogo meteo testuale
+    </label>
+</div>
+<div style="background: #f0f8ff; padding: 12px; border-radius: 12px; margin-bottom: 18px;">
+<label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
+<input id="toggle-estremi-lista" onchange="toggleEstremiLista()" type="checkbox"/>
+      Mostra estremi giornalieri
+    </label>
+</div>
+<div class="filtro-riga-combinata">
+<label for="filtro-provincia">Filtra per provincia:</label>
+<select id="filtro-provincia" onchange="aggiornaTabella()">
+<option value="">Tutte</option>
+<option value="CS">Cosenza</option>
+<option value="CZ">Catanzaro</option>
+<option value="KR">Crotone</option>
+<option value="VV">Vibo Valentia</option>
+<option value="RC">Reggio Calabria</option>
+</select>
+<label for="filtro-ordinamento">Ordina per:</label>
+<select id="filtro-ordinamento" onchange="aggiornaTabella()">
+<option value="caldo">Stazione più calda</option>
+<option value="freddo">Stazione più fredda</option>
+<option value="raffica">Raffiche</option>
+<option value="pioggia">Pioggia</option>
+</select>
+<label class="mlg-label-small">
+<input id="filtro-mlg" onchange="aggiornaTabella()" type="checkbox"/>
+    Mostra solo stazioni MLG
+  </label>
+</div>
+</section>
+<div style="height: 260px;"></div>
+<div id="tabella"></div>
+<div id="popup-grafico">
+<button class="close-btn" onclick="chiudiGrafico()">Chiudi</button>
+<iframe id="grafico-frame" src=""></iframe>
+</div>
+
+
+<div id="slide-banner" onclick="apriInfoMappa()" style="position: fixed; right: -300px; background: #1a3a9b; color: white; padding: 10px 20px; border-radius: 4px 0 0 4px; font-size: 14px; font-weight: 500; cursor: pointer; z-index: 9999; box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: right 0.5s ease; ; top: 65px">Come leggere questa mappa?<span onclick="document.getElementById('slide-banner').style.display = 'none'; event.stopPropagation();" style="margin-left: 10px; font-weight: bold;"> ✕</span></div><div id="info-mappa" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color: rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center; font-family:Arial,sans-serif;">
+<div style="background:#fff; max-width:600px; width:90%; max-height:90vh; overflow-y:auto;
+              padding:25px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.3); text-align:justify;">
+<h2 style="margin-top:0; color:#1a3a9b;">Come leggere questa mappa?</h2>
+<h4 style="color:#555; margin-top:0; font-weight:normal;">A cura di Meteo Lo Gullo</h4>
+<p style="font-size:15px; line-height:1.7; color:#333;">
+        Questa piattaforma rappresenta un nuovo ramo operativo del progetto MLG, pensato per offrire una visione quanto più completa e dettagliata delle condizioni meteorologiche sull’intero territorio calabrese. La mappa raccoglie tutte le stazioni installate e finanziate direttamente da Meteo Lo Gullo (riconoscibili grazie a una stellina rossa e alla relativa dicitura), oltre a quelle appartenenti ad appassionati o gruppi amatoriali che decidono di aderire formalmente alla rete: anche queste saranno marchiate come ufficiali e i loro dati saranno pienamente validati.
+        <br/><br/>
+        Accanto a queste stazioni ufficiali, la mappa include una fitta rete di postazioni fisiche non direttamente gestite da MLG, le cui misurazioni vengono elaborate a partire da più centraline presenti nella stessa area geografica. Non si tratta di dati di singole stazioni identificabili, ma di aggregazioni create esclusivamente a partire da fonti pubbliche liberamente accessibili online. Nessun dato è stato prelevato da enti pubblici né da privati senza consenso: il sistema aggrega in modo trasparente ciò che già circola in rete, per offrire un quadro di riferimento il più ampio possibile.
+        <br/><br/>
+        Questa è la prima versione pubblica della mappa, già oggi la rete meteorologica più ampia esistente sul territorio calabrese, ma è in continua evoluzione. L’obiettivo è quello di sostituire progressivamente le postazioni riassuntive con stazioni ufficiali installate da MLG o da collaboratori affidabili. Chiunque possieda una stazione meteo in una zona attualmente coperta da dati riassuntivi e desideri offrire un dato certificato, può contattarci per entrare nella rete.
+        </p>
+<div style="text-align:right; margin-top:15px;">
+<button onclick="chiudiInfoMappa()" style="padding:8px 16px; background:#c00; color:white; border:none; border-radius:4px; cursor:pointer;">Chiudi</button>
+</div>
+</div>
+</div>
+<!-- Firebase Script per min/max reali -->
+<!-- Firebase App (the core Firebase SDK) -->
+
+
+<!-- Firebase compat + Calcolo estremo client-side -->
+<div class="watermark-overlay"></div>
+<script>
+// Consolidato e sicuro
+
+function creaPopup(d) {
+  return `
+    <strong>${d.nome}</strong><br/>
+    Temperatura: ${d.temperatura} °C<br/>
+    Umidità: ${d.umidita} %<br/>
+    Pioggia: ${typeof d.pioggia !== 'undefined' ? d.pioggia.toFixed(1) : 'N/A'} mm<br/>
+    Vento: ${d.vento} km/h<br/>
+  `;
+}
+
+function aggiungiMarkerStazione(d) {
+  const marker = L.marker([d.lat, d.lon], { icon: iconaStazione }).addTo(mappa);
+  marker.bindPopup(creaPopup(d));
+  markersById[d.stationId] = marker;
+}
+
+// Variante base (principale)
+function visualizzaPioggia_v1() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (marker) {
+      const el = marker.getElement();
+      if (el) {
+        const mm = parseFloat(d.pioggia);
+        const colore = getColorPioggia(mm);
+        el.innerHTML = `<span style='color:${getTextColorForBackground(colore)};'>${mm} mm</span>`;
+      }
+    }
+  });
+}
+
+// Variante con layout HTML ricco
+function visualizzaPioggia_v2() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (marker) {
+      const el = marker.getElement();
+      if (el) {
+        const valore = parseFloat(d.pioggia).toFixed(1);
+        const colore = getColorPioggia(valore);
+        const textColor = getTextColorForBackground(colore);
+        el.innerHTML = `<div style='display: flex; align-items: center; justify-content: center;
+                         width: 100%; height: 100%; font-size: 14px; font-weight: bold;
+                         color: ${textColor};'>${valore} mm</div>`;
+      }
+    }
+  });
+}
+
+// Variante fallback semplice
+function visualizzaPioggia_v3() {
+  datiTabella.forEach((d) => {
+    const marker = markersById[d.stationId];
+    if (typeof d.pioggia !== 'undefined' && marker) {
+      const el = marker.getElement();
+      if (el) {
+        const colore = d.pioggia > 5 ? "#003366" : "#3399ff";
+        const testo = `${d.pioggia.toFixed(1)} mm`;
+        el.innerHTML = `<span style='color:white;'>${testo}</span>`;
+        el.style.backgroundColor = colore;
+        el.style.width = '48px';
+        el.style.height = '48px';
+      }
+    }
+  });
+}
+
+// Wrapper adattivo (per chiamate dinamiche)
+function visualizzaPioggia() {
+  // Seleziona quale chiamare, per ora usiamo v1
+  visualizzaPioggia_v1();
+}
+</script></body>
+</html>
+
+(marker, stazione) {
+  marker.on('click', async () =&gt; {
+    const stationId = stazione.stationId;
+    const popup = L.popup().setLatLng([stazione.lat, stazione.lon]);
+    let contenuto = `<div class="popup-title">${stazione.nome}</div>`;
+
+    try {
+      const { min, max } = await getExtremesFromFirebase(stationId);
+      contenuto += `<div class="popup-sub">Estremi giornalieri</div>`;
+      contenuto += `<div class="popup-data">Min: <span class="bold">${min !== null ? min.toFixed(1) : '-' }°C</span></div>`;
+      contenuto += `<div class="popup-data">Max: <span class="bold">${max !== null ? max.toFixed(1) : '-' }°C</span></div>`;
+    } catch (e) {
+      contenuto += `<div class="popup-data">Errore nel recupero estremi</div>`;
+    }
+
+    popup.setContent(contenuto);
+    popup.openOn(mymap);
+  });
+}
+
