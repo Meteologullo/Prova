@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<style id="hideMarkerOpacity">.leaflet-marker-icon,.leaflet-marker-shadow{opacity:0;transition:opacity 0.15s linear;}</style>
+
+<meta charset="utf-8"/>
+<title>Mappa Meteo Calabria</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" rel="stylesheet"/>
+
+
+<!-- === PATCH REFRESH CAM UPDATED 2025‑06‑13 === -->
+
+<!-- === /PATCH === -->
+
+<!-- === WEBCAM PATCH 2025-06-14 === -->
+
+
+<!-- === WEBCAM FIX 2025-06-14 ChatGPT === -->
+<script>
+(() => {
+  const cfg = {
+    appKey: "D617B04D233DAF0BC8F252E742484DFE",
+    apiKey: "9e96f3e4-1e3d-4de5-80f8-ab2c2e0c6748",
+    mac:    "C0:5D:89:C9:84:60",
+    stationId: "IAMANT7"
+  };
+  const API_URL = "https://api.ecowitt.net/api/v3/device/real_time";
+  function proxify(url){
+    return "https://corsproxy.io/?" + encodeURIComponent(url);
+  }
+  async function getWebcamUrl(){
+    const qs = new URLSearchParams({
+      application_key: cfg.appKey,
+      api_key: cfg.apiKey,
+      mac: cfg.mac,
+      call_back: "camera.photo"
+    }).toString();
+    const res = await fetch(proxify(API_URL+"?"+qs), {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const js = await res.json();
+    let url = js?.data?.camera?.photo?.url || js?.data?.camera?.capture_url;
+    if(!url) return null;
+    if(url.startsWith("http://")) url = url.replace("http://","https://");
+    return url+"&t="+Date.now();
+  }
+  async function updateWebcam(){
+    try{
+      const url = await getWebcamUrl();
+      if(!url) return;
+      if(Array.isArray(window.stazioni)){
+        const st = window.stazioni.find(s => s.stationId === cfg.stationId);
+        if(st) st.webcam = url;
+      }
+      if(typeof window.reintegraWebcamNeiPopup === "function"){
+        window.reintegraWebcamNeiPopup();
+      }
+    }catch(e){
+      console.error("[WEBCAM FIX]", e);
+    }
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    updateWebcam();
+    setInterval(updateWebcam, 60000);
+  });
+})();
+</script>
+<!-- === /WEBCAM FIX === -->
