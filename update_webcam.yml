@@ -1,0 +1,26 @@
+
+name: Aggiorna webcam Ecowitt
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Fetch Ecowitt URL
+        env:
+          APP_KEY: ${{ secrets.APP_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          curl -s "https://api.ecowitt.net/api/v3/device/real_time?application_key=$APP_KEY&api_key=$API_KEY&mac=C0:5D:89:C9:84:60&call_back=camera.photo"           | jq -r '.data.camera.photo.url // .data.camera.capture_url'           | jq -R '{url: .}' > data/webcam.json
+      - name: Commit
+        run: |
+          git config user.name  github-actions
+          git config user.email github-actions@github.com
+          git add data/webcam.json
+          git commit -m "auto: aggiorna URL webcam" || echo "No changes"
+          git push

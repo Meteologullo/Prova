@@ -1,12 +1,20 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; URL='mlgmap_openmeteo.html'" />
-  <title>Redirect...</title>
+<meta charset="utf-8"/>
+<title>Meteo Lo Gullo – Webcam Demo</title>
+<script>
+(async () => {
+  const ST_ID = "IAMANT7";
+  const JSON_URL = "./data/webcam.json?t=" + Date.now();
+  const res = await fetch(JSON_URL, {cache:"no-store"});
+  const j = await res.json();
+  const url = j.url + "/256X144";
+  document.body.innerHTML = '<img src="'+url+'" style="width:320px;border:4px solid #2196f3;border-radius:8px;">';
+})();
+</script>
 </head>
 <body>
-Se non vieni reindirizzato automaticamente, clicca <a href="mappa_calabria_definitivo.html">qui</a>.
+Caricamento webcam…
 </body>
 </html>
