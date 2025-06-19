@@ -1,0 +1,4 @@
+name = "spiaggia-cam"
+main = "src/index.js"
+compatibility_date = "2025-06-19"
+usage_model = "bundled"
