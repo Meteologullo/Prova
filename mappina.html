@@ -1,0 +1,261 @@
+
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Weather Widget</title>
+<style>
+        #weatherWidget {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            font-family: sans-serif;
+        }
+        #weatherWidget img.background {
+            width: 100%;
+            display: block;
+            position: relative;
+            z-index: 1;
+        }
+        #weatherWidget .marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 5;
+            cursor: pointer;
+        }
+        #weatherWidget .marker img {
+            width: 32px;
+            height: 32px;
+            pointer-events: none;
+        }
+        #weatherWidget .marker .temp {
+            margin-top: 2px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 3px #000;
+            pointer-events: none;
+        }
+        #weatherWidget #title {
+            position: absolute;
+            top: 20px; right: 20px;
+            z-index: 4; text-align: right; color: #fff;
+        }
+        #weatherWidget #title h1 { margin: 0; font-size: 24px; }
+        #weatherWidget #title p  { margin: 2px 0 0; font-size: 14px; }
+        #weatherWidget #minmax {
+            position: absolute; top: 20px; left: 20px;
+            z-index: 4; background: rgba(0,0,0,0.5);
+            padding: 8px; border-radius: 4px; font-size: 12px; color: #fff;
+            display: none;
+        }
+        #weatherWidget #minmax table { border-collapse: collapse; }
+        #weatherWidget #minmax td { padding: 2px 6px; }
+        #weatherWidget #minmax .min { color: #8cf; }
+        #weatherWidget #minmax .max { color: #fc8; }
+        #weatherWidget .wind {
+            position: absolute; width: 40px; height: 40px;
+            z-index: 3; opacity: 0.8;
+        }
+        #weatherWidget #adminBtn {
+            position: absolute; top: 10px; left: 10px; z-index: 10;
+        }
+        #weatherWidget #adminPanel {
+            position: absolute; top: 10px; right: 10px; z-index: 10;
+            background: rgba(255,255,255,0.95); color: #000;
+            padding: 10px; border: 1px solid #ccc; width: 220px;
+            display: none;
+        }
+        #weatherWidget #adminPanel input,
+        #weatherWidget #adminPanel select,
+        #weatherWidget #adminPanel button {
+            width: 100%; margin: 5px 0;
+        }
+        #weatherWidget #territory {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+<div id="weatherWidget">
+<button id="adminBtn">🔧 Admin</button>
+<div id="adminPanel">
+<h4>Modifica Marker</h4>
+<label>Giorno:<br/>
+<select id="daySelect"></select>
+</label>
+<label>Icona URL:<br/>
+<input id="iconUrl" placeholder="URL icona" type="text"/>
+</label>
+<label>°C:<br/>
+<input id="tempVal" type="number"/>
+</label>
+<button id="saveBtn">Salva</button>
+</div>
+<img alt="Mappa Meteo" class="background" src="https://static.wixstatic.com/media/05712a_53208849ecff496bb8868f1d69e8ae89~mv2.jpg"/>
+<div id="territory"></div>
+<div id="title">
+<h1 id="titleDay">GIORNO 4</h1>
+<p id="titleDate">APRILE 2025</p>
+</div>
+<div id="minmax"></div>
+<img class="wind" src="https://i.imgur.com/8wP5Qbh.png" style="left:30%; top:65%; transform:rotate(45deg);"/>
+<img class="wind" src="https://i.imgur.com/8wP5Qbh.png" style="left:15%; top:50%; transform:rotate(-20deg);"/>
+</div>
+<script>
+  const config = [
+    {
+      name:  'GIORNO 4',
+      date:  'APRILE 2025',
+      minmax: [
+        { code:'CS', min:7,  max:19 },
+        { code:'KR', min:11, max:17 },
+        { code:'CZ', min:9,  max:16 },
+        { code:'VV', min:7,  max:16 },
+        { code:'RC', min:11, max:19 },
+      ],
+      points: []
+    }
+  ];
+
+  for (let x = 20; x <= 80; x += 10) {
+    for (let y = 20; y <= 80; y += 10) {
+      config[0].points.push({
+        x: x,
+        y: y,
+        icon: 'https://img.icons8.com/emoji/48/000000/sun-emoji.png',
+        temp: Math.floor(Math.random() * 10) + 15
+      });
+    }
+  }
+
+  let currentDay = 0, editingIndex = null, adminMode = false;
+  const w   = document.getElementById('weatherWidget');
+  const ds  = w.querySelector('#daySelect');
+  const ab  = w.querySelector('#adminBtn');
+  const ap  = w.querySelector('#adminPanel');
+  const sv  = w.querySelector('#saveBtn');
+  const iu  = w.querySelector('#iconUrl');
+  const tv  = w.querySelector('#tempVal');
+  const tD  = w.querySelector('#titleDay');
+  const tDt = w.querySelector('#titleDate');
+  const mm  = w.querySelector('#minmax');
+
+  config.forEach((d,i)=> {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = d.name; ds.append(o);
+  });
+
+  ds.addEventListener('change', () => {
+    currentDay = +ds.value;
+    renderAll();
+  });
+
+  ab.addEventListener('click', () => {
+    const p = prompt('Password admin:');
+    if(p === 'admin'){
+      adminMode = !adminMode;
+      ap.style.display = adminMode ? 'block' : 'none';
+      ab.textContent = adminMode ? '🔒 Lock' : '🔧 Admin';
+      renderMarkers();
+    } else {
+      alert('Password errata');
+    }
+  });
+
+  sv.addEventListener('click', () => {
+    if(editingIndex === null) return alert('Seleziona un marker');
+    const pt = config[currentDay].points[editingIndex];
+    pt.icon = iu.value;
+    pt.temp = parseFloat(tv.value);
+    renderMarkers();
+  });
+
+  function renderHeader(){
+    const d = config[currentDay];
+    tD.textContent = d.name;
+    tDt.textContent = d.date;
+    mm.innerHTML = '<table>' + d.minmax.map(r => `
+      <tr>
+        <td>${r.code}</td>
+        <td class="min">+${r.min}</td>
+        <td class="max">+${r.max}</td>
+      </tr>`).join('') + '</table>';
+    mm.style.display = adminMode ? 'none' : 'block';
+  }
+
+  function renderMarkers() {
+    w.querySelectorAll('.marker').forEach(x => x.remove());
+    config[currentDay].points.forEach((pt, i) => {
+      const m = document.createElement('div');
+      m.className = 'marker';
+      m.style.left = pt.x + '%';
+      m.style.top = pt.y + '%';
+      m.innerHTML = `<img src="${pt.icon}"><div class="temp">${pt.temp}°</div>`;
+      w.appendChild(m);
+      if (adminMode) {
+        m.addEventListener('click', () => {
+          editingIndex = i;
+          iu.value = pt.icon;
+          tv.value = pt.temp;
+        });
+      }
+    });
+
+    enableDragAndDrop();
+  }
+
+  function enableDragAndDrop() {
+    let draggedMarker = null;
+
+    document.querySelectorAll('.marker').forEach(marker => {
+      marker.addEventListener('mousedown', (e) => {
+        if (!adminMode) return;
+        draggedMarker = marker;
+        const offsetX = e.clientX - marker.getBoundingClientRect().left;
+        const offsetY = e.clientY - marker.getBoundingClientRect().top;
+
+        function onMouseMove(e) {
+          if (draggedMarker) {
+            const left = ((e.clientX - offsetX) / w.offsetWidth) * 100;
+            const top = ((e.clientY - offsetY) / w.offsetHeight) * 100;
+            draggedMarker.style.left = `${Math.min(Math.max(0, left), 100)}%`;
+            draggedMarker.style.top = `${Math.min(Math.max(0, top), 100)}%`;
+          }
+        }
+
+        function onMouseUp() {
+          if (draggedMarker) {
+            const pt = config[currentDay].points[editingIndex];
+            pt.x = parseFloat(draggedMarker.style.left);
+            pt.y = parseFloat(draggedMarker.style.top);
+            renderMarkers();
+            draggedMarker = null;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+          }
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    });
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderMarkers();
+  }
+
+  renderAll();
+</script>
+</body>
+</html>
