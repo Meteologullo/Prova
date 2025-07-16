@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Mappa Meteo – versione deluxe</title>
+
+<!-- Google Fonts for a modern look -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+:root{
+    --color-bg: radial-gradient(circle at 50% 20%, #0093E9 0%, #005F9E 100%);
+    --panel-bg: rgba(255,255,255,0.96);
+    --accent: #ffcb00;
+}
+
+/* --- layout principale --- */
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%; font-family:'Nunito',sans-serif; color:#fff;}
+#widget{
+    position:relative; width:100%; height:100%;
+    max-width:740px; margin:0 auto; overflow:hidden;
+    background:var(--color-bg);
+}
+
+/* Responsive background map */
+#map{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:contain; pointer-events:none;
+    opacity:.35;                 /* leggera trasparenza per far risaltare marker */
+}
+
+/* --- marker --- */
+.marker{
+    position:absolute; z-index:5;
+    transform:translate(-50%,-50%);
+    cursor:grab; touch-action:none; user-select:none; text-align:center;
+}
+.marker:active{cursor:grabbing;}
+
+.marker img{
+    width:52px; height:52px; pointer-events:none;
+    filter:drop-shadow(0 0 2px rgba(0,0,0,.6));
+}
+/* animazioni semplici per diversi tipi di icona */
+img.sunny{ animation:spin 12s linear infinite; }
+img.cloudy{ animation:drift 5s ease-in-out infinite alternate; }
+img.rainy{ animation:pulse 1.4s ease-in-out infinite; }
+
+@keyframes spin{from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+@keyframes drift{from{transform:translateX(-4px);} to{transform:translateX(4px);} }
+@keyframes pulse{0%{transform:scale(1);}50%{transform:scale(0.92);}100%{transform:scale(1);} }
+
+.marker .t{
+    margin-top:2px; font-weight:800; font-size:14px;
+    text-shadow:0 0 4px #000;
+}
+
+/* --- title & nav giorni --- */
+header{
+    position:absolute; top:10px; right:10px; z-index:4; text-align:right;
+}
+header h1{font-size:26px; margin:0; line-height:1.1; font-weight:800;}
+header p{font-size:14px; margin-top:2px;}
+
+nav{
+    position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+    display:flex; gap:6px; z-index:4; flex-wrap:wrap; justify-content:center;
+}
+nav button{
+    background:rgba(255,255,255,.8); border:none;
+    padding:8px 12px; border-radius:6px; font-size:15px;
+    color:#004070; font-weight:600;
+}
+nav button.active{background:var(--accent); color:#000;}
+
+/* --- floating action button admin --- */
+#fab{
+    position:absolute; bottom:84px; right:22px; z-index:6;
+    background:var(--accent); border:none; width:50px; height:50px; border-radius:50%;
+    font-size:26px; box-shadow:0 4px 10px rgba(0,0,0,.35); color:#000;
+}
+
+/* --- admin bottom‑sheet --- */
+#panel{
+    position:absolute; left:0; right:0; bottom:0;
+    background:var(--panel-bg); padding:14px 16px 18px; z-index:10;
+    border-top-left-radius:14px; border-top-right-radius:14px;
+    transform:translateY(110%); transition:transform .35s ease;
+    box-shadow:0 -4px 14px rgba(0,0,0,.35);
+}
+#panel.open{transform:translateY(0);}
+#panel h3{color:#004070; margin-bottom:6px; font-weight:800;}
+#panel label{display:block; font-size:14px; color:#004070; margin-top:10px;}
+#panel input, #panel select{width:100%; padding:6px 8px; font-size:15px; border:1px solid #ccc; border-radius:6px;}
+#panel .row{display:flex; gap:8px;}
+#panel button{
+    margin-top:12px; width:100%; padding:10px; font-size:16px;
+    border:none; border-radius:6px; font-weight:700; background:var(--accent); color:#000;
+}
+/* close bar */
+#handle{
+    width:44px; height:5px; border-radius:2.5px;
+    background:#ccc; margin:0 auto 8px;
+}
+
+#toast{
+    position:absolute; top:20px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,.8); color:#fff; padding:8px 16px; border-radius:6px;
+    font-size:14px; display:none; z-index:20;
+}
+
+</style>
+</head>
+<body>
+
+<div id="widget">
+
+    <img id="map"
+     src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png"
+     data-fallback="https://i.imgur.com/jAoPvQY.png"
+     alt="Mappa Calabria"
+     onerror="this.onerror=null;this.src=this.dataset.fallback;"
+/>
+
+    <header>
+        <h1 id="hDay">GIORNO 1</h1>
+        <p id="hDate">APRILE 2025</p>
+    </header>
+
+    <nav id="nav"></nav>
+
+    <button id="fab">⚙️</button>
+
+    <!-- Bottom sheet panel -->
+    <div id="panel">
+        <div id="handle"></div>
+        <h3>Modifica Marker</h3>
+
+        <label>Giorno
+            <select id="selDay"></select>
+        </label>
+
+        <label>Condizione meteo
+            <select id="selIcon"></select>
+        </label>
+
+        <label>URL icona personalizzata
+            <input type="text" id="inpUrl" placeholder="https://...">
+        </label>
+
+        <label>Temperatura °C
+            <input type="number" id="inpTemp">
+        </label>
+
+        <div class="row">
+            <button id="btnSave">Salva marker</button>
+            <button id="btnSaveLayout" style="background:#00d27f;">💾 Layout</button>
+        </div>
+        <button id="btnReset" style="background:#ff5b5b;">Reset layout</button>
+    </div>
+
+    <div id="toast"></div>
+
+</div>
+
+<script>
+/* ========= dati iniziali ========= */
+const ICONS={
+  'Sole':            {url:'https://img.icons8.com/emoji/96/000000/sun-emoji.png',    cls:'sunny'},
+  'Parz. nuvoloso':  {url:'https://img.icons8.com/emoji/96/000000/sun-behind-cloud.png', cls:'cloudy'},
+  'Nuvoloso':        {url:'https://img.icons8.com/emoji/96/000000/cloud-emoji.png',     cls:'cloudy'},
+  'Pioggia':         {url:'https://img.icons8.com/emoji/96/000000/cloud-with-rain-emoji.png', cls:'rainy'},
+  'Temporale':       {url:'https://img.icons8.com/emoji/96/000000/cloud-with-lightning-and-rain-emoji.png', cls:'rainy'},
+  'Neve':            {url:'https://img.icons8.com/emoji/96/000000/cloud-with-snow-emoji.png', cls:'cloudy'},
+  'Nebbia':          {url:'https://img.icons8.com/pastel-glyph/96/000000/fog--v1.png', cls:'cloudy'},
+  'Vento':           {url:'https://img.icons8.com/emoji/96/000000/wind-face-emoji.png', cls:'cloudy'}
+};
+
+/* genera punti casuali d’esempio (20 marker) */
+const sample = _=>Array.from({length:20}, ()=>
+  ({x:Math.random()*70+15, y:Math.random()*70+15, icon:'Sole', temp:Math.round(Math.random()*12+15)})
+);
+
+const CONFIG = [
+  {name:'GIORNO 1', date:'APRILE 2025', points: sample()},
+  {name:'GIORNO 2', date:'APRILE 2025', points: sample()},
+  {name:'GIORNO 3', date:'APRILE 2025', points: sample()},
+  {name:'GIORNO 4', date:'APRILE 2025', points: sample()},
+];
+
+const STORAGE_KEY='METEO_WIDGET_CONFIG_V1';
+
+function saveLayout(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(CONFIG));
+  toast('Layout salvato 👍');
+}
+function resetLayout(){
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+function loadLayout(){
+  const data=localStorage.getItem(STORAGE_KEY);
+  if(!data) return;
+  try{
+    const parsed=JSON.parse(data);
+    if(Array.isArray(parsed) && parsed.length){
+      CONFIG.splice(0,CONFIG.length,...parsed);
+    }
+  }catch(e){}
+}
+
+loadLayout();
+
+/* ========= elementi DOM ========= */
+const w=document.getElementById('widget'),
+      hDay=document.getElementById('hDay'),
+      hDate=document.getElementById('hDate'),
+      nav=document.getElementById('nav'),
+      fab=document.getElementById('fab'),
+      panel=document.getElementById('panel'),
+      selDay=document.getElementById('selDay'),
+      selIcon=document.getElementById('selIcon'),
+      inpUrl=document.getElementById('inpUrl'),
+      inpTemp=document.getElementById('inpTemp'),
+      btnSave=document.getElementById('btnSave'),
+      btnSaveLayout=document.getElementById('btnSaveLayout'),
+      btnReset=document.getElementById('btnReset'),
+      toastEl=document.getElementById('toast');
+
+let curDay=0, editIdx=null, admin=false;
+
+/* ========= costruisci UI ========= */
+function buildNav(){
+  nav.innerHTML='';
+  CONFIG.forEach((d,i)=>{
+    const b=document.createElement('button');
+    b.textContent=d.name;
+    if(i===curDay) b.classList.add('active');
+    b.onclick=()=>{curDay=i; renderAll();}
+    nav.appendChild(b);
+  });
+}
+function buildSelectors(){
+  selDay.innerHTML='';
+  CONFIG.forEach((d,i)=>{
+    const o=new Option(d.name,i);
+    selDay.add(o);
+  });
+  selIcon.innerHTML='';
+  Object.keys(ICONS).forEach(label=>{
+    const o=new Option(label,label);
+    selIcon.add(o);
+  });
+}
+
+function toast(msg){
+  toastEl.textContent=msg;
+  toastEl.style.display='block';
+  setTimeout(()=>toastEl.style.display='none',2200);
+}
+
+/* ========= render marker ========= */
+function renderMarkers(){
+  /* pulizia */
+  w.querySelectorAll('.marker').forEach(m=>m.remove());
+
+  CONFIG[curDay].points.forEach((pt,i)=>{
+    const data=ICONS[pt.icon]||ICONS['Sole'];
+    const m=document.createElement('div');
+    m.className='marker';
+    m.style.left=pt.x+'%';
+    m.style.top=pt.y+'%';
+    m.innerHTML=`<img src="${data.url}" class="${data.cls}" alt=""><div class="t">${pt.temp}°</div>`;
+    w.appendChild(m);
+
+    m.addEventListener('click',e=>{
+      if(!admin) return;
+      editIdx=i;
+      panel.classList.add('open');
+      selDay.value=curDay;
+      selIcon.value=pt.icon;
+      inpUrl.value=data.url;
+      inpTemp.value=pt.temp;
+      e.stopPropagation();
+    });
+
+    /* drag --- pointer events */
+    m.addEventListener('pointerdown',e=>{
+      if(!admin) return;
+      editIdx=i;
+      m.setPointerCapture(e.pointerId);
+      const rect=w.getBoundingClientRect();
+      const move=ev=>{
+        const nx=((ev.clientX-rect.left)/rect.width)*100,
+              ny=((ev.clientY-rect.top)/rect.height)*100;
+        m.style.left=Math.min(Math.max(0,nx),100)+'%';
+        m.style.top=Math.min(Math.max(0,ny),100)+'%';
+      };
+      const up=ev=>{
+        m.releasePointerCapture(ev.pointerId);
+        const pt=CONFIG[curDay].points[i];
+        pt.x=parseFloat(m.style.left);
+        pt.y=parseFloat(m.style.top);
+        m.removeEventListener('pointermove',move);
+        m.removeEventListener('pointerup',up);
+      };
+      m.addEventListener('pointermove',move);
+      m.addEventListener('pointerup',up);
+    });
+  });
+}
+
+/* ========= render tutto ========= */
+function renderAll(){
+  hDay.textContent=CONFIG[curDay].name;
+  hDate.textContent=CONFIG[curDay].date;
+  buildNav();
+  renderMarkers();
+}
+
+/* ========= eventi ========= */
+fab.onclick=()=>{
+  const pwd=admin?null:prompt('Password admin:');
+  if(!admin && pwd!=='admin') return;
+  admin=!admin;
+  fab.textContent=admin?'🔒':'⚙️';
+  toast(admin?'Modalità admin attiva':'Admin disattivato');
+};
+
+w.addEventListener('click',()=>panel.classList.remove('open'));
+
+btnSave.onclick=()=>{
+  if(editIdx===null){toast('Seleziona un marker');return;}
+  const pDay=parseInt(selDay.value);
+  const pt=CONFIG[pDay].points[editIdx];
+  pt.icon=selIcon.value;
+  if(inpUrl.value.trim()) ICONS[selIcon.value]={url:inpUrl.value.trim(),cls:'custom'};
+  pt.temp=parseFloat(inpTemp.value)||pt.temp;
+
+  curDay=pDay;
+  editIdx=null;
+  panel.classList.remove('open');
+  renderAll();
+};
+
+btnSaveLayout.onclick=saveLayout;
+btnReset.onclick=resetLayout;
+
+/* chiudi bottom sheet trascinando verso il basso */
+let startY=0;
+panel.addEventListener('touchstart',e=>startY=e.touches[0].clientY);
+panel.addEventListener('touchmove',e=>{
+  if(e.touches[0].clientY-startY>80) panel.classList.remove('open');
+});
+
+/* ========= init ========= */
+buildSelectors();
+renderAll();
+
+</script>
+</body>
+</html>
