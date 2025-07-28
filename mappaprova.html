@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Meteo Calabria – Dashboard Unificata</title>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+
+  <style>
+    /* ——— Palette generica pagina ——— */
+    :root{
+      --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+      --glass:rgba(255,255,255,.14);
+      --blur:14px;
+      --radius:18px;
+      --accent:#00d2ff;
+      --accent2:#3a7bd5;
+      --text:#ecf1f8;
+
+      /* Widget redesign3 */
+      --clr-sky:#4fd1ff;
+      --clr-sky-2:#0ea5e9;
+      --clr-night:#06214b;
+      --clr-night-2:#010c1e;
+      --clr-accent:#facc15;
+      --clr-accent-night:#ffe680;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{
+      min-height:100vh;background:var(--bg);font-family:"Inter",sans-serif;color:var(--text);
+      display:flex;flex-direction:column;align-items:center;padding:20px 12px;
+    }
+
+    /* ——— Barra di ricerca (solo UI) ——— */
+    .search{display:flex;gap:.5rem;width:100%;max-width:820px;margin-bottom:20px}
+    .search input{
+      flex:1;padding:.9rem 1.1rem;border:none;border-radius:var(--radius);
+      background:var(--glass);backdrop-filter:blur(var(--blur));
+      color:var(--text);font-size:1rem;outline:none;
+    }
+    .search button{
+      padding:.9rem 1.2rem;border:none;border-radius:var(--radius);
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#fff;font-weight:700;font-size:1rem;cursor:pointer;
+    }
+
+    /* ——— Widget principale (grid) ——— */
+    #widget{
+      width:100%;max-width:820px;display:grid;
+      grid-template-columns:1fr auto;
+      grid-template-rows:auto 1fr auto;
+      grid-template-areas:
+        "header header"
+        "map    forecast"
+        "bottom bottom";
+      background:radial-gradient(circle at 50% 15%,var(--clr-sky) 0%,var(--clr-sky-2) 100%);
+      border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);
+      overflow:hidden;position:relative;isolation:isolate;transition:background .4s;
+    }
+    body.night #widget{
+      background:radial-gradient(circle at 50% 15%,var(--clr-night) 0%,var(--clr-night-2) 100%);
+    }
+
+    /* Header */
+    header{grid-area:header;padding:18px 14px;text-shadow:0 2px 6px rgba(0,0,0,.5);font-family:'Baloo 2',cursive;}
+    header h1{font-size:clamp(26px,6vw,38px);font-weight:800;line-height:1.1;}
+    header p{font-size:clamp(14px,3vw,18px);margin-top:2px;font-weight:600;opacity:.9;}
+    body.night header *{filter:brightness(.88);}
+
+    /* Map area */
+    #mapArea{grid-area:map;position:relative;margin:0 14px 88px 14px;border-radius:6px;aspect-ratio:1/1;}
+    #mapArea::before{content:"";position:absolute;inset:0;background:rgba(255,255,255,.08);border-radius:inherit;}
+    #map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:.3;filter:drop-shadow(0 0 2px rgba(0,0,0,.5));}
+
+    .marker{position:absolute;transform:translate(-50%,-50%);font-size:calc(var(--marker-size,36px)*0.9);user-select:none;cursor:default;text-shadow:0 1px 3px rgba(0,0,0,.45);}
+
+    /* Forecast table */
+    #forecast{grid-area:forecast;margin:20px 14px 0 0;border-collapse:collapse;border-radius:10px;
+      background:rgba(255,255,255,.15);backdrop-filter:blur(10px);font-size:13px;min-width:160px;
+      box-shadow:0 4px 12px rgba(0,0,0,.25);overflow:hidden;z-index:2;transition:background .35s;}
+    body.night #forecast{background:rgba(255,255,255,.10);} #forecast th,#forecast td{padding:4px 10px;}
+    #forecast th{background:rgba(255,255,255,.25);font-weight:700;font-family:'Baloo 2',cursive;transition:background .35s;}
+    body.night #forecast th{background:rgba(255,255,255,.18);} #forecast tr:nth-child(even) td{background:rgba(255,255,255,.05);} #forecast tr:hover td{background:rgba(255,255,255,.08);} #forecast th:first-child::before{content:"🌡️ ";}
+    #forecast td:nth-child(2),#forecast td:nth-child(3){font-weight:800;font-size:18px;}
+
+    /* Bottom bar */
+    #bottomBar{grid-area:bottom;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 14px;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);box-shadow:0 -4px 12px rgba(0,0,0,.25);border-top-left-radius:12px;border-top-right-radius:12px;z-index:3;transition:background .35s;}
+    body.night #bottomBar{background:rgba(255,255,255,.10);}  
+    #nav{flex:1;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;overflow-x:auto;padding:2px 0;}
+    #nav button{background:transparent;border:none;font-size:14px;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .2s,color .2s;color:#fff;white-space:nowrap;}
+    #nav button:hover{background:rgba(255,255,255,.25);} body.night #nav button:hover{background:rgba(255,255,255,.18);} #nav button.active{background:var(--clr-accent);color:#000;} body.night #nav button.active{background:var(--clr-accent-night);color:#000;}
+
+    .fab-btn{width:54px;height:54px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.35);transition:transform .2s,background .35s;flex-shrink:0;font-size:26px;}
+    .fab-btn:hover{transform:scale(1.08);} #fab{background:var(--clr-accent);color:#000;} body.night #fab{background:var(--clr-accent-night);} #themeBtn{background:#ffffff26;color:#fff;} body.night #themeBtn{background:#ffffff33;}
+  </style>
+</head>
+<body>
+  <!-- Barra di ricerca -->
+  <form class="search" onsubmit="event.preventDefault();alert('Ricerca non implementata in questa demo');">
+    <input placeholder="Scrivi una città o usa 📍…" required />
+    <button type="submit"><i class="fa-solid fa-search"></i></button>
+  </form>
+
+  <!-- Widget -->
+  <div id="widget">
+    <header>
+      <h1 id="hDay">GIORNO 1</h1>
+      <p id="hDate"></p>
+    </header>
+
+    <div id="mapArea">
+      <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa Calabria" />
+    </div>
+
+    <table id="forecast"></table>
+
+    <div id="bottomBar">
+      <button id="themeBtn" class="fab-btn" title="Cambia tema">🌙</button>
+      <nav id="nav"></nav>
+      <button id="fab" class="fab-btn" title="Pannello admin">⚙️</button>
+    </div>
+  </div>
+
+  <script>
+  /*********************  DEMO DATA  *********************/
+  const DAYS = [
+    {label:'GIORNO 1',offset:0,points:[
+      {city:'Cosenza',x:46,y:34,icon:'☀️',tmax:22,tmin:12},
+      {city:'Catanzaro',x:62,y:56,icon:'⛅️',tmax:21,tmin:14},
+      {city:'Reggio',x:44,y:80,icon:'🌧️',tmax:20,tmin:16}
+    ]},
+    {label:'GIORNO 2',offset:1,points:[
+      {city:'Cosenza',x:46,y:34,icon:'⛅️',tmax:24,tmin:13},
+      {city:'Catanzaro',x:62,y:56,icon:'☀️',tmax:23,tmin:15},
+      {city:'Reggio',x:44,y:80,icon:'☀️',tmax:21,tmin:17}
+    ]},
+    {label:'GIORNO 3',offset:2,points:[
+      {city:'Cosenza',x:46,y:34,icon:'🌧️',tmax:19,tmin:11},
+      {city:'Catanzaro',x:62,y:56,icon:'🌦️',tmax:20,tmin:13},
+      {city:'Reggio',x:44,y:80,icon:'⛅️',tmax:22,tmin:14}
+    ]},
+    {label:'GIORNO 4',offset:3,points:[
+      {city:'Cosenza',x:46,y:34,icon:'☀️',tmax:25,tmin:14},
+      {city:'Catanzaro',x:62,y:56,icon:'☀️',tmax:24,tmin:16},
+      {city:'Reggio',x:44,y:80,icon:'☀️',tmax:23,tmin:18}
+    ]}
+  ];
+  let curDay=0,night=false;
+
+  /* Utility */
+  const $=sel=>document.querySelector(sel);
+
+  /* Build NAV */
+  function buildNav(){
+    const nav=$('#nav');
+    DAYS.forEach((d,i)=>{
+      const btn=document.createElement('button');
+      btn.textContent=d.label;
+      if(i===0) btn.classList.add('active');
+      btn.onclick=()=>{curDay=i;updateNav();render();};
+      nav.appendChild(btn);
+    });
+  }
+  function updateNav(){
+    $('#nav').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('active',i===curDay));
+  }
+
+  /* Render */
+  function render(){
+    const data=DAYS[curDay];
+    /* header */
+    $('#hDay').textContent=data.label;
+    const dt=new Date();dt.setDate(dt.getDate()+data.offset);
+    $('#hDate').textContent=dt.toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+
+    /* markers */
+    const mapA=$('#mapArea');
+    mapA.querySelectorAll('.marker').forEach(m=>m.remove());
+    data.points.forEach(p=>{
+      const mk=document.createElement('div');
+      mk.className='marker';
+      mk.style.left=p.x+'%';
+      mk.style.top=p.y+'%';
+      mk.textContent=p.icon;
+      mk.title=`${p.city}: ${p.tmax}° / ${p.tmin}°`;
+      mapA.appendChild(mk);
+    });
+
+    /* table */
+    const tbl=$('#forecast');
+    tbl.innerHTML='<tr><th>Città</th><th>Max</th><th>Min</th></tr>';
+    data.points.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${r.city}</td><td>${r.tmax}°</td><td>${r.tmin}°</td>`;
+      tbl.appendChild(tr);
+    });
+  }
+
+  /* Theme toggle */
+  function toggleTheme(){
+    night=!night;
+    document.body.classList.toggle('night',night);
+    $('#themeBtn').textContent=night?'☀️':'🌙';
+  }
+
+  /* Init */
+  document.addEventListener('DOMContentLoaded',()=>{
+    buildNav();
+    render();
+    $('#themeBtn').onclick=toggleTheme;
+    $('#fab').onclick=()=>alert('Admin panel in sviluppo…');
+  });
+  </script>
+</body>
+</html>
