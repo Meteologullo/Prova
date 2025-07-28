@@ -1,0 +1,231 @@
+
+<!DOCTYPE html><html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Mappa Meteo Calabria – PRO</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+<style>
+:root{
+  --gap:14px;
+  --hdr-h:60px;
+  --bar-h:72px;
+  --clr-bg1:#46a9ff;
+  --clr-bg2:#125fb9;
+  --clr-accent:#facc15;
+  --clr-panel:#fbfbfb;
+  --clr-dark:#092143;
+}
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',sans-serif;}
+body{background:radial-gradient(circle at 50% 0%,var(--clr-bg1) 0%,var(--clr-bg2) 100%);color:#fff;-webkit-tap-highlight-color:transparent;}
+img{max-width:100%;display:block}
+button{cursor:pointer;}
+
+header{position:fixed;top:0;left:0;right:0;height:var(--hdr-h);padding:8px var(--gap);display:flex;flex-direction:column;justify-content:center;z-index:20;}
+header h1{font-family:'Baloo 2',cursive;font-size:28px;font-weight:800;}
+header p{font-size:15px;font-weight:600;opacity:.9;}
+
+#mapWrap{position:fixed;top:var(--hdr-h);left:0;right:0;bottom:var(--bar-h);overflow:hidden;}
+#mapWrap img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:.24;}
+
+.marker{position:absolute;transform:translate(-50%,-50%);touch-action:none;}
+.marker img{width:100%;height:100%;}
+
+#botBar{position:fixed;left:0;right:0;bottom:0;height:var(--bar-h);display:flex;align-items:center;padding:6px var(--gap);background:rgba(0,0,0,.28);backdrop-filter:blur(8px);z-index:20;}
+#dayNav{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1;}
+#dayNav::-webkit-scrollbar{display:none;}
+#dayNav button{flex:0 0 auto;padding:6px 12px;border-radius:18px;border:none;background:rgba(255,255,255,.18);color:#fff;font-weight:600;white-space:nowrap;}
+#dayNav button.active{background:var(--clr-accent);color:#000;}
+#addDay{width:42px;height:42px;border-radius:50%;border:none;background:var(--clr-accent);color:#000;font-size:26px;font-weight:800;margin-left:6px;}
+#addIcon,#gearBtn{width:46px;height:46px;border:none;border-radius:50%;background:rgba(0,0,0,.34);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;margin-left:6px;}
+
+#icPalette{position:absolute;left:50%;bottom:calc(var(--bar-h) + 6px);transform:translateX(-50%) scale(0);transform-origin:bottom center;width:92vw;max-width:480px;padding:12px;background:var(--clr-panel);border-radius:15px;box-shadow:0 8px 20px rgba(0,0,0,.35);display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:10px;z-index:30;transition:transform .25s;}
+#icPalette.open{transform:translateX(-50%) scale(1);}
+#icPalette button{background:#fff;border:none;border-radius:12px;padding:8px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;}
+#icPalette img{width:100%;height:100%;}
+
+#side{position:fixed;top:0;right:-260px;width:260px;height:100%;background:var(--clr-panel);color:var(--clr-dark);box-shadow:-4px 0 14px rgba(0,0,0,.28);transition:right .3s;z-index:40;}
+#side.open{right:0;}
+#side h3{padding:18px 18px 8px;font-family:'Baloo 2',cursive;font-size:22px;}
+#side section{padding:0 18px 28px;display:flex;flex-direction:column;gap:12px;font-size:14px;}
+#side label{display:flex;flex-direction:column;gap:4px;}
+#side input[type=text]{padding:6px 8px;border-radius:6px;border:1px solid #b3b3b3;font-size:15px;}
+#closeSide{position:absolute;top:12px;left:-48px;width:48px;height:48px;border-radius:50%;border:none;background:var(--clr-accent);color:#000;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.25);}
+#saveCfg{padding:9px;border:none;border-radius:8px;background:var(--clr-dark);color:#fff;font-weight:600;}
+
+.hide{display:none!important;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="hDay">GIORNO</h1>
+  <p id="hDate">DATA</p>
+</header>
+
+<div id="mapWrap">
+  <img class="bg" id="bgMap" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/900px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Calabria">
+</div>
+
+<div id="botBar">
+  <nav id="dayNav"></nav>
+  <button id="addDay" title="Nuovo giorno">＋</button>
+  <button id="addIcon" title="Palette icone">★</button>
+  <button id="gearBtn" title="Impostazioni">⚙️</button>
+</div>
+
+<div id="icPalette"></div>
+
+<aside id="side">
+  <button id="closeSide">×</button>
+  <h3>Impostazioni</h3>
+  <section>
+    <label>Nome giorno <input type="text" id="inpDay"></label>
+    <label>Data <input type="text" id="inpDate"></label>
+    <label>Mappa (URL) <input type="text" id="inpMap"></label>
+    <button id="saveCfg">Salva</button>
+  </section>
+</aside>
+
+<script>
+/* ======= Storage & inizializzazione =================================== */
+const blankDay={name:"Giorno",date:"Data",map:"",points:[]};
+let CONFIG,storageOK=true;
+try{CONFIG=JSON.parse(localStorage.getItem("WX_CAL_V1"))||[JSON.parse(JSON.stringify(blankDay))];}
+catch(e){CONFIG=[JSON.parse(JSON.stringify(blankDay))];storageOK=false;}
+function persist(){if(storageOK) localStorage.setItem("WX_CAL_V1",JSON.stringify(CONFIG));}
+
+/* ======= Icon set ====================================================== */
+const base="https://raw.githubusercontent.com/matte-meteo/icons/master/";
+const ICONS=[
+ {id:"sunny",src:base+"sunny.png",lbl:"Sole"},
+ {id:"partly",src:base+"partly-day.png",lbl:"Parz. nuvole"},
+ {id:"cloud",src:base+"overcast.png",lbl:"Nuvoloso"},
+ {id:"rain",src:base+"rain.png",lbl:"Pioggia"},
+ {id:"rain-h",src:base+"heavy-rain.png",lbl:"Pioggia forte"},
+ {id:"storm",src:base+"storm.png",lbl:"Temporale"},
+ {id:"snow",src:base+"snow.png",lbl:"Neve"},
+ {id:"mist",src:base+"mist.png",lbl:"Nebbia"},
+ {id:"wind-w",src:base+"wind-weak.png",lbl:"Vento debole"},
+ {id:"wind-m",src:base+"wind-mod.png",lbl:"Vento moderato"},
+ {id:"wind-s",src:base+"wind-strong.png",lbl:"Vento forte"},
+ {id:"sea-c",src:base+"sea-calm.png",lbl:"Mare calmo"},
+ {id:"sea-m",src:base+"sea-mod.png",lbl:"Mare mosso"},
+ {id:"sea-r",src:base+"sea-rough.png",lbl:"Mare agitato"}
+];
+/* pointer to quick lookup */
+const ICON_MAP={};ICONS.forEach(i=>ICON_MAP[i.id]=i);
+
+/* ======= elementi ====================================================== */
+const hDay=$("#hDay"),hDate=$("#hDate"),bg=$("#bgMap");
+const dayNav=$("#dayNav"),palette=$("#icPalette");
+let cur=0,selectedIcon=null;
+
+function $(s,ctx=document){return ctx.querySelector(s);}
+function pct(v,tot){return (v/tot)*100;}
+
+/* ======= Palette ======================================================= */
+function buildPalette(){
+ palette.innerHTML="";
+ ICONS.forEach(ic=>{
+   const b=document.createElement("button");
+   b.innerHTML=`<img src="${ic.src}" alt="">`;
+   b.title=ic.lbl;
+   b.onclick=()=>{selectedIcon=ic;palette.classList.remove("open");};
+   palette.appendChild(b);
+ });
+}
+$("#addIcon").onclick=()=>palette.classList.toggle("open");
+
+/* ======= Giorni nav ==================================================== */
+function renderNav(){
+ dayNav.innerHTML="";
+ CONFIG.forEach((d,i)=>{
+   const btn=document.createElement("button");
+   btn.textContent=d.name||`Giorno ${i+1}`;
+   if(i===cur)btn.classList.add("active");
+   btn.onclick=()=>{cur=i;updateView();};
+   dayNav.appendChild(btn);
+ });
+}
+$("#addDay").onclick=()=>{CONFIG.push(JSON.parse(JSON.stringify(blankDay)));cur=CONFIG.length-1;persist();updateView();};
+
+/* ======= Aggiornamento schermata ======================================= */
+function updateView(){
+ const D=CONFIG[cur];
+ hDay.textContent=D.name||`Giorno ${cur+1}`;
+ hDate.textContent=D.date||"";
+ if(D.map){bg.src=D.map;}
+ /* pulisci marker esistenti */
+ document.querySelectorAll(".marker").forEach(m=>m.remove());
+ D.points.forEach(pt=>spawnMarker(pt));
+ renderNav();
+}
+function spawnMarker(pt){
+ const div=document.createElement("div");
+ div.className="marker";
+ div.style.left=pt.x+"%";div.style.top=pt.y+"%";
+ div.style.width=pt.s+"px";div.style.height=pt.s+"px";
+ div.innerHTML=`<img src="${ICON_MAP[pt.t].src}" alt="">`;
+ document.getElementById("mapWrap").appendChild(div);
+
+ interact(div)
+   .draggable({
+     inertia:true,
+     listeners:{move(ev){
+       const rect=document.getElementById("mapWrap").getBoundingClientRect();
+       const x=pct(ev.pageX-rect.left,rect.width);
+       const y=pct(ev.pageY-rect.top,rect.height);
+       div.style.left=x+"%";div.style.top=y+"%";
+       pt.x=x;pt.y=y;persist();
+     }}
+   })
+   .gesturable({
+     listeners:{move(ev){
+       pt.s*= (1+ev.ds);
+       pt.s=Math.max(40,Math.min(160,pt.s));
+       div.style.width=pt.s+"px";div.style.height=pt.s+"px";
+       persist();
+     }}
+   });
+ div.ondblclick=()=>{if(confirm("Eliminare icona?")){CONFIG[cur].points=CONFIG[cur].points.filter(p=>p!==pt);div.remove();persist();}};
+}
+
+/* ======= Click su mappa per aggiungere icon ============================ */
+document.getElementById("mapWrap").addEventListener("click",e=>{
+ if(!selectedIcon){palette.classList.add("open");return;}
+ const rect=e.currentTarget.getBoundingClientRect();
+ const x=pct(e.clientX-rect.left,rect.width);
+ const y=pct(e.clientY-rect.top,rect.height);
+ const pt={x,y,s:80,t:selectedIcon.id};
+ CONFIG[cur].points.push(pt);persist();
+ spawnMarker(pt);
+});
+
+/* ======= Side panel ==================================================== */
+$("#gearBtn").onclick=()=>openSide();
+$("#closeSide").onclick=()=>$("#side").classList.remove("open");
+$("#saveCfg").onclick=()=>{
+  const d=CONFIG[cur];
+  d.name=$("#inpDay").value.trim()||d.name;
+  d.date=$("#inpDate").value.trim()||d.date;
+  d.map=$("#inpMap").value.trim(); if(d.map)bg.src=d.map;
+  persist();updateView();$("#side").classList.remove("open");
+};
+function openSide(){
+ const d=CONFIG[cur];
+ $("#inpDay").value=d.name;
+ $("#inpDate").value=d.date;
+ $("#inpMap").value=d.map;
+ $("#side").classList.add("open");
+}
+
+/* ======= Avvio ========================================================= */
+buildPalette();updateView();
+</script>
+</body>
+</html>
