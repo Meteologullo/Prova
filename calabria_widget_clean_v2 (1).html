@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mappa Calabria</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+<style>
+  :root{
+    --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+    --glass:rgba(255,255,255,.14);
+    --blur:14px;
+    --radius:18px;
+    --accent:#00d2ff;
+    --accent2:#3a7bd5;
+    --text:#ecf1f8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);          /* stesso gradient dello shell */
+    font-family:"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    color:var(--text);
+    padding:1rem 0;
+  }
+
+  /* ——— wrapper mappa ——— */
+  #mapWrapper{
+    position:relative;
+    width:100%;max-width:480px;
+    aspect-ratio:1/1.15;           /* proporzione compact mobile */
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+
+  /* la grafica/SVG della mappa occuperà **tutto** il wrapper */
+  #mapWrapper > *{
+    position:absolute;inset:0;
+    width:100%!important;height:100%!important
+  }
+
+  /* ——— barra Giorni ——— */
+  #daysBar{
+    position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+    display:flex;gap:.4rem;
+    background:var(--glass);backdrop-filter:blur(var(--blur));
+    padding:.35rem .55rem;border-radius:var(--radius);
+  }
+  #daysBar button{
+    border:none;background:none;color:var(--text);
+    font-size:.8rem;font-weight:600;padding:.45rem .75rem;
+    border-radius:var(--radius);cursor:pointer;
+  }
+  #daysBar button.active,
+  #daysBar button:hover{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff;
+  }
+</style>
+</head>
+<body>
+
+<div id="mapWrapper">
+  <!-- la tua logica/SVG/Leaflet esistente rimane qui -->
+  <!-- ad esempio: <canvas id="calabriaMapCanvas"></canvas>   -->
+
+  <!--  ⬇  barra selezione Giorni rialzata di ~60 px  ⬇ -->
+  <div id="daysBar">
+    <button class="active">GIORNO 1</button>
+    <button>GIORNO 2</button>
+    <button>GIORNO 3</button>
+    <button>GIORNO 4</button>
+  </div>
+</div>
+
+<!-- i vecchi <script> JS (pin, fetch, ecc.) li rimetti pari‑pari -->
+</body>
+</html>
