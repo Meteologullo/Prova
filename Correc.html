@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meteo Logulo • Previsioni Smart</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+:root{
+  --bg-grad:linear-gradient(135deg,#09203f,#537895);
+  --glass:rgba(255,255,255,0.15);
+  --blur:15px;
+  --accent:#00c6ff;
+  --accent2:#0072ff;
+  --r:16px;
+  --light:#f5f5f5;
+  --dim:#b9c1cd;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI','Roboto',sans-serif;background:var(--bg-grad);color:var(--light);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+.app{width:100%;max-width:480px}
+.search{display:flex;gap:.5rem;margin-bottom:1.3rem}
+.search input{flex:1;padding:.75rem 1rem;background:var(--glass);border:none;border-radius:var(--r);backdrop-filter:blur(var(--blur));color:var(--light);font-size:1rem}
+.search button{padding:.75rem 1rem;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--r);color:#fff;font-weight:600;cursor:pointer}
+.section{background:var(--glass);border-radius:var(--r);backdrop-filter:blur(var(--blur));padding:1.25rem 1.4rem;margin-bottom:1rem}
+h2{font-size:1.45rem;margin-bottom:.6rem}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.8rem}
+.day{text-align:center;background:rgba(255,255,255,0.08);border-radius:var(--r);padding:.6rem .3rem}
+.day span{display:block}
+.day .date{font-size:.9rem;margin-bottom:.25rem}
+.day .icon i{font-size:1.35rem;margin-bottom:.1rem}
+.day .min{color:var(--dim);font-size:.85rem}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{padding:.32rem .45rem;text-align:center}
+th{position:sticky;top:0;background:var(--glass);backdrop-filter:blur(var(--blur));}
+tr:nth-child(even){background:rgba(255,255,255,0.05)}
+.scroll-x{overflow-x:auto;margin-top:.5rem}
+.obs{display:flex;gap:.8rem;align-items:center}
+.obs .temp{font-size:2.4rem;font-weight:600}
+iframe.radar{width:100%;height:300px;border:none;border-radius:var(--r);}
+footer{text-align:center;font-size:.8rem;color:var(--dim);margin-top:1rem}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+  <div class="app">
+    <form class="search" id="searchForm">
+      <input id="q" placeholder="Cerca comune..." autocomplete="off">
+      <button><i class="fas fa-search"></i></button>
+    </form>
+
+    <div id="dailySec" class="section" style="display:none"></div>
+
+    <div id="hourlySec" class="section" style="display:none">
+      <h2>Dettaglio orario</h2>
+      <div class="scroll-x"><table id="hourlyTbl"></table></div>
+    </div>
+
+    <div id="obsSec" class="section" style="display:none"></div>
+
+    <div id="radarSec" class="section" style="display:none">
+      <h2>Radar & Satellite</h2>
+      <iframe id="radarFrame" class="radar" loading="lazy"
+        src="https://embed.windy.com/embed2.html?lat=38.9&lon=16.3&zoom=6&overlay=radar&level=surface&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&detailLat=38.9&detailLon=16.3&metricWind=default&metricTemp=default"></iframe>
+      <p style="font-size:.85rem;text-align:center;margin-top:.4rem">Zoom interattivo per verificare i fenomeni in avvicinamento.</p>
+    </div>
+
+    <footer>
+      © 2025 Meteo&nbsp;Logulo – Previsioni automatiche.<br>
+      Confrontale sempre con la <a href="#" id="mapLink">MLG&nbsp;Map in tempo reale</a> e i nostri approfondimenti.
+    </footer>
+  </div>
+
+  <script>
+    window.stazioni = [
+  { nome: "Bianchi - Palinudo Staglio", mlg: true, lat: 39.11, lon: 16.42, quota: "830 m", provincia: "CS", regione: "Calabria", area: "Valle del Corace", stationId: "IBIANC4", apiKey: "2ccb91c2398a4f778b91c2398a4f772f", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Cosenza - Vaglio Lise", mlg: true, lat: 39.31, lon: 16.27, quota: "208 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN11", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-cosenza-vaglio-lise" },
+  { nome: "Amantea Spiaggia", mlg: true, lat: 39.13, lon: 16.07, quota: "0 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "IAMANT7", apiKey: "a3f4ae4f9b6d46a4b4ae4f9b6d06a494", webcam: "https://meteologullo.github.io/mappamlg/webcam_spiaggia_pulita.html", linkStazione: "https://www.meteologullo.com/stazione-amantea-spiaggia" },
+  { nome: "Monte Scuro - Celico", mlg: true, lat: 39.33, lon: 16.4, quota: "1643 m", provincia: "CS", regione: "Calabria", area: "Vetta della Sila Grande", stationId: "ICELIC3", apiKey: "2d12def7f4894eca92def7f4892eca99", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-meteo-di-monte-scuro-celico" },
+  { nome: "Cosenza - Campagnano", mlg: true, lat: 39.31, lon: 16.23, quota: "234 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN20", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-cosenza-campagnano" },
+  { nome: "Mendicino - Tivolille Pasquali", mlg: true, lat: 39.28, lon: 16.2, quota: "431 m", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera Interna", stationId: "IMENDI13", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-mendicino-tivolille" },
+  { nome: "Casali del Manco - Morelli Soprana", mlg: true, lat: 39.28, lon: 16.29, quota: "389 m", provincia: "CS", regione: "Calabria", area: "collina Valle del Crati", stationId: "ICASAL40", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-casali-del-manco-morelli-soprana" },
+  { nome: "Nuova Stazione 1", mlg: true, lat: 39.40, lon: 16.50, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Nuova Area", stationId: "INUST1", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Catanzaro Centro", lat: 38.82, lon: 16.43, quota: "320 m", provincia: "CZ", regione: "Calabria", area: "Centro città", openMeteo: true, stationId: "CATCENTRO", webcam: "", linkStazione: "#" }
+,
+  { nome: "Reggio Calabria - Centro", lat: 38.11, lon: 15.65, quota: "31 m", provincia: "RC", regione: "Calabria", area: "Area dello Stretto", openMeteo: true, stationId: "REGCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Rossano - Centro Storico", lat: 39.58, lon: 16.63, quota: "270 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ROSSCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Valentia - Monte Poro", lat: 38.63, lon: 16.05, quota: "710 m", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBOPORO", webcam: "", linkStazione: "#" },
+  { nome: "Locri Marina", lat: 38.25, lon: 16.26, quota: "12 m", provincia: "RC", regione: "Calabria", area: "Costa Ionica Reggina", openMeteo: true, stationId: "LOCRIMARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni in Fiore", lat: 39.26, lon: 16.68, quota: "1049 m", provincia: "CS", regione: "Calabria", area: "Altopiano Silano", openMeteo: true, stationId: "SGFIORE", webcam: "", linkStazione: "#" },
+  { nome: "Crotone Porto", lat: 39.08, lon: 17.12, quota: "8 m", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CROPOR", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme - Sant'Eufemia", lat: 38.91, lon: 16.24, quota: "15 m", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMSANTEUF", webcam: "", linkStazione: "#" },
+  { nome: "Scalea - Centro", lat: 39.81, lon: 15.79, quota: "25 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "SCALEACENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna - Parco Nazionale Sila Piccola", lat: 39.02, lon: 16.68, quota: "880 m", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TAVSILAPIC", webcam: "", linkStazione: "#" },
+  { nome: "Isola di Capo Rizzuto", lat: 38.96, lon: 17.09, quota: "75 m", provincia: "KR", regione: "Calabria", area: "Capo Rizzuto", openMeteo: true, stationId: "ISOCAPORIZ", webcam: "", linkStazione: "#" },
+,
+  { nome: "Cirò Marina", lat: 39.37, lon: 17.12, quota: "25 m", provincia: "KR", regione: "Calabria", area: "Alto Ionio Crotonese", openMeteo: true, stationId: "CIROMARINA", webcam: "", linkStazione: "#" },
+  { nome: "Cariati", lat: 39.5, lon: 16.96, quota: "30 m", provincia: "CS", regione: "Calabria", area: "Basso Ionio cosentino", openMeteo: true, stationId: "CARIATI", webcam: "", linkStazione: "#" },
+  { nome: "Petilia Policastro", lat: 39.13, lon: 16.77, quota: "436 m", provincia: "KR", regione: "Calabria", area: "Marchesato Crotonese", openMeteo: true, stationId: "PETILIA", webcam: "", linkStazione: "#" },
+  { nome: "Tropea", lat: 38.68, lon: 15.9, quota: "61 m", provincia: "VV", regione: "Calabria", area: "Costa degli Dei", openMeteo: true, stationId: "TROPEA", webcam: "", linkStazione: "#" },
+  { nome: "Gerace", lat: 38.27, lon: 16.23, quota: "500 m", provincia: "RC", regione: "Calabria", area: "Collina Ionica alto Reggino", openMeteo: true, stationId: "GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Spezzano della Sila", lat: 39.30, lon: 16.33, quota: "800 m", provincia: "CS", regione: "Calabria", area: "Pre-Sila Grande cosentina", openMeteo: true, stationId: "SPEZSILA", webcam: "", linkStazione: "#" },
+  { nome: "Paola", lat: 39.37, lon: 16.03, quota: "154 m", provincia: "CS", regione: "Calabria", area: "Tirreno Cosentino", openMeteo: true, stationId: "PAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere Marittimo", lat: 39.61, lon: 15.86, quota: "150 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "BELVEDERE", webcam: "", linkStazione: "#" },
+  { nome: "Mormanno", lat: 39.88, lon: 15.98, quota: "850 m", provincia: "CS", regione: "Calabria", area: "Pollino", openMeteo: true, stationId: "MORMANNO", webcam: "", linkStazione: "#" },
+  { nome: "Soverato", lat: 38.68, lon: 16.54, quota: "20 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica basso Catanzarese", openMeteo: true, stationId: "SOVERATO", webcam: "", linkStazione: "#" },
+  { nome: "Palmi", lat: 38.36, lon: 15.85, quota: "228 m", provincia: "RC", regione: "Calabria", area: "Costa Viola", openMeteo: true, stationId: "PALMI", webcam: "", linkStazione: "#" },
+  { nome: "Serrastretta", lat: 39.01, lon: 16.4, quota: "820 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "SERRASTRETTA", webcam: "", linkStazione: "#" },
+  { nome: "Santa Severina", lat: 39.21, lon: 16.97, quota: "326 m", provincia: "KR", regione: "Calabria", area: "Marchesato crotonese", openMeteo: true, stationId: "SSSEVERINA", webcam: "", linkStazione: "#" },
+  { nome: "Badolato Marina", lat: 38.6, lon: 16.55, quota: "10 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica basso Catanzarese", openMeteo: true, stationId: "BADO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Delianuova", lat: 38.2, lon: 15.88, quota: "600 m", provincia: "RC", regione: "Calabria", area: "Pre-Aspromonte Occidentale", openMeteo: true, stationId: "DELIANUOVA", webcam: "", linkStazione: "#" },
+  {"nome": "Rende", "lat": 39.3306, "lon": 16.2078, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "RENDE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Montalto Uffugo", "lat": 39.4165, "lon": 16.1985, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "MONTALTO_UFFUGO", "webcam": "", "linkStazione": "#"},{"nome": "Bisignano", "lat": 39.50, "lon": 16.27, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Collina alta Valle del Crati", "openMeteo": true, "stationId": "MONGRASSANO_SCALO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Tarsia", "lat": 39.58, "lon": 16.3167, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "TARSIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Castrovillari", "lat": 39.8167, "lon": 16.2, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Pollino", "openMeteo": true, "stationId": "CASTROVILLARI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Sibari", "lat": 39.6833, "lon": 16.5333, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sibaritide", "openMeteo": true, "stationId": "SIBARI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Villapiana", "lat": 39.84, "lon": 16.45, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sibaritide", "openMeteo": true, "stationId": "VILLAPIANA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Camigliatello Silano", "lat": 39.3306, "lon": 16.4492, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "CAMIGLIATELLO_SILANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monte Curcio", "lat": 39.317, "lon": 16.42, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "MONTE_CURCIO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Botte Donato", "lat": 39.2833, "lon": 16.45, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "BOTTE_DONATO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Daltolia", "lat": 39.033, "lon": 16.388, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Savuto", "openMeteo": true, "stationId": "DALTOLIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Rogliano", "lat": 39.1581, "lon": 16.3723, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Savuto", "openMeteo": true, "stationId": "ROGLIANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Girifalco", "lat": 38.8, "lon": 16.4167, "quota": "ND", "provincia": "CZ", "regione": "Calabria", "area": "Pre-Serre", "openMeteo": true, "stationId": "GIRIFALCO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Vibo Valentia", "lat": 38.6749, "lon": 16.1027, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "VIBO_VALENTIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Capo Vaticano", "lat": 38.6278, "lon": 15.8415, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Costa degli Dei", "openMeteo": true, "stationId": "CAPO_VATICANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Rosarno", "lat": 38.4886, "lon": 15.9738, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "ROSARNO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Gioia Tauro", "lat": 38.4236, "lon": 15.8996, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "GIOIA_TAURO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Pellaro", "lat": 38.01, "lon": 15.633, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Area dello Stretto", "openMeteo": true, "stationId": "PELLARO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Villa San Giovanni", "lat": 38.2131, "lon": 15.6414, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Area dello Stretto", "openMeteo": true, "stationId": "VILLA_SAN_GIOVANNI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Melito di Porto Salvo", "lat": 37.9167, "lon": 15.7333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "MELITO_DI_PORTO_SALVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Brancaleone", "lat": 37.95, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "BRANCALEONE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Africo Nuovo", "lat": 38.0167, "lon": 16.1333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "AFRICO_NUOVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Bovalino", "lat": 38.15, "lon": 16.2, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "BOVALINO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monasterace Marina", "lat": 38.4333, "lon": 16.5333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Meridionale", "openMeteo": true, "stationId": "MONASTERACE_MARINA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Mongiana", "lat": 38.5167, "lon": 16.3, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "MONGIANA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Fabrizia", "lat": 38.5, "lon": 16.3667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "FABRIZIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Nardodipace", "lat": 38.4833, "lon": 16.4, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "NARDODIPACE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Polistena", "lat": 38.4167, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "POLISTENA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Natoli Nuovo", "lat": 38.5167, "lon": 16.0833, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "NATOLI_NUOVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Cittanova", "lat": 38.3167, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "CITTANOVA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Zungri", "lat": 38.6167, "lon": 15.9333, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "ZUNGRI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Spilinga", "lat": 38.6, "lon": 15.8833, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "SPILINGA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Pizzo", "lat": 38.7333, "lon": 16.1667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Costa Tirrenica Vibonese", "openMeteo": true, "stationId": "PIZZO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monterosso Calabro", "lat": 38.6333, "lon": 16.2667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "MONTEROSSO_CALABRO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Cutro", "lat": 39.0167, "lon": 17.0833, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Collina Crotonese", "openMeteo": true, "stationId": "CUTRO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Capocolonna", "lat": 39.0167, "lon": 17.1333, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "CAPOCOLONNA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Marina di Strongoli", "lat": 39.3, "lon": 17.1167, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "MARINA_DI_STRONGOLI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Acerenthia - Camigliano", "lat": 39.2667, "lon": 17.0, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Collina Crotonese", "openMeteo": true, "stationId": "ACERENTHIA_-_CAMIGLIANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Torretta di Crucoli", "lat": 39.4167, "lon": 17.0333, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "TORRETTA_DI_CRUCOLI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Longobucco", "lat": 39.45, "lon": 16.65, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Greca", "openMeteo": true, "stationId": "LONGOBUCCO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Acri", "lat": 39.5, "lon": 16.3833, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Greca", "openMeteo": true, "stationId": "ACRI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Roccaforte del Greco", "lat": 38.0167, "lon": 15.85, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Aspromonte", "openMeteo": true, "stationId": "ROCCAFORTE_DEL_GRECO", "webcam": "", "linkStazione": "#"},
+  {"nome": "San Luca", "lat": 38.1333, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Aspromonte", "openMeteo": true, "stationId": "SAN_LUCA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Santa Caterina dello Ionio", "lat": 38.55, "lon": 16.5667, "quota": "ND", "provincia": "CZ", "regione": "Calabria", "area": "Costa Ionica Meridionale", "openMeteo": true, "stationId": "SANTA_CATERINA_DELLO_IONIO", "webcam": "", "linkStazione": "#"},
+  {"nome": "San Sosti", "lat": 39.66, "lon": 16.02, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle dell'Esaro", "openMeteo": true, "stationId": "SANSOSTI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Altomonte", "lat": 39.7, "lon": 16.1333, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle dell'Esaro", "openMeteo": true, "stationId": "ALTOMONTE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Roseto Capo Spulico", "lat": 39.9667, "lon": 16.5833, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Alto Ionio Cosentino", "openMeteo": true, "stationId": "ROSETO_CAPO_SPULICO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Trebisacce", "lat": 39.87, "lon": 16.53, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Alto Ionio Cosentino", "openMeteo": true, "stationId": "TREBISACCE", "webcam": "", "linkStazione": "#"}
+,
+  { nome: "Rende - Quattromiglia", lat: 39.353702, lon: 16.242313, quota: "ND", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", openMeteo: true, stationId: "RENDE_QUATTR", webcam: "", linkStazione: "#" },
+  { nome: "Torano Castello - Sartano", lat: 39.49, lon: 16.21, quota: "90", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati", openMeteo: true, stationId: "LUZZI_PETRINI", webcam: "", linkStazione: "#" },
+  { nome: "Luzzi - Petrini", lat: 39.446816, lon: 16.28, quota: "ND", provincia: "CS", regione: "Calabria", area: "Media Valle del Crati", openMeteo: true, stationId: "LUZZI_CENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Lattarico", lat: 39.464303, lon: 16.138027, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna nord", openMeteo: true, stationId: "LATTARICO", webcam: "", linkStazione: "#" },
+  { nome: "Rota Greca", lat: 39.467, lon: 16.117, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna nord", openMeteo: true, stationId: "ROTA_GRECA", webcam: "", linkStazione: "#" },
+  { nome: "Lattarico - Piretto", lat: 39.467, lon: 16.133, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera interna nord", openMeteo: true, stationId: "LATTARICO_PIRETTO", webcam: "", linkStazione: "#" },
+  { nome: "Cassano all'Ionio", lat: 39.783, lon: 16.317, quota: "ND", provincia: "CS", regione: "Calabria", area: "Piana di Sibari centrale", openMeteo: true, stationId: "CASSANO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Sibari", lat: 39.74, lon: 16.45, quota: "ND", provincia: "CS", regione: "Calabria", area: "Piana di Sibari orientale", openMeteo: true, stationId: "SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Terranova da Sibari", lat: 39.6575, lon: 16.3398, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Piana di Sibari sud", openMeteo: true, stationId: "TERRANOVA_SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Tarsia", lat: 39.62311, lon: 16.27337, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Valle del Crati nord", openMeteo: true, stationId: "TARSIA", webcam: "", linkStazione: "#" },
+  { nome: "Roggiano Gravina", lat: 39.61786, lon: 16.16173, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Valle dell'Esaro", openMeteo: true, stationId: "ROGGIANO", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro in Guarano", lat: 44.52, lon: 13.48, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Sila cosentina", openMeteo: true, stationId: "SANPIETRO_GUARANO", webcam: "", linkStazione: "#" },
+  { nome: "Marano Marchesato", lat: 39.316974, lon: 16.174788, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna sud", openMeteo: true, stationId: "MARANO_MARCH", webcam: "", linkStazione: "#" },
+  { nome: "Carolei", lat: 39.25, lon: 16.217, quota: "ND", provincia: "CS", regione: "Calabria", area: "Serre cosentine", openMeteo: true, stationId: "CAROLEI", webcam: "", linkStazione: "#" },
+  { nome: "Dipignano", lat: 39.237886, lon: 16.25324, quota: "ND", provincia: "CS", regione: "Calabria", area: "Serre cosentine", openMeteo: true, stationId: "DIPIGNANO", webcam: "", linkStazione: "#" },
+  { nome: "Mangone", lat: 39.205635, lon: 16.332584, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Savuto", openMeteo: true, stationId: "MANGONE", webcam: "", linkStazione: "#" },
+  { nome: "Altilia", lat: 39.1286, lon: 16.2532, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Savuto", openMeteo: true, stationId: "ALTILIA", webcam: "", linkStazione: "#" },
+  { nome: "Aiello Calabro", lat: 39.117215, lon: 16.166775, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina basso tirreno cosentino", openMeteo: true, stationId: "AIELLO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme", lat: 38.966667, lon: 16.299999, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMEZIA_TERME", webcam: "", linkStazione: "#" },
+  { nome: "Falerna", lat: 39.003346, lon: 16.172041, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa tirrenica catanzarese", openMeteo: true, stationId: "FALERNA", webcam: "", linkStazione: "#" },
+  { nome: "San Lucido", lat: 39.309956, lon: 16.051827, quota: "ND", provincia: "CS", regione: "Calabria", area: "Costa tirrenica cosentina", openMeteo: true, stationId: "SAN_LUCIDO", webcam: "", linkStazione: "#" },
+  { nome: "Guardia Piemontese", lat: 39.467, lon: 16.0, quota: "ND", provincia: "CS", regione: "Calabria", area: "Costa alto tirreno cosentino", openMeteo: true, stationId: "GUARDIA_PIEM", webcam: "", linkStazione: "#" },
+  { nome: "Vena di Maida", lat: 38.888685, lon: 16.407462, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "VENA_DI_MAIDA", webcam: "", linkStazione: "#" },
+  { nome: "Settingiano", lat: 38.910024, lon: 16.514955, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "SETTINGIANO", webcam: "", linkStazione: "#" },
+  { nome: "Caraffa di Catanzaro", lat: 38.88194, lon: 16.4875, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "CARAFFA", webcam: "", linkStazione: "#" },
+  { nome: "Catanzaro Lido", lat: 38.8303, lon: 16.6278, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "CATANZARO_LIDO", webcam: "", linkStazione: "#" },
+  { nome: "Simeri Mare", lat: 38.865607, lon: 16.697665, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "SIMERI_MARE", webcam: "", linkStazione: "#" },
+  { nome: "Sorbo San Basile", lat: 39.01889, lon: 16.56944, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "SORBO_BASILE", webcam: "", linkStazione: "#" },
+  { nome: "Steccato di Cutro", lat: 38.938014, lon: 16.916678, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa del basso ionio crotonese", openMeteo: true, stationId: "STECCATO_CUTRO", webcam: "", linkStazione: "#" },
+  { nome: "Cropani", lat: 38.967, lon: 16.783, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica alto catanzarese", openMeteo: true, stationId: "CROPANI", webcam: "", linkStazione: "#" },
+  { nome: "Botricello Superiore", lat: 38.93199, lon: 16.85831, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina alto ionio catanzarese", openMeteo: true, stationId: "BOTRICELLO", webcam: "", linkStazione: "#" },
+  { nome: "Acconia", lat: 38.83585, lon: 16.2653, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "ACCONIA", webcam: "", linkStazione: "#" },
+  { nome: "Curinga", lat: 38.8281, lon: 16.31344, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Valle dell'Amato", openMeteo: true, stationId: "CURINGA", webcam: "", linkStazione: "#" },
+  { nome: "Maida", lat: 38.8588, lon: 16.3628, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "MAIDA", webcam: "", linkStazione: "#" },
+  { nome: "Francavilla Angitola", lat: 38.783, lon: 16.267, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "FRANCAVILLA_ANGITOLA", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro Lametino", lat: 38.869082, lon: 16.277958, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina della Piana di Lamezia", openMeteo: true, stationId: "SANPIETRO_LAM", webcam: "", linkStazione: "#" },
+  { nome: "Squillace", lat: 38.780585, lon: 16.513228, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica del basso catanzarese", openMeteo: true, stationId: "SQUILLACE", webcam: "", linkStazione: "#" },
+  { nome: "Montepaone Lido", lat: 38.728733, lon: 16.541554, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica del basso catanzarese", openMeteo: true, stationId: "MONTEPAONE_LIDO", webcam: "", linkStazione: "#" },
+  { nome: "San Vito sullo Ionio", lat: 38.710368, lon: 16.409777, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Entroterra del basso ionio catanzarese", openMeteo: true, stationId: "SANVITO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Monterosso Calabro", lat: 38.71792, lon: 16.291973, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MONTEROSSO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "Chiaravalle Centrale", lat: 38.680996, lon: 16.411957, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Entroterra del basso ionio catanzarese", openMeteo: true, stationId: "CHIARAVALLE_C", webcam: "", linkStazione: "#" },
+  { nome: "Verbicaro", lat: 39.756, lon: 15.916, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera marittima nord", openMeteo: true, stationId: "VERBICARO", webcam: "", linkStazione: "#" },
+  { nome: "Orsomarso", lat: 39.799, lon: 15.908, quota: "ND", provincia: "CS", regione: "Calabria", area: "Catena Costiera marittima nord", openMeteo: true, stationId: "ORSOMARSO", webcam: "", linkStazione: "#" },
+  { nome: "Cirella", lat: 39.703, lon: 15.823, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto Tirreno cosentino", openMeteo: true, stationId: "CIRELLA", webcam: "", linkStazione: "#" },
+  { nome: "Praia a Mare", lat: 39.909, lon: 15.778, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "PRAIA_A_MARE", webcam: "", linkStazione: "#" },
+  { nome: "Laino Borgo", lat: 39.95, lon: 15.97, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Mercure", openMeteo: true, stationId: "LAINO_BORGO", webcam: "", linkStazione: "#" },
+  { nome: "Papasidero", lat: 39.87, lon: 15.90, quota: "ND", provincia: "CS", regione: "Calabria", area: "Borgo dell'alto tirreno", openMeteo: true, stationId: "PAPASIDERO", webcam: "", linkStazione: "#" },
+  { nome: "Acquaformosa", lat: 39.736, lon: 16.078, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "ACQUAFORMOSA", webcam: "", linkStazione: "#" },
+  { nome: "Saracena", lat: 39.849, lon: 16.11, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SARACENA", webcam: "", linkStazione: "#" },
+  { nome: "Cerchiara di Calabria", lat: 39.883, lon: 16.4, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CERCHIARA_DI_CALABRIA", webcam: "", linkStazione: "#" },
+  { nome: "San Lorenzo Bellizzi", lat: 39.88, lon: 16.33, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SAN_LORENZO_BELLIZZI", webcam: "", linkStazione: "#" },
+  { nome: "Plataci", lat: 39.90, lon: 16.43, quota: "ND", provincia: "CS", regione: "Calabria", area: "Parco Nazionale del Pollino", openMeteo: true, stationId: "PLATACI", webcam: "", linkStazione: "#" },
+  { nome: "Albidona", lat: 39.937, lon: 16.525, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ALBIDONA", webcam: "", linkStazione: "#" },
+  { nome: "Alessandria del Carretto", lat: 39.984, lon: 16.338, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "ALESSANDRIA_DEL_CARRETTO", webcam: "", linkStazione: "#" },
+  { nome: "Terranova di Pollino", lat: 40.032, lon: 16.23, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "TERRANOVA_DI_POLLINO", webcam: "", linkStazione: "#" },
+  { nome: "Castroregio", lat: 39.987, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CASTROREGIO", webcam: "", linkStazione: "#" },
+  { nome: "Oriolo", lat: 40.05, lon: 16.434, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ORIOLO", webcam: "", linkStazione: "#" },
+  { nome: "Montegiordano", lat: 40.04, lon: 16.53, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "MONTEGIORDANO", webcam: "", linkStazione: "#" },
+  { nome: "Nocara", lat: 40.09, lon: 16.48, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "NOCARA", webcam: "", linkStazione: "#" },
+  { nome: "Rocca Imperiale", lat: 40.10, lon: 16.58, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "ROCCA_IMPERIALE", webcam: "", linkStazione: "#" },
+  { nome: "Apollinara", lat: 39.70, lon: 16.41, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "APOLLINARA", webcam: "", linkStazione: "#" },
+  { nome: "Cantinella", lat: 39.66, lon: 16.44, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CANTINELLA", webcam: "", linkStazione: "#" },
+  { nome: "Corigliano Scalo", lat: 39.618, lon: 16.509, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CORIGLIANO_SCALO", webcam: "", linkStazione: "#" },
+  { nome: "San Giorgio Albanese", lat: 39.58, lon: 16.45, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SAN_GIORGIO_ALBANESE", webcam: "", linkStazione: "#" },
+  { nome: "San Demetrio Corone", lat: 39.562, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SAN_DEMETRIO_CORONE", webcam: "", linkStazione: "#" },
+  { nome: "Cozzo Carbonaro", lat: 39.46, lon: 16.20, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alta Valle del Crati", openMeteo: true, stationId: "COZZO_CARBONARO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna di Montalto Uffugo", lat: 39.415, lon: 16.246, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "TAVERNA_DI_MONTALTO_UFFUGO", webcam: "", linkStazione: "#" },
+  { nome: "Rose", lat: 39.394, lon: 16.232, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina della media Valle del Crati", openMeteo: true, stationId: "ROSE", webcam: "", linkStazione: "#" },
+  { nome: "San Vincenzo la Costa", lat: 39.374, lon: 16.162, quota: "ND", provincia: "CS", regione: "Calabria", area: "Catena Costiera interna", openMeteo: true, stationId: "SAN_VINCENZO_LA_COSTA", webcam: "", linkStazione: "#" },
+  { nome: "Lago", lat: 39.16, lon: 16.16, quota: "600", provincia: "CS", regione: "Calabria", area: "Serre Cosentine", openMeteo: true, stationId: "LAGO", webcam: "", linkStazione: "#" },
+  { nome: "San Mango d'Aquino", lat: 39.027, lon: 16.217, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina della Valle del Savuto", openMeteo: true, stationId: "SAN_MANGO_DAQUINO", webcam: "", linkStazione: "#" },
+  { nome: "Panetti", lat: 39.01, lon: 16.30, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina del Monte Reventino", openMeteo: true, stationId: "PANETTI", webcam: "", linkStazione: "#" },
+  { nome: "Cicala", lat: 39.02, lon: 16.416, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "CICALA", webcam: "", linkStazione: "#" },
+  { nome: "Panettieri", lat: 39.079, lon: 16.423, quota: "ND", provincia: "CS", regione: "Calabria", area: "Monte Reventino", openMeteo: true, stationId: "PANETTIERI", webcam: "", linkStazione: "#" },
+  { nome: "Sellia", lat: 38.832, lon: 16.517, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina dell'alto ionio catanzarese", openMeteo: true, stationId: "SELLIA", webcam: "", linkStazione: "#" },
+  { nome: "Pianopoli", lat: 38.957, lon: 16.319, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Marcellinara", openMeteo: true, stationId: "PIANOPOLI", webcam: "", linkStazione: "#" },
+  { nome: "Gizzeria", lat: 38.937, lon: 16.148, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Alto tirreno catanzarese", openMeteo: true, stationId: "GIZZERIA", webcam: "", linkStazione: "#" },
+  { nome: "Soveria Simeri", lat: 38.97, lon: 16.659, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina dell'alto ionio catanzarese", openMeteo: true, stationId: "SOVERIA_SIMERI", webcam: "", linkStazione: "#" },
+  { nome: "Mesoraca", lat: 39.096, lon: 16.789, quota: "ND", provincia: "KR", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "MESORACA", webcam: "", linkStazione: "#" },
+  { nome: "San Mauro Marchesato", lat: 39.126, lon: 16.859, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAN_MAURO_MARCHESATO", webcam: "", linkStazione: "#" },
+  { nome: "Marcedusa", lat: 39.024, lon: 16.858, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MARCEDUSA", webcam: "", linkStazione: "#" },
+  { nome: "Papanice", lat: 39.118, lon: 16.981, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "PAPANICE", webcam: "", linkStazione: "#" },
+  { nome: "Capo Colonna", lat: 39.016, lon: 17.135, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CAPO_COLONNA", webcam: "", linkStazione: "#" },
+  { nome: "Le Cannella", lat: 38.946, lon: 17.074, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "LE_CANNELLA", webcam: "", linkStazione: "#" },
+  { nome: "Le Castella", lat: 38.906, lon: 17.01, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "LE_CASTELLA", webcam: "", linkStazione: "#" },
+  { nome: "San Floro", lat: 38.899, lon: 16.486, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_FLORO", webcam: "", linkStazione: "#" },
+  { nome: "Borgia", lat: 38.882, lon: 16.507, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BORGIA", webcam: "", linkStazione: "#" },
+  { nome: "Vallefiorita", lat: 38.778, lon: 16.49, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "VALLEFIORITA", webcam: "", linkStazione: "#" },
+  { nome: "Palermiti", lat: 38.71, lon: 16.422, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PALERMITI", webcam: "", linkStazione: "#" },
+  { nome: "Petrizzi", lat: 38.637, lon: 16.474, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PETRIZZI", webcam: "", linkStazione: "#" },
+  { nome: "San Sostene", lat: 38.65, lon: 16.487, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_SOSTENE", webcam: "", linkStazione: "#" },
+  { nome: "Brognaturo", lat: 38.575, lon: 16.373, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "BROGNATURO", webcam: "", linkStazione: "#" },
+  { nome: "Badolato", lat: 38.578, lon: 16.556, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BADOLATO", webcam: "", linkStazione: "#" },
+  { nome: "Serra San Bruno", lat: 38.583, lon: 16.316, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SERRA_SAN_BRUNO", webcam: "", linkStazione: "#" },
+  { nome: "Arena", lat: 38.576, lon: 16.157, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "ARENA", webcam: "", linkStazione: "#" },
+  { nome: "Monsoreto", lat: 38.521, lon: 16.163, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MONSORETO", webcam: "", linkStazione: "#" },
+  { nome: "Paravati", lat: 38.6, lon: 16.084, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "PARAVATI", webcam: "", linkStazione: "#" },
+  { nome: "Mileto", lat: 38.606, lon: 16.067, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MILETO", webcam: "", linkStazione: "#" },
+  { nome: "Briatico", lat: 38.72, lon: 15.949, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "BRIATICO", webcam: "", linkStazione: "#" },
+  { nome: "Zambrone", lat: 38.695, lon: 15.959, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "ZAMBRONE", webcam: "", linkStazione: "#" },
+  { nome: "Caria", lat: 38.638, lon: 15.958, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "CARIA", webcam: "", linkStazione: "#" },
+  { nome: "Maierato", lat: 38.697, lon: 16.111, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MAIERATO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Marina", lat: 38.721, lon: 16.127, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Nicotera", lat: 38.533, lon: 15.933, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "NICOTERA", webcam: "", linkStazione: "#" },
+  { nome: "San Calogero", lat: 38.53, lon: 16.033, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SAN_CALOGERO", webcam: "", linkStazione: "#" },
+  { nome: "San Ferdinando", lat: 38.483, lon: 15.899, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_FERDINANDO", webcam: "", linkStazione: "#" },
+  { nome: "Taurianova", lat: 38.354, lon: 16.03, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "TAURIANOVA", webcam: "", linkStazione: "#" },
+  { nome: "Oppido Mamertina", lat: 38.351, lon: 15.986, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "OPPIDO_MAMERTINA", webcam: "", linkStazione: "#" },
+  { nome: "Siderno", lat: 38.27, lon: 16.294, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SIDERNO", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Gioiosa Ionica", lat: 38.3, lon: 16.318, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_GIOIOSA_IONICA", webcam: "", linkStazione: "#" },
+  { nome: "Roccella Ionica", lat: 38.327, lon: 16.398, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ROCCELLA_IONICA", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Caulonia", lat: 38.389, lon: 16.463, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_CAULONIA", webcam: "", linkStazione: "#" },
+  { nome: "Riace Marina", lat: 38.483, lon: 16.566, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "RIACE_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Trepitò", lat: 38.386, lon: 16.453, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "VILLAGGIO_TREPITÒ", webcam: "", linkStazione: "#" },
+  { nome: "Santa Cristina d'Aspromonte", lat: 38.275, lon: 15.954, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTA_CRISTINA_DASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Antonimina", lat: 38.195, lon: 16.097, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ANTONIMINA", webcam: "", linkStazione: "#" },
+  { nome: "Ardore", lat: 38.23, lon: 16.171, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ARDORE", webcam: "", linkStazione: "#" },
+  { nome: "Molochio", lat: 38.28, lon: 16.01, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOLOCHIO", webcam: "", linkStazione: "#" },
+  { nome: "Bagnara Calabra", lat: 38.272, lon: 15.799, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BAGNARA_CALABRA", webcam: "", linkStazione: "#" },
+  { nome: "Gallico Marina", lat: 38.17, lon: 15.65, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "GALLICO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Gregorio", lat: 38.048, lon: 15.682, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_GREGORIO", webcam: "", linkStazione: "#" },
+  { nome: "Cardeto", lat: 38.045, lon: 15.745, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "CARDETO", webcam: "", linkStazione: "#" },
+  { nome: "Amendolea", lat: 38.025, lon: 15.887, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "AMENDOLEA", webcam: "", linkStazione: "#" },
+  { nome: "Bianco", lat: 38.082, lon: 16.142, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BIANCO", webcam: "", linkStazione: "#" },
+  { nome: "Montebello Ionico", lat: 37.986, lon: 15.759, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MONTEBELLO_IONICO", webcam: "", linkStazione: "#" },
+  { nome: "Motta San Giovanni", lat: 38.013, lon: 15.706, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOTTA_SAN_GIOVANNI", webcam: "", linkStazione: "#" },
+  { nome: "Bova Marina", lat: 37.933, lon: 15.918, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BOVA_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Palizzi Marina", lat: 37.919, lon: 15.973, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PALIZZI_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Alessio in Aspromonte", lat: 38.148, lon: 15.709, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTALESSIO_IN_ASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Santo Stefano in Aspromonte", lat: 38.155, lon: 15.799, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTO_STEFANO_IN_ASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Gambarie", lat: 38.154, lon: 15.877, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "GAMBARIE", webcam: "", linkStazione: "#" },
+  { nome: "Sambatello", lat: 38.179, lon: 15.69, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAMBATELLO", webcam: "", linkStazione: "#" },
+  { nome: "Trunca", lat: 38.155, lon: 15.642, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "TRUNCA", webcam: "", linkStazione: "#" },
+  { nome: "Palizzi", lat: 37.939, lon: 15.991, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PALIZZI", webcam: "", linkStazione: "#" },
+  { nome: "Pietrapennata", lat: 38.187, lon: 15.956, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PIETRAPENNATA", webcam: "", linkStazione: "#" },
+  { nome: "Motticella", lat: 38.064, lon: 16.137, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOTTICELLA", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Agata del Bianco", lat: 38.092, lon: 16.176, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTAGATA_DEL_BIANCO", webcam: "", linkStazione: "#" },
+  { nome: "Locri", lat: 38.243, lon: 16.258, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "LOCRI", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Sant'Ilario dello Ionio", lat: 38.174, lon: 16.239, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_SANTILARIO_DELLO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Benestare", lat: 38.207, lon: 16.148, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BENESTARE", webcam: "", linkStazione: "#" },
+  { nome: "Platì", lat: 38.19, lon: 16.094, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PLATÌ", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Eufemia d'Aspromonte", lat: 38.287, lon: 15.887, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTEUFEMIA_DASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Melicuccà", lat: 38.35, lon: 15.942, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MELICUCCÀ", webcam: "", linkStazione: "#" },
+  { nome: "Monasterace", lat: 38.474, lon: 16.58, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MONASTERACE", webcam: "", linkStazione: "#" },
+  { nome: "Torre di Ruggiero", lat: 38.648, lon: 16.353, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TORRE_DI_RUGGIERO", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Angelo di Gerocarne", lat: 38.639, lon: 16.123, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SANTANGELO_DI_GEROCARNE", webcam: "", linkStazione: "#" },
+  { nome: "San Nicola da Crissa", lat: 38.635, lon: 16.205, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SAN_NICOLA_DA_CRISSA", webcam: "", linkStazione: "#" },
+  { nome: "Montepaone", lat: 38.697, lon: 16.529, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MONTEPAONE", webcam: "", linkStazione: "#" },
+  { nome: "Roccelletta", lat: 38.781, lon: 16.519, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "ROCCELLETTA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni di Gerace", lat: 38.286, lon: 16.226, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_GIOVANNI_DI_GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Ciricilla", lat: 39.012, lon: 16.365, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CIRICILLA", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Palumbo", lat: 39.215, lon: 16.762, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VILLAGGIO_PALUMBO", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Mancuso", lat: 39.022, lon: 16.608, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "VILLAGGIO_MANCUSO", webcam: "", linkStazione: "#" },
+  { nome: "Cotronei", lat: 39.16, lon: 16.773, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "COTRONEI", webcam: "", linkStazione: "#" },
+  { nome: "Caccuri", lat: 39.164, lon: 16.786, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CACCURI", webcam: "", linkStazione: "#" },
+  { nome: "Cerenzia", lat: 39.246, lon: 16.812, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CERENZIA", webcam: "", linkStazione: "#" },
+  { nome: "Castelsilano", lat: 39.238, lon: 16.844, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CASTELSILANO", webcam: "", linkStazione: "#" },
+  { nome: "Vigne", lat: 39.357, lon: 16.869, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VIGNE", webcam: "", linkStazione: "#" },
+  { nome: "Verzino", lat: 39.326, lon: 16.911, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VERZINO", webcam: "", linkStazione: "#" },
+  { nome: "Savelli", lat: 39.3, lon: 16.762, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAVELLI", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere di Spinello", lat: 39.236, lon: 16.925, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "BELVEDERE_DI_SPINELLO", webcam: "", linkStazione: "#" },
+  { nome: "Casabona", lat: 39.2, lon: 16.991, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CASABONA", webcam: "", linkStazione: "#" },
+  { nome: "San Nicola dell'Alto", lat: 39.221, lon: 17.071, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAN_NICOLA_DELLALTO", webcam: "", linkStazione: "#" },
+  { nome: "Pino Grande", lat: 39.32, lon: 16.75, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PINO_GRANDE", webcam: "", linkStazione: "#" },
+  { nome: "Lorica", lat: 39.24, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Altipiano silano", openMeteo: true, stationId: "LORICA", webcam: "", linkStazione: "#" },
+  { nome: "Bocchigliero", lat: 39.429, lon: 16.797, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "BOCCHIGLIERO", webcam: "", linkStazione: "#" },
+  { nome: "Campana", lat: 39.496, lon: 16.742, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CAMPANA", webcam: "", linkStazione: "#" },
+  { nome: "Campo San Lorenzo", lat: 39.36, lon: 16.49, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CAMPO_SAN_LORENZO", webcam: "", linkStazione: "#" },
+  { nome: "Corigliano Calabro", lat: 39.593, lon: 16.519, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CORIGLIANO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "San Giacomo d'Acri", lat: 39.485, lon: 16.357, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SAN_GIACOMO_DACRI", webcam: "", linkStazione: "#" },
+  { nome: "Pietrapaola", lat: 39.486, lon: 16.893, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PIETRAPAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Mandatoriccio", lat: 39.508, lon: 16.87, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "MANDATORICCIO", webcam: "", linkStazione: "#" },
+  { nome: "Cropalati", lat: 39.466, lon: 16.585, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CROPALATI", webcam: "", linkStazione: "#" },
+  { nome: "Paludi", lat: 39.496, lon: 16.671, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PALUDI", webcam: "", linkStazione: "#" },
+  { nome: "Mirto", lat: 39.502, lon: 16.768, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "MIRTO", webcam: "", linkStazione: "#" },
+  { nome: "Crosia", lat: 39.517, lon: 16.903, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CROSIA", webcam: "", linkStazione: "#" },
+  { nome: "Calopezzati", lat: 39.516, lon: 16.869, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CALOPEZZATI", webcam: "", linkStazione: "#" },
+  { nome: "Camigliano", lat: 38.983, lon: 16.233, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "CAMIGLIANO", webcam: "", linkStazione: "#" },
+  { nome: "Fabrizio", lat: 39.635, lon: 16.575, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "FABRIZIO", webcam: "", linkStazione: "#" },
+  { nome: "Schiavonea", lat: 39.663, lon: 16.523, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SCHIAVONEA", webcam: "", linkStazione: "#" },
+  { nome: "Laghi di Sibari", lat: 39.72, lon: 16.50, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "LAGHI_DI_SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Doria", lat: 39.73, lon: 16.35, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "DORIA", webcam: "", linkStazione: "#" },
+  { nome: "Firmo", lat: 39.72, lon: 16.17, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina sibaritide", openMeteo: true, stationId: "FIRMO", webcam: "", linkStazione: "#" },
+  { nome: "Miglierina", lat: 39.001, lon: 16.444, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MIGLIERINA", webcam: "", linkStazione: "#" },
+  { nome: "Tiriolo", lat: 38.962, lon: 16.512, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TIRIOLO", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro Apostolo", lat: 39.007, lon: 16.47, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_PIETRO_APOSTOLO", webcam: "", linkStazione: "#" },
+  { nome: "Cerva", lat: 39.029, lon: 16.572, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "CERVA", webcam: "", linkStazione: "#" },
+  { nome: "Petronà", lat: 39.118, lon: 16.632, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PETRONÀ", webcam: "", linkStazione: "#" },
+  { nome: "Belcastro", lat: 39.027, lon: 16.687, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BELCASTRO", webcam: "", linkStazione: "#" },
+  { nome: "Simeri", lat: 38.971, lon: 16.677, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SIMERI", webcam: "", linkStazione: "#" },
+  { nome: "Dulcino", lat: 39.039, lon: 16.434, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "DULCINO", webcam: "", linkStazione: "#" },
+  { nome: "Filadelfia", lat: 38.818, lon: 16.247, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "FILADELFIA", webcam: "", linkStazione: "#" },
+  { nome: "Olivara", lat: 38.77, lon: 16.21, quota: "ND", provincia: "VV", regione: "Calabria", area: "Costa vibonese", openMeteo: true, stationId: "OLIVARA", webcam: "", linkStazione: "#" }
+,
+  { nome: "Cosenza Diodato", mlg: true, lat: 39.27, lon: 16.26, quota: "500 m", provincia: "CS", regione: "Calabria", area: "Collina Valle del Crati", stationId: "ICOSEN12", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Aprigliano Guarno", mlg: true, lat: 39.24, lon: 16.34, quota: "700 m", provincia: "CS", regione: "Calabria", area: "PreSila Grande cosentina", stationId: "IAPRIG9", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  
+  { nome: "Campora San Giovanni", lat: 39.07, lon: 16.09, quota: "4 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "IAMANT5", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Catanzaro sud", lat: 38.90, lon: 16.59, quota: "280 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", stationId: "ICATAN51", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Crotone centro", lat: 39.08, lon: 17.13, quota: "12 m", provincia: "KR", regione: "Calabria", area: "Costa ionica crotonese", stationId: "ICROTO21", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Torano Castello - Scalo", lat: 39.46, lon: 16.24, quota: "89 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati", stationId: "IMONTA161", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+// ---------- SEGUONO ESEMPI DA COMPILARE ----------,
+  { nome: "Spez. Sila - Moccone", mlg: true, lat: 39.34, lon: 16.44, quota: "1300 m", provincia: "CS", regione: "Calabria", area: "Sila Grande", stationId: "ISPEZZ1", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-10" },
+  { nome: "Domanico - Potame", mlg: true, lat: 39.19, lon: 16.20, quota: "1000 m", provincia: "CS", regione: "Calabria", area: "Serre Cosentine", stationId: "IDOMAN19", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-11" },
+  { nome: "Feroleto Antico", mlg: true, lat: 38.96, lon: 16.37, quota: "225 m", provincia: "CZ", regione: "Calabria", area: "Piana Lametina", stationId: "IFEROL1", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-12" },
+  { nome: "Taverna", mlg: true, lat: 39.02, lon: 16.58, quota: "540 m", provincia: "CZ", regione: "Calabria", area: "Pre-Sila Piccola", stationId: "ITAVER2", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-13" },
+  { nome: "Soveria Mannelli", mlg: true, lat: 39.08, lon: 16.37, quota: "710 m", provincia: "CZ", regione: "Calabria", area: "Reventino interno", stationId: "ISOVER27", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-14" },
+  { nome: "Capo Bianco", mlg: true, lat: 38.91, lon: 17.11, quota: "12 m", provincia: "KR", regione: "Calabria", area: "Basso ionio crotonese", stationId: "IISOLA24", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-15" },
+  { nome: "Saracena", mlg: true, lat: 39.78, lon: 16.16, quota: "650 m", provincia: "CS", regione: "Calabria", area: "Area del Pollino", stationId: "ISARAC8", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-16" },
+  { nome: "Frascineto", mlg: true, lat: 39.83, lon: 16.26, quota: "500 m", provincia: "CS", regione: "Calabria", area: "Area del Pollino", stationId: "IFRASC28", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-17" },
+  { nome: "Catanzaro centrale", mlg: true, lat: 38.92, lon: 16.59, quota: "350 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", stationId: "ICATAN57", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-18" },
+  { nome: "Vibo V. - Olivarella", mlg: true, lat: 38.67, lon: 16.08, quota: "420 m", provincia: "VV", regione: "Calabria", area: "Monte Leone", stationId: "IVIBOV3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-19" },
+  { nome: "Catanzaro - Viale Crotone", mlg: true, lat: 38.84, lon: 16.65, quota: "32 m", provincia: "CZ", regione: "Calabria", area: "Ionio catanzarese", stationId: "ICATAN92", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-20" },
+  { nome: "Marina di Curinga", mlg: true, lat: 38.83, lon: 16.22, quota: "38 m", provincia: "CZ", regione: "Calabria", area: "Basso tirreno catanzarese", stationId: "IFRANC35", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-21" },
+  { nome: "Capo Vaticano - Frizza", mlg: true, lat: 38.63, lon: 15.83, quota: "100 m", provincia: "VV", regione: "Calabria", area: "Costa vibonese", stationId: "IRICADI98", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-22" },
+  { nome: "Reggio Calabria - Stadio", mlg: true, lat: 38.10, lon: 15.65, quota: "90 m", provincia: "RC", regione: "Calabria", area: "Area dello stretto", stationId: "IREGGI58", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-23" },
+  { nome: "San Lorenzo - Marina", mlg: true, lat: 37.92, lon: 15.80, quota: "5 m", provincia: "RC", regione: "Calabria", area: "Basso reggino", stationId: "IMELIT15", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-24" },
+  { nome: "Brancaleone Marina", mlg: true, lat: 37.96, lon: 16.10, quota: "28 m", provincia: "RC", regione: "Calabria", area: "Basso ionio reggino", stationId: "ICALABRI4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-25" },
+  { nome: "Sant'Ilario dello Ionio", mlg: true, lat: 38.21, lon: 16.19, quota: "32 m", provincia: "RC", regione: "Calabria", area: "Ionio reggino", stationId: "ISANTI149", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-26" },
+  { nome: "Siderno - Corso Garibaldi", mlg: true, lat: 38.26, lon: 16.29, quota: "70 m", provincia: "RC", regione: "Calabria", area: "Alto ionio reggino", stationId: "ISIDERNO2", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-27" },
+  { nome: "Molochio", mlg: true, lat: 38.31, lon: 16.03, quota: "120 m", provincia: "RC", regione: "Calabria", area: "Aspromonte occidentale", stationId: "IMOLOC3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-28" },
+  { nome: "Rende - Piano Monello", mlg: true, lat: 39.34, lon: 16.23, quota: "200 m", provincia: "CS", regione: "Calabria", area: "Valle del Crati", stationId: "IRENDE15", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-29" },
+  { nome: "Rende Nord", mlg: true, lat: 39.36, lon: 16.23, quota: "137 m", provincia: "CS", regione: "Calabria", area: "Media Valle del Crati", stationId: "IRENDE23", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-30" },
+  { nome: "Corigliano - Villaggio Frasso", mlg: true, lat: 39.64, lon: 16.48, quota: "80 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", stationId: "ICORIG10", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-31" },
+  { nome: "Cosenza Sud", mlg: true, lat: 39.29, lon: 16.23, quota: "310 m", provincia: "CS", regione: "Calabria", area: "Bassa Valle del Crati", stationId: "ICALABRI46", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-32" },
+  { nome: "Cosenza - Città 2000", mlg: true, lat: 40.15000, lon: 17.15000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP33", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-33" },
+  { nome: "Esempio Stazione 34", mlg: true, lat: 40.20000, lon: 17.20000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP34", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-34" },
+  { nome: "Esempio Stazione 35", mlg: true, lat: 40.25000, lon: 17.25000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP35", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-35" },
+  { nome: "Esempio Stazione 36", mlg: true, lat: 40.30000, lon: 17.30000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP36", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-36" },
+  { nome: "Esempio Stazione 37", mlg: true, lat: 40.35000, lon: 17.35000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP37", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-37" },
+  { nome: "Esempio Stazione 38", mlg: true, lat: 40.40000, lon: 17.40000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP38", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-38" },
+  { nome: "Esempio Stazione 39", mlg: true, lat: 40.45000, lon: 17.45000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP39", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-39" },
+  { nome: "Longobardi Marina", mlg: true, lat: 39.196082, lon: 16.064474, quota: "8 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "ILONGO4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Cosenza - Viale Parco", mlg: true, lat: 39.32, lon: 16.25, quota: "205 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN19", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Rende - Santa Chiara", mlg: true, lat: 39.34, lon: 16.26, quota: "182 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "IRENDE25", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "San Pietro in Guarano Est", mlg: true, lat: 39.34, lon: 16.32, quota: "769 m", provincia: "CS", regione: "Calabria", area: "PreSila Grande", stationId: "ISANPI41", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Casali del Manco - Verticelli", mlg: true, lat: 39.28, lon: 16.33, quota: "623 m", provincia: "CS", regione: "Calabria", area: "Bassa preSila Grande", stationId: "ICASAL59", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Catanzaro Santa Maria", mlg: true, lat: 38.87, lon: 16.60, quota: "27 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro orientale", stationId: "ICATAN48", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Luzzi - Cavoni", mlg: true, lat: 39.45, lon: 16.26, quota: "135 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati centro", stationId: "ILUZZI4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Capo Bonifati", mlg: true, lat: 39.55, lon: 15.87, quota: "17 m", provincia: "CS", regione: "Calabria", area: "Alto tirreno cosentino", stationId: "IBONIF3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Esempio Stazione 9", mlg: true, lat: 0, lon: 0, quota: "", provincia: "", regione: "", area: "", stationId: "ESEMPIO9", apiKey: "", webcam: "", linkStazione: "" },
+  { nome: "Esempio Stazione 10", mlg: true, lat: 0, lon: 0, quota: "", provincia: "", regione: "", area: "", stationId: "ESEMPIO10", apiKey: "", webcam: "", linkStazione: "" }
+];
+    const ICONS = {
+ 0:"fa-sun",1:"fa-cloud-sun",2:"fa-cloud",3:"fa-cloud",
+ 45:"fa-smog",48:"fa-smog",51:"fa-cloud-rain",53:"fa-cloud-rain",
+ 55:"fa-cloud-showers-heavy",56:"fa-cloud-meatball",57:"fa-cloud-meatball",
+ 61:"fa-cloud-showers-heavy",63:"fa-cloud-showers-heavy",65:"fa-cloud-showers-heavy",
+ 66:"fa-snowflake",67:"fa-snowflake",
+ 71:"fa-snowflake",73:"fa-snowflake",75:"fa-snowflake",
+ 80:"fa-cloud-showers-heavy",81:"fa-cloud-showers-heavy",82:"fa-cloud-showers-heavy",
+ 95:"fa-bolt",96:"fa-bolt",99:"fa-bolt"
+};
+    
+const rad = Math.PI/180;
+const icon = c => ICONS[c] || "fa-question";
+function haversine(lat1,lon1,lat2,lon2){
+  const dLat=(lat2-lat1)*rad,dLon=(lon2-lon1)*rad;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLon/2)**2;
+  return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+async function geocode(q){
+  const r=await fetch("https://geocode.maps.co/search?q="+encodeURIComponent(q));
+  const j=await r.json();
+  if(!j.length) throw "Comune non trovato";
+  return {lat:+j[0].lat,lon:+j[0].lon,name:j[0].display_name};
+}
+async function forecast(lat,lon,tz="Europe/Rome"){
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=${tz}&current_weather=true&hourly=temperature_2m,relativehumidity_2m,precipitation_probability,precipitation,apparent_temperature,weathercode,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weathercode&forecast_days=7`;
+  return fetch(url).then(r=>r.json());
+}
+function buildDaily(data,place){
+  const cur=data.current_weather,d=data.daily;
+  let html=`<h2>${place}</h2>`;
+  html+=`<div class="obs"><i class="fa-solid ${icon(cur.weathercode)} fa-2x"></i>
+         <div><div class="temp">${Math.round(cur.temperature)}°</div>
+         <div>${Math.round(cur.windspeed)} km/h</div></div></div>`;
+  html+='<h3 style="margin:1rem 0 .5rem">Prossimi giorni</h3><div class="days">';
+  for(let i=0;i<d.time.length;i++){
+    html+=`<div class="day"><span class="date">${d.time[i].slice(5)}</span>
+           <span class="icon"><i class="fa-solid ${icon(d.weathercode[i])}"></i></span>
+           <span class="max">${Math.round(d.temperature_2m_max[i])}°</span>
+           <span class="min">${Math.round(d.temperature_2m_min[i])}°</span></div>`;
+  }
+  html+='</div>';
+  return html;
+}
+function buildHourly(data){
+  const h=data.hourly,idx=h.time.indexOf(data.current_weather.time);
+  let head="<tr><th>Ora</th><th>T°</th><th>Percep.</th><th>UR%</th><th>Pioggia mm</th><th>Prob%</th><th>Vento</th></tr>";
+  let rows="";
+  for(let i=idx;i<Math.min(idx+24,h.time.length);i++){
+    rows+=`<tr><td>${h.time[i].slice(11,16)}</td>
+            <td>${Math.round(h.temperature_2m[i])}°</td>
+            <td>${Math.round(h.apparent_temperature[i])}°</td>
+            <td>${h.relativehumidity_2m[i]}%</td>
+            <td>${(h.precipitation[i]||0).toFixed(1)}</td>
+            <td>${h.precipitation_probability?.[i]??"--"}</td>
+            <td>${Math.round(h.wind_speed_10m[i])}</td></tr>`;
+  }
+  return head+rows;
+}
+function nearestStation(lat,lon){
+  if(!Array.isArray(window.stazioni)||!window.stazioni.length) return null;
+  let best=null,dist=1e9;
+  window.stazioni.forEach(s=>{
+    const d=haversine(lat,lon,s.lat,s.lon);
+    if(d<dist){dist=d;best=s;}
+  });
+  return {station:best,dist};
+}
+async function fetchObs(s){
+  if(!s) throw "stazione mancante";
+  if(s.apiKey){
+    const u=`https://api.weather.com/v2/pws/observations/current?stationId=${s.stationId}&format=json&units=m&apiKey=${s.apiKey}`;
+    const j=await fetch(u).then(r=>r.json());
+    const o=j.observations[0];
+    return {temp:o.metric.temp,hum:o.humidity,wind:o.windSpeed,prec:o.precipTotal,feels:o.metric.temp,source:'PWS'};
+  }
+  const j=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${s.lat}&longitude=${s.lon}&current=temperature_2m,relativehumidity_2m,precipitation,wind_speed_10m,apparent_temperature&timezone=auto`).then(r=>r.json());
+  const c=j.current;
+  return {temp:c.temperature_2m,hum:c.relativehumidity_2m,wind:c.wind_speed_10m,prec:c.precipitation,feels:c.apparent_temperature,source:'Open-Meteo'};
+}
+function buildObsHtml(obs,st,dist){
+  return `<h2>Dati real‑time</h2>
+          <div class="obs"><i class="fa-solid fa-location-dot fa-lg"></i>
+           <div><div class="temp">${Math.round(obs.temp)}°</div>
+           <div>UR ${obs.hum}% • ${Math.round(obs.wind)} km/h</div></div></div>
+          <ul style="margin-top:.6rem;font-size:.9rem;list-style:none;padding:0;line-height:1.4">
+            <li>Pioggia oggi: ${(obs.prec||0).toFixed(1)} mm</li>
+            <li>Percepita: ${Math.round(obs.feels)}°</li>
+            <li>Fonte: Meteo Logulo – ${st.nome}${dist>2?` (a ${dist.toFixed(1)} km)`:""}</li>
+          </ul>`;
+}
+async function run(q){
+  const geo=await geocode(q);
+  const data=await forecast(geo.lat,geo.lon);
+  dailySec.innerHTML=buildDaily(data,geo.name.split(",")[0]);
+  dailySec.style.display="";
+  hourlyTbl.innerHTML=buildHourly(data);
+  hourlySec.style.display="";
+  radarSec.style.display="";
+  const near=nearestStation(geo.lat,geo.lon);
+  if(near&&near.station){
+    try{
+      const obs=await fetchObs(near.station);
+      obsSec.innerHTML=buildObsHtml(obs,near.station,near.dist);
+      obsSec.style.display="";
+    }catch(e){console.warn(e);}
+  }
+}
+searchForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const val=q.value.trim();
+  if(!val) return;
+  dailySec.style.display=hourlySec.style.display=obsSec.style.display="none";
+  dailySec.innerHTML=hourlyTbl.innerHTML=obsSec.innerHTML="⏳";
+  run(val).catch(err=>dailySec.innerHTML=err);
+});
+mapLink.href="https://meteologullo.com/mlgmap";
+
+  </script>
+</body>
+</html>
