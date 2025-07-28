@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Mappa Meteo – deluxe 3.0 (Mobile‑first)</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+
+<style>
+/* ===== Variabili principali & layout ===== */
+:root{
+  /* colori (uguali alla v2.4) */
+  --clr-sky-start:#4fd1ff;
+  --clr-sky-end:#0ea5e9;
+  --clr-accent:#facc15;
+  --clr-glass:rgba(255,255,255,.15);
+  --clr-glass-light:rgba(255,255,255,.25);
+  --clr-dark:#004070;
+
+  /* night */
+  --clr-sky-night-start:#06214b;
+  --clr-sky-night-end:#010c1e;
+  --clr-accent-night:#ffe680;
+  --clr-glass-night:rgba(255,255,255,.10);
+  --clr-glass-light-night:rgba(255,255,255,.18);
+
+  /* layout */
+  --side-gap:14px;         /* margine laterale minimo */
+  --sidebar-width:190px;   /* spazio dedicato alla tabella */
+  --bottom-bar-h:88px;     /* altezza della barra in fondo */
+
+  --marker-size:36px;      /* dimensione di default dei marker */
+}
+@media(min-width:768px){ :root{ --marker-size:46px; } }
+
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',sans-serif;color:#fff;}
+
+/* ===== Contenitore generale in grid ===== */
+#widget{
+  height:100%;
+  max-width:820px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:1fr auto;
+  grid-template-rows:auto 1fr auto;     /* header – contenuto – bottom‑bar */
+  grid-template-areas:
+    "header header"
+    "map    forecast"
+    "bottom bottom";
+  background:radial-gradient(circle at 50% 15%,var(--clr-sky-start) 0%,var(--clr-sky-end) 100%);
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  overflow:hidden;
+  position:relative;
+  isolation:isolate;
+  transition:background .4s ease;
+}
+body.night #widget{
+  background:radial-gradient(circle at 50% 15%,var(--clr-sky-night-start) 0%,var(--clr-sky-night-end) 100%);
+}
+
+/* ===== Header ===== */
+header{
+  grid-area:header;
+  position:relative;
+  padding:18px var(--side-gap);
+  z-index:4;
+  text-shadow:0 2px 6px rgba(0,0,0,.5);
+  font-family:'Baloo 2',cursive;
+}
+header h1{font-size:clamp(26px,6vw,38px);font-weight:800;line-height:1.1;}
+header p{font-size:clamp(14px,3vw,18px);margin-top:2px;font-weight:600;opacity:.9;}
+body.night header p,body.night header h1{filter:brightness(.88);}
+
+/* ===== Area mappa (contenitore + immagine) ===== */
+#mapArea{
+  grid-area:map;
+  position:relative;
+  margin:0 var(--side-gap) var(--bottom-bar-h) var(--side-gap);
+  border-radius:6px;
+}
+#map{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:contain;pointer-events:none;
+  opacity:.25;filter:drop-shadow(0 0 2px rgba(0,0,0,.5));
+}
+
+/* ===== Marker ===== */
+.marker{
+  position:absolute;z-index:5;transform:translate(-50%,-50%);
+  cursor:grab;user-select:none;text-align:center;
+}
+.marker:active{cursor:grabbing;}
+.marker img{
+  width:var(--marker-size);height:var(--marker-size);border-radius:50%;
+  filter:drop-shadow(0 0 4px rgba(0,0,0,.55));
+  pointer-events:none;
+  transition:filter .35s,transform .25s;
+}
+body.night .marker img{filter:drop-shadow(0 0 4px rgba(0,0,0,.9));}
+.marker img:hover{transform:scale(1.15);}
+@keyframes spin{to{transform:rotate(360deg);} }
+@keyframes drift{0%{transform:translateX(-4px);}100%{transform:translateX(4px);} }
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(.85);} }
+@keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-8%);} }
+@keyframes wave{0%,100%{transform:translateY(0);}50%{transform:translateY(-6%);} }
+img.sunny{animation:spin 12s linear infinite;}
+img.cloudy{animation:drift 5s ease-in-out infinite alternate;}
+img.rainy{animation:pulse 1.4s ease-in-out infinite;}
+img.windy{animation:bounce 2.5s ease-in-out infinite;}
+img.wavy{animation:wave 2.4s ease-in-out infinite;}
+
+/* ===== Tabella previsioni ===== */
+#forecast{
+  grid-area:forecast;
+  position:relative;
+  margin:20px var(--side-gap) 0 0;
+  border-collapse:collapse;
+  border-radius:10px;
+  backdrop-filter:blur(10px);
+  background:var(--clr-glass);
+  font-size:13px;min-width:160px;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);
+  overflow:hidden;
+  z-index:4;
+  transition:background .35s;
+}
+body.night #forecast{background:var(--clr-glass-night);}
+#forecast th,#forecast td{padding:4px 10px;}
+#forecast th{
+  background:var(--clr-glass-light);font-weight:700;
+  font-family:'Baloo 2',cursive;transition:background .35s;
+}
+body.night #forecast th{background:var(--clr-glass-light-night);}
+#forecast tr:nth-child(even) td{background:rgba(255,255,255,.05);}
+#forecast tr:hover td{background:rgba(255,255,255,.08);}
+#forecast th:first-child::before{content:"🌡️ ";}
+#forecast td:nth-child(2),#forecast td:nth-child(3){
+  font-weight:800;font-size:18px;
+}
+
+/* ===== Bottom‑bar (nav + pulsanti) ===== */
+#bottomBar{
+  grid-area:bottom;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px var(--side-gap) 14px;
+  backdrop-filter:blur(6px);
+  background:var(--clr-glass);
+  box-shadow:0 -4px 12px rgba(0,0,0,.25);
+  border-top-left-radius:12px;border-top-right-radius:12px;
+  z-index:4;transition:background .35s;
+}
+body.night #bottomBar{background:var(--clr-glass-night);}
+
+/* nav giorni */
+#nav{
+  flex:1;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;
+  overflow-x:auto;padding:2px 0;
+}
+#nav button{
+  background:transparent;border:none;font-size:14px;font-weight:600;
+  padding:6px 10px;border-radius:8px;transition:background .2s,color .2s;
+  color:#fff;white-space:nowrap;
+}
+#nav button:hover{background:var(--clr-glass-light);}
+body.night #nav button:hover{background:var(--clr-glass-light-night);}
+#nav button.active{background:var(--clr-accent);color:#000;}
+body.night #nav button.active{background:var(--clr-accent-night);color:#000;}
+
+/* floating buttons (ora dentro la bottom‑bar) */
+.fab-btn{
+  width:54px;height:54px;border-radius:50%;border:none;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.35);
+  transition:transform .2s,background .35s;flex-shrink:0;
+}
+.fab-btn:hover{transform:scale(1.08);}
+#fab{background:var(--clr-accent);color:#000;font-size:28px;font-weight:800;}
+body.night #fab{background:var(--clr-accent-night);}
+#themeBtn{background:#ffffff26;color:#fff;font-size:26px;backdrop-filter:blur(6px);}
+body.night #themeBtn{background:#ffffff33;}
+
+/* ===== Pannello admin & Toast: stili originali (copiati) ===== */
+#panel{
+  position:absolute;left:0;right:0;bottom:0;z-index:10;
+  background:rgba(255,255,255,.95);color:var(--clr-dark);
+  padding:22px 22px 30px;border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(110%);transition:transform .35s ease;
+  box-shadow:0 -6px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);
+  overflow-y:auto;max-height:85vh;font-family:'Inter',sans-serif;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:0 auto 12px;}
+#panel h3{margin:12px 0 6px;font-size:18px;font-weight:800;font-family:'Baloo 2',cursive;}
+#panel label{display:block;margin-top:12px;font-size:14px;}
+#panel input,#panel select{
+  width:100%;padding:8px 10px;font-size:15px;border:1px solid #c0c0c0;border-radius:6px;
+}
+#panel .row{display:flex;gap:10px;flex-wrap:wrap;}
+#panel button{
+  width:100%;padding:11px;font-size:16px;border:none;border-radius:8px;font-weight:700;
+  cursor:pointer;transition:filter .15s;
+}
+#panel button:hover{filter:brightness(1.08);}
+#btnSaveMarker{background:var(--clr-accent);}
+#btnDeleteMarker{background:#ff6666;color:#fff;}
+#btnSaveLayout{background:#10b981;color:#fff;}
+#btnReset{background:#ef4444;color:#fff;}
+#btnSaveForecast{background:var(--clr-accent);}
+#toast{
+  position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:8px;font-size:15px;
+  box-shadow:0 4px 10px rgba(0,0,0,.45);display:none;z-index:20;
+}
+
+/* ===== Mobile: layout a una colonna ===== */
+@media(max-width:600px){
+  /* cambiamo l'ordine in griglia */
+  #widget{
+    grid-template-columns:1fr;
+    grid-template-rows:auto auto 1fr auto;
+    grid-template-areas:
+      "header"
+      "forecast"
+      "map"
+      "bottom";
+  }
+  #mapArea{margin:0 var(--side-gap) var(--bottom-bar-h) var(--side-gap);height:46vh;}
+  #forecast{margin:14px var(--side-gap) 0;}
+  #nav button{font-size:12px;padding:5px 8px;}
+  .fab-btn{width:46px;height:46px;font-size:24px;}
+}
+
+/* === bug‑fix 2025‑04‑xx === */
+#forecast{z-index:8;}              /* sopra i marker */
+.marker{z-index:5;}                /* default */
+#nav{flex-wrap:nowrap;}            /* una sola riga, scroll orizzontale */
+
+</style>
+</head>
+<body>
+<div id="widget">
+  <!-- Header -->
+  <header>
+    <h1 id="hDay">GIORNO 1</h1>
+    <p id="hDate">APRILE 2025</p>
+  </header>
+
+  <!-- Tabella -->
+  <table id="forecast"></table>
+
+  <!-- Area mappa -->
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png"
+         data-fallback="https://i.imgur.com/jAoPvQY.png" alt="Mappa Calabria"
+         onerror="this.onerror=null;this.src=this.dataset.fallback;" />
+  </div>
+
+  <!-- Bottom‑bar -->
+  <div id="bottomBar">
+    <button id="themeBtn" class="fab-btn" title="Tema notte">🌙</button>
+    <nav id="nav"></nav>
+    <button id="fab" class="fab-btn" title="Admin">⚙️</button>
+  </div>
+
+  <!-- Pannello admin (contenuto identico all’originale) -->
+  <div id="panel">
+    <div id="handle"></div>
+
+    <h3>Modifica Giorno</h3>
+    <label>Giorno
+      <select id="selDay"></select>
+    </label>
+    <label>Nome visualizzato
+      <input type="text" id="inpDayName">
+    </label>
+    <label>Data visualizzata
+      <input type="text" id="inpDayDate">
+    </label>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #ddd;">
+
+    <h3>Modifica Marker</h3>
+    <label>Condizione
+      <select id="selIcon"></select>
+    </label>
+    <label>URL icona personalizzata
+      <input type="text" id="inpUrl" placeholder="https://...">
+    </label>
+    <label>Dimensione marker
+      <input type="range" id="inpMarkerSize" min="24" max="64">
+    </label>
+    <div class="row">
+      <button id="btnSaveMarker">Salva marker</button>
+      <button id="btnDeleteMarker">🗑️ Elimina marker</button>
+      <button id="btnSaveLayout">💾 Layout</button>
+      <button id="btnApplyToAll">↪️ Applica a tutti i giorni</button>
+    </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #ddd;">
+
+    <h3>Modifica Tabella</h3>
+    <label>Città
+      <select id="selCity"></select>
+    </label>
+    <div class="row">
+      <label style="flex:1;">T° max
+        <input type="number" id="inpTmax">
+      </label>
+      <label style="flex:1;">T° min
+        <input type="number" id="inpTmin">
+      </label>
+    </div>
+    <button id="btnSaveForecast">Salva previsione</button>
+
+    <button id="btnReset" style="margin-top:22px;">Reset layout</button>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+
+/*** ==== DATI DI BASE ==== ***/
+const WIND_ICON='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSI+PGxpbmUgeDE9IjMyIiB5MT0iNCIgeDI9IjMyIiB5Mj0iNjAiLz48cG9seWxpbmUgcG9pbnRzPSIzMiwxNiA1MiwxNiA1Miw0Ii8+PC9zdmc+';
+const SEA_ICON='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSI+CjxwYXRoIGQ9Ik00IDIwYzQtNCA4LTQgMTIgMHM4IDQgMTIgMCA4LTQgMTIgMCA4IDQgMTIgMCA4LTQgMTIgMCIvPgo8cGF0aCBkPSJNNCAzMmM0LTQgOC00IDEyIDBzOCA0IDEyIDAgOC00IDEyIDAgOCA0IDEyIDAgOC00IDEyIDAiLz4KPHBhdGggZD0iTTQgNDRjNC00IDgtNCAxMiAwczggNCAxMiAwIDgtNCAxMiAwIDggNCAxMiAwIDgtNCAxMiAwIi8+Cjwvc3ZnPg==';
+
+const ICONS_DAY={
+  "Sole": {url:"https://img.icons8.com/emoji/96/000000/sun-emoji.png", cls:"sunny" },
+  "Parz. nuvoloso": {url:"https://img.icons8.com/emoji/96/000000/sun-behind-cloud.png", cls:"cloudy" },
+  "Nuvoloso": {url:"https://img.icons8.com/emoji/96/000000/cloud-emoji.png", cls:"cloudy" },
+  "Pioggia": {url:"https://img.icons8.com/emoji/96/000000/cloud-with-rain-emoji.png", cls:"rainy" },
+  "Temporale": {url:"https://img.icons8.com/emoji/96/000000/cloud-with-lightning-and-rain-emoji.png", cls:"rainy" },
+  "Neve": {url:"https://img.icons8.com/emoji/96/000000/cloud-with-snow-emoji.png", cls:"cloudy" },
+  "Nebbia": {url:"https://img.icons8.com/pastel-glyph/96/000000/fog--v1.png", cls:"cloudy" },
+  "Vento debole": {url:WIND_ICON, cls:"windy"},
+  "Vento moderato": {url:WIND_ICON, cls:"windy"},
+  "Vento forte": {url:WIND_ICON, cls:"windy"},
+  "Vento molto forte": {url:WIND_ICON, cls:"windy"},
+  "Mare calmo": {url:SEA_ICON, cls:"wavy"},
+  "Mare quasi calmo": {url:SEA_ICON, cls:"wavy"},
+  "Mare poco mosso": {url:SEA_ICON, cls:"wavy"},
+  "Mare mosso": {url:SEA_ICON, cls:"wavy"},
+  "Mare molto mosso": {url:SEA_ICON, cls:"wavy"},
+  "Mare agitato": {url:SEA_ICON, cls:"wavy"},
+  "Mare molto agitato": {url:SEA_ICON, cls:"wavy"},
+  "Mare tempesta": {url:SEA_ICON, cls:"wavy"},
+};
+/* versione notte: alcune icone diverse (altre riciclano quelle diurne) */
+const ICONS_NIGHT={
+  "Sole": {url:"https://img.icons8.com/emoji/96/000000/full-moon-face.png", cls:"sunny" },
+  "Parz. nuvoloso": {url:"https://img.icons8.com/emoji/96/000000/night-with-stars.png", cls:"cloudy" }
+};
+
+const CITIES=["Cosenza","Catanzaro","Crotone","Vibo Valentia","Reggio Calabria"];
+
+/* generatori demo (uguali alla v2.3) */
+const genMarkers=_=>Array.from({length:50},()=>({x:Math.random()*70+15,y:Math.random()*70+15,icon:"Sole"}));
+const genForecast=_=>CITIES.map(c=>({city:c,tmax:Math.round(Math.random()*10+20),tmin:Math.round(Math.random()*10+10)}));
+
+const CONFIG=[
+  {name:"GIORNO 1",date:"APRILE 2025",points:genMarkers(),forecast:genForecast()},
+  {name:"GIORNO 2",date:"APRILE 2025",points:genMarkers(),forecast:genForecast()},
+  {name:"GIORNO 3",date:"APRILE 2025",points:genMarkers(),forecast:genForecast()},
+  {name:"GIORNO 4",date:"APRILE 2025",points:genMarkers(),forecast:genForecast()}
+];
+
+/*** ==== STORAGE KEYS ==== ***/
+const STORAGE_KEY="METEO_WIDGET_CONFIG_V6";
+const THEME_KEY="METEO_WIDGET_THEME";
+
+/*** ==== THEME ==== ***/
+let night=false;
+function loadTheme(){
+  const t=localStorage.getItem(THEME_KEY);
+  night=(t==="night");
+  document.body.classList.toggle("night",night);
+}
+function saveTheme(){
+  localStorage.setItem(THEME_KEY,night?"night":"day");
+}
+function toggleTheme(){
+  night=!night;
+  document.body.classList.toggle("night",night);
+  saveTheme();
+  renderMarkers();
+  themeBtn.textContent=night?"☀️":"🌙";
+}
+
+/*** ==== STORAGE ==== ***/
+function saveLayout(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(CONFIG));
+  toast("Layout salvato 👍");
+}
+function resetLayout(){localStorage.removeItem(STORAGE_KEY); location.reload();}
+function loadLayout(){
+  try{
+    const data=localStorage.getItem(STORAGE_KEY);
+    if(data){const parsed=JSON.parse(data); if(Array.isArray(parsed)&&parsed.length){CONFIG.splice(0,CONFIG.length,...parsed);}}
+  }catch(e){}
+}
+loadLayout();
+
+/*** ==== DOM ==== ***/
+const w=document.getElementById("widget"),
+      mapArea=document.getElementById("mapArea"),
+      hDay=document.getElementById("hDay"),
+      hDate=document.getElementById("hDate"),
+      nav=document.getElementById("nav"),
+      fab=document.getElementById("fab"),
+      themeBtn=document.getElementById("themeBtn"),
+      panel=document.getElementById("panel"),
+      selDay=document.getElementById("selDay"),
+      inpDayName=document.getElementById("inpDayName"),
+      inpDayDate=document.getElementById("inpDayDate"),
+      selIcon=document.getElementById("selIcon"),
+      inpUrl=document.getElementById("inpUrl"),
+      inpMarkerSize=document.getElementById("inpMarkerSize"),
+      btnSaveMarker=document.getElementById("btnSaveMarker"),
+      btnDeleteMarker=document.getElementById("btnDeleteMarker"),
+      btnSaveLayout=document.getElementById("btnSaveLayout"),
+      btnApplyToAll=document.getElementById("btnApplyToAll"),
+      btnReset=document.getElementById("btnReset"),
+      toastEl=document.getElementById("toast"),
+      forecastTbl=document.getElementById("forecast"),
+      selCity=document.getElementById("selCity"),
+      inpTmax=document.getElementById("inpTmax"),
+      inpTmin=document.getElementById("inpTmin"),
+      btnSaveForecast=document.getElementById("btnSaveForecast");
+
+let curDay=0, editIdx=null, admin=false;
+
+/*** ==== UI BUILDERS ==== ***/
+function buildNav(){
+  nav.innerHTML="";
+  CONFIG.forEach((d,i)=>{
+    const b=document.createElement("button");
+    b.textContent=d.name;
+    if(i===curDay) b.classList.add("active");
+    b.onclick=()=>{curDay=i; renderAll();};
+    nav.appendChild(b);
+  });
+}
+function buildSelectors(){
+  /* giorni */
+  selDay.innerHTML="";
+  CONFIG.forEach((d,i)=>selDay.add(new Option(d.name,i)));
+
+  /* icone */
+  selIcon.innerHTML="";
+  Object.keys(ICONS_DAY).forEach(label=>selIcon.add(new Option(label,label)));
+
+  /* città */
+  selCity.innerHTML="";
+  CITIES.forEach(c=>selCity.add(new Option(c,c)));
+
+  /* auto‑url icona */
+  selIcon.onchange=()=>{ const l=selIcon.value; inpUrl.value=(night?ICONS_NIGHT[l]?.url:ICONS_DAY[l]?.url)||""; };
+
+  /* slider marker size */
+  const size=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--marker-size'));
+  inpMarkerSize.value=size;
+}
+function toast(msg){
+  toastEl.textContent=msg;
+  toastEl.style.display="block";
+  clearTimeout(toastEl._t);
+  toastEl._t=setTimeout(()=>toastEl.style.display="none",2300);
+}
+
+/*** ==== RENDER ==== ***/
+function getIcon(iconName){
+  return night && ICONS_NIGHT[iconName] ? ICONS_NIGHT[iconName] : ICONS_DAY[iconName];
+}
+function renderMarkers(){
+  mapArea.querySelectorAll(".marker").forEach(m=>m.remove());
+  CONFIG[curDay].points.forEach((pt,i)=>{
+    const d=getIcon(pt.icon) || getIcon("Sole");
+    const m=document.createElement("div"); m.className="marker"; m.style.left=pt.x+"%"; m.style.top=pt.y+"%";
+    m.innerHTML=`<img src="${d.url}" class="${d.cls}" alt="">`;
+    mapArea.appendChild(m);
+
+    /* click => open editor */
+    m.addEventListener("click",e=>{
+      if(!admin) return;
+      editIdx=i;
+      panel.classList.add("open");
+      selDay.value=curDay;
+      selIcon.value=pt.icon;
+      inpUrl.value=d.url;
+      btnDeleteMarker.style.display="block";
+      e.stopPropagation();
+    });
+
+    /* drag */
+    m.addEventListener("pointerdown",e=>{
+      if(!admin) return; editIdx=i; m.setPointerCapture(e.pointerId);
+      const rect=mapArea.getBoundingClientRect();
+      const move=ev=>{
+        const nx=((ev.clientX-rect.left)/rect.width)*100,
+              ny=((ev.clientY-rect.top)/rect.height)*100;
+        m.style.left=Math.min(Math.max(0,nx),100)+"%";
+        m.style.top=Math.min(Math.max(0,ny),100)+"%";
+      };
+      const up=ev=>{
+        m.releasePointerCapture(ev.pointerId);
+        const p=CONFIG[curDay].points[i];
+        p.x=parseFloat(m.style.left); p.y=parseFloat(m.style.top);
+        m.removeEventListener("pointermove",move); m.removeEventListener("pointerup",up);
+      };
+      m.addEventListener("pointermove",move);
+      m.addEventListener("pointerup",up);
+    });
+  });
+}
+function renderForecastTable(){
+  const day=CONFIG[curDay];
+  forecastTbl.innerHTML="";
+  const thead=document.createElement("thead");
+  thead.innerHTML="<tr><th>Città</th><th>Min°</th><th>Max°</th></tr>";
+  forecastTbl.appendChild(thead);
+  const tbody=document.createElement("tbody");
+  day.forecast.forEach(f=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${f.city}</td>
+      <td data-editable data-city="${f.city}" data-field="tmax">${f.tmax}</td>
+      <td data-editable data-city="${f.city}" data-field="tmin">${f.tmin}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  forecastTbl.appendChild(tbody);
+  updateEditableCells();
+}
+function renderAll(){
+  hDay.textContent=CONFIG[curDay].name;
+  hDate.textContent=CONFIG[curDay].date;
+
+  inpDayName.value=CONFIG[curDay].name;
+  inpDayDate.value=CONFIG[curDay].date;
+
+  buildNav();
+  renderMarkers();
+  renderForecastTable();
+}
+
+/*** ==== EDITABLE CELLS ==== ***/
+function updateEditableCells(){
+  const cells=forecastTbl.querySelectorAll("td[data-editable]");
+  forecastTbl.classList.toggle("editable",admin);
+  cells.forEach(c=>{
+    c.contentEditable=admin;
+    c.oninput=admin?e=>{
+      const city=c.dataset.city, field=c.dataset.field;
+      const val=parseFloat(c.textContent)||0;
+      const f=CONFIG[curDay].forecast.find(x=>x.city===city);
+      if(f) f[field]=val;
+    }:null;
+  });
+}
+
+/*** ==== EVENT HANDLERS ==== ***/
+/* Admin toggle */
+fab.onclick=()=>{
+  const pwd=admin?null:prompt("Password admin:");
+  if(!admin && pwd!=="admin") return;
+  admin=!admin;
+  fab.textContent=admin?"🔒":"⚙️";
+  toast(admin?"Modalità admin attiva":"Admin disattivato");
+  updateEditableCells();
+};
+
+/* Theme toggle */
+themeBtn.onclick=toggleTheme;
+
+/* chiusura pannello clic fuori */
+panel.addEventListener("click",e=>e.stopPropagation());
+w.addEventListener("click",()=>panel.classList.remove("open"));
+
+/* cambio giorno dal select */
+selDay.onchange=_=>{
+  const idx=parseInt(selDay.value,10);
+  inpDayName.value=CONFIG[idx].name;
+  inpDayDate.value=CONFIG[idx].date;
+};
+/* salvataggio header */
+inpDayName.onchange=inpDayDate.onchange=_=>{
+  const idx=parseInt(selDay.value,10);
+  CONFIG[idx].name=inpDayName.value.trim()||CONFIG[idx].name;
+  CONFIG[idx].date=inpDayDate.value.trim()||CONFIG[idx].date;
+  curDay=idx; renderAll();
+};
+/* Salva marker */
+btnSaveMarker.onclick=_=>{
+  if(editIdx===null){toast("Seleziona un marker");return;}
+  const dayIdx=parseInt(selDay.value,10);
+  const pt=CONFIG[dayIdx].points[editIdx];
+  pt.icon=selIcon.value;
+  const defUrl=getIcon(pt.icon).url;
+  if(inpUrl.value.trim() && inpUrl.value.trim()!==defUrl){
+    if(night){
+      ICONS_NIGHT[pt.icon]={url:inpUrl.value.trim(),cls:"custom"};
+    }else{
+      ICONS_DAY[pt.icon]={url:inpUrl.value.trim(),cls:"custom"};
+    }
+  }
+  curDay=dayIdx; editIdx=null; panel.classList.remove("open"); renderAll();
+};
+/* Elimina marker */
+btnDeleteMarker.onclick=_=>{
+  if(editIdx===null){toast("Seleziona un marker");return;}
+  const d=parseInt(selDay.value,10);
+  CONFIG[d].points.splice(editIdx,1);
+  panel.classList.remove("open");
+  editIdx=null;
+  renderAll();
+};
+/* Slider marker size */
+inpMarkerSize.oninput=e=>{
+  document.documentElement.style.setProperty('--marker-size',e.target.value+'px');
+};
+/* Salva previsione */
+btnSaveForecast.onclick=_=>{
+  const city=selCity.value;
+  const tmax=parseFloat(inpTmax.value);
+  const tmin=parseFloat(inpTmin.value);
+  const f=CONFIG[curDay].forecast.find(x=>x.city===city);
+  if(f){
+    if(!isNaN(tmax)) f.tmax=tmax;
+    if(!isNaN(tmin)) f.tmin=tmin;
+    renderForecastTable();
+    toast("Previsione aggiornata");
+  }
+};
+/* Layout / reset */
+btnSaveLayout.onclick=saveLayout;
+btnReset.onclick=resetLayout;
+
+/* Applica layout a tutti i giorni */
+btnApplyToAll.onclick = _ => {
+  const src = CONFIG[curDay];
+  CONFIG.forEach((d, i) => {
+    if (i !== curDay) {
+      d.points = src.points.map(pt => ({ ...pt })); // copia profonda dei marker
+    }
+  });
+  toast("Layout applicato agli altri giorni");
+  renderAll();
+};
+
+
+/* Swipe close on mobile */
+let startY=0;
+panel.addEventListener("touchstart",e=>startY=e.touches[0].clientY);
+panel.addEventListener("touchmove",e=>{
+  if(e.touches[0].clientY-startY>90) panel.classList.remove("open");
+});
+
+/*** ==== INIT ==== ***/
+buildSelectors();
+loadTheme();
+renderAll();
+themeBtn.textContent=night?"☀️":"🌙";
+
+</script>
+</body>
+</html>
