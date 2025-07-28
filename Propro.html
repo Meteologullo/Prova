@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang='it'>
+<head>
+<meta charset='utf-8'/>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'/>
+<title>Mappa Meteo – PRO v2 (fix)</title>
+<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Baloo+2:wght@600&display=swap' rel='stylesheet'>
+<style>
+/* variabili, reset e layout identici alla v2 precedente… */
+:root{--clr-sky-start:#4fd1ff;--clr-sky-end:#0ea5e9;--clr-accent:#facc15;--clr-glass:rgba(255,255,255,.15);--clr-glass-light:rgba(255,255,255,.25);--clr-dark:#004070;--side-gap:14px;--marker-size:80px;}
+@media(min-width:768px){:root{--marker-size:90px;}}
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',sans-serif;color:#fff;}
+body{overflow-x:hidden;}
+body.night{background:#011627;}body.night #widget{background:#011627;}
+#widget{height:100%;display:grid;grid-template-rows:auto 1fr auto;grid-template-areas:'header' 'map' 'bottom';background:radial-gradient(circle at 50% 15%,var(--clr-sky-start) 0%,var(--clr-sky-end) 100%);}header{grid-area:header;padding:18px var(--side-gap);}header h1{font-family:'Baloo 2',cursive;font-size:34px;font-weight:800;line-height:1.1;}header p{font-size:16px;font-weight:600;opacity:.9;}
+#mapArea{grid-area:map;position:relative;margin:0 var(--side-gap);cursor:crosshair;}
+#map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.22;}
+.marker{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);user-select:none;width:var(--marker-size);height:var(--marker-size);transition:transform .12s;touch-action:none;}
+.marker img{width:100%;height:100%;pointer-events:none;}
+.map-edit .marker{cursor:grab;}.marker.dragging{cursor:grabbing;}
+.marker.breathe{animation:breathe 5s ease-in-out infinite;}@keyframes breathe{0%,100%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.05);}}
+#bottomBar{grid-area:bottom;padding:4px var(--side-gap) 6px;backdrop-filter:blur(8px);background:var(--clr-glass);display:flex;flex-direction:column;gap:4px;}#ticker{display:none;font-family:'Baloo 2',cursive;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;height:22px;}#ticker .track{display:inline-block;animation:ticker 18s linear infinite;}@keyframes ticker{0%{transform:translateX(100%);}100%{transform:translateX(-100%);}}
+#barRow{display:flex;align-items:center;gap:10px;}#nav{flex:1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}#nav::-webkit-scrollbar{display:none;}#nav button{flex:0 0 auto;background:transparent;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-weight:600;white-space:nowrap;transition:background .2s}#nav button.active{background:var(--clr-accent);color:#000;}
+.fab-btn{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(0,0,0,.35);background:var(--clr-glass-light);backdrop-filter:blur(4px);border:none;color:#fff;}
+#panel{position:fixed;left:0;right:0;bottom:0;z-index:120;background:#fff;color:var(--clr-dark);border-top-left-radius:18px;border-top-right-radius:18px;transform:translateY(70%);transition:transform .35s ease;max-height:92vh;overflow-y:auto;touch-action:none;}#panel.open{transform:translateY(0);}#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:10px auto 16px;}
+#panel-inner{padding:0 22px 30px;display:flex;flex-direction:column;gap:20px;}fieldset{border:1px solid #d0d0d0;border-radius:8px;padding:12px;}legend{padding:0 6px;font-weight:600;}label{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;font-size:14px;}input[type=text],input[type=number]{padding:6px 8px;font-size:15px;border:1px solid #ccc;border-radius:6px;width:100%;}input[type=number]{width:90px;}.city-row{display:flex;align-items:end;gap:10px;flex-wrap:wrap;}.city-row input[name=cname]{flex:1 1 120px;}button.save-btn{align-self:flex-end;margin-top:8px;padding:9px 20px;font-weight:600;background:var(--clr-dark);color:#fff;border:none;border-radius:8px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div id='widget'>
+  <header><h1 id='hDay'>GIORNO</h1><p id='hDate'>DATA</p></header>
+  <div id='mapArea'><img id='map' src='https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png' alt='Mappa Calabria'></div>
+  <div id='bottomBar'><div id='ticker'></div><div id='barRow'><button id='themeBtn' class='fab-btn' title='Tema notte'>🌙</button><nav id='nav'></nav><button id='fab' class='fab-btn' title='Pannello di controllo'>⚙️</button></div></div>
+</div>
+<div id='panel'><div id='handle'></div><div id='panel-inner'></div></div>
+
+<script>
+/* ====== DATI DEMO ====== */
+const demoData={0:{name:"GIORNO 1",date:"APRILE 2025",cities:[{name:"Cosenza",tmin:18,tmax:26},{name:"Catanzaro",tmin:17,tmax:25},{name:"Crotone",tmin:19,tmax:27},{name:"Vibo",tmin:18,tmax:24}],points:[{x:28,y:42,icon:"clear_d",size:80},{x:55,y:37,icon:"clouds",size:80},{x:46,y:59,icon:"calm_sea",size:80}]}};
+
+/* ====== ICONS ====== */
+const ICONS={clear_d:"https://openweathermap.org/img/wn/01d@2x.png",clear_n:"https://openweathermap.org/img/wn/01n@2x.png",fewclouds_d:"https://openweathermap.org/img/wn/02d@2x.png",fewclouds_n:"https://openweathermap.org/img/wn/02n@2x.png",clouds:"https://openweathermap.org/img/wn/03d@2x.png",overcast:"https://openweathermap.org/img/wn/04d@2x.png",rain_light:"https://openweathermap.org/img/wn/09d@2x.png",rain_heavy:"https://openweathermap.org/img/wn/10d@2x.png",thunder:"https://openweathermap.org/img/wn/11d@2x.png",snow:"https://openweathermap.org/img/wn/13d@2x.png",mist:"https://openweathermap.org/img/wn/50d@2x.png",wind_n:"https://img.icons8.com/fluency/48/north-wind.png",wind_ne:"https://img.icons8.com/fluency/48/north-east-wind.png",wind_e:"https://img.icons8.com/fluency/48/east-wind.png",wind_se:"https://img.icons8.com/fluency/48/south-east-wind.png",wind_s:"https://img.icons8.com/fluency/48/south-wind.png",wind_sw:"https://img.icons8.com/fluency/48/south-west-wind.png",wind_w:"https://img.icons8.com/fluency/48/west-wind.png",wind_nw:"https://img.icons8.com/fluency/48/north-west-wind.png",calm_sea:"https://img.icons8.com/fluency/48/water.png",moderate_sea:"https://img.icons8.com/fluency/48/waves.png",rough_sea:"https://img.icons8.com/fluency/48/storm-surge.png"};
+const ICON_KEYS=Object.keys(ICONS);
+
+/* ====== CONFIG STORAGE SAFE ====== */
+let CONFIG, storageBroken=false;
+try{
+  if(!localStorage.getItem('CONFIG_PRO_V2')){localStorage.setItem('CONFIG_PRO_V2',JSON.stringify(demoData));}
+  CONFIG=JSON.parse(localStorage.getItem('CONFIG_PRO_V2'));
+}catch(e){
+  console.warn('localStorage non disponibile, uso configurazione volatile:',e);
+  CONFIG=JSON.parse(JSON.stringify(demoData));
+  storageBroken=true;
+}
+function saveConfig(){if(storageBroken) return;try{localStorage.setItem('CONFIG_PRO_V2',JSON.stringify(CONFIG));}catch(e){}}
+
+/* ====== VARIABILI STATO & QUERY ====== */
+let curDay='0',editing=false,dragInfo=null;
+const hDay=q('#hDay'),hDate=q('#hDate'),mapArea=q('#mapArea'),mapImg=q('#map'),nav=q('#nav'),panel=q('#panel'),panelInner=q('#panel-inner'),fab=q('#fab'),ticker=q('#ticker'),themeBtn=q('#themeBtn');
+function q(s,c=document){return c.querySelector(s);}
+
+/* ===== RENDER FUNZIONI ===== */
+function renderMarkers(){mapArea.querySelectorAll('.marker').forEach(el=>el.remove());CONFIG[curDay].points.forEach((pt,i)=>{const m=document.createElement('div');m.className='marker'+(editing?'':' breathe');m.style.left=pt.x+'%';m.style.top=pt.y+'%';m.style.width=pt.size+'px';m.style.height=pt.size+'px';m.dataset.idx=i;m.dataset.icon=pt.icon;m.innerHTML='<img src="'+(ICONS[pt.icon]||ICONS.clear_d)+'" draggable="false">';mapArea.appendChild(m);});}
+function renderTicker(){const cities=CONFIG[curDay].cities||[];if(!cities.length){ticker.style.display='none';return;}ticker.style.display='block';ticker.innerHTML='<div class="track">'+cities.map(c=>`${c.name}: ${c.tmin}°/${c.tmax}°`).join(' • ')+'</div>';}
+
+/* ===== NAV ===== */
+function buildNav(){nav.innerHTML='';Object.keys(CONFIG).forEach(id=>{const b=document.createElement('button');b.textContent=CONFIG[id].name;if(id===curDay)b.classList.add('active');b.onclick=()=>{curDay=id;applyHeader();renderMarkers();renderTicker();nav.querySelectorAll('button').forEach(el=>el.classList.remove('active'));b.classList.add('active');if(editing)buildPanel();};nav.appendChild(b);});}
+
+/* ===== HEADER ===== */
+function applyHeader(){hDay.textContent=CONFIG[curDay].name;hDate.textContent=CONFIG[curDay].date;}
+
+/* ===== PANEL ===== */
+function buildPanel(){const d=CONFIG[curDay];panelInner.innerHTML='';const fs1=document.createElement('fieldset');fs1.innerHTML=`<legend>Intestazione</legend><label>Giorno <input type='text' id='inpDay' value='${d.name}'></label><label>Data <input type='text' id='inpDate' value='${d.date}'></label>`;panelInner.appendChild(fs1);const fs2=document.createElement('fieldset');fs2.innerHTML='<legend>Temperature</legend>';d.cities.forEach((c,i)=>{const row=document.createElement('div');row.className='city-row';row.innerHTML=`<label>Nome <input type='text' name='cname' data-idx='${i}' value='${c.name}'></label><label>Min <input type='number' name='tmin' data-idx='${i}' value='${c.tmin}'></label><label>Max <input type='number' name='tmax' data-idx='${i}' value='${c.tmax}'></label>`;fs2.appendChild(row);});panelInner.appendChild(fs2);const fs3=document.createElement('fieldset');fs3.innerHTML='<legend>Simboli</legend><p>- Tocca la mappa per aggiungere.</p><p>- Trascina per spostare.</p><p>- Tap singolo: cambia icona.</p><p>- Doppio tap: ridimensiona.</p><p>- Pressione lunga: elimina.</p>';panelInner.appendChild(fs3);const sv=document.createElement('button');sv.textContent='Salva e chiudi';sv.className='save-btn';sv.onclick=()=>{d.name=q('#inpDay').value.trim()||d.name;d.date=q('#inpDate').value.trim()||d.date;fs2.querySelectorAll('.city-row').forEach(r=>{const i=parseInt(r.querySelector('[name="cname"]').dataset.idx);const n=r.querySelector('[name="cname"]').value.trim();const tmin=parseInt(r.querySelector('[name="tmin"]').value);const tmax=parseInt(r.querySelector('[name="tmax"]').value);if(n)d.cities[i].name=n;if(!isNaN(tmin))d.cities[i].tmin=tmin;if(!isNaN(tmax))d.cities[i].tmax=tmax;});saveConfig();applyHeader();renderTicker();buildNav();togglePanel();};panelInner.appendChild(sv);}
+function togglePanel(){panel.classList.toggle('open');editing=panel.classList.contains('open');document.body.classList.toggle('panel-open',editing);mapArea.classList.toggle('map-edit',editing);renderMarkers();if(editing)buildPanel();}
+
+/* ======= EVENTI PRINCIPALI ======= */
+fab.onclick=()=>togglePanel();
+panel.onclick=e=>{if(e.target===panel)togglePanel();};
+themeBtn.onclick=()=>{document.body.classList.toggle('night');themeBtn.textContent=document.body.classList.contains('night')?'☀️':'🌙';};
+
+/* DRAG & GESTURE MARKER */
+mapArea.addEventListener('pointerdown',e=>{if(!editing)return;const mk=e.target.closest('.marker');if(mk){dragInfo={mk,startX:e.clientX,startY:e.clientY,initL:parseFloat(mk.style.left),initT:parseFloat(mk.style.top),moved:false,down:Date.now()};mk.classList.add('dragging');mk.setPointerCapture(e.pointerId);}});
+mapArea.addEventListener('pointermove',e=>{if(!dragInfo)return;e.preventDefault();const dx=e.clientX-dragInfo.startX,dy=e.clientY-dragInfo.startY;if(Math.abs(dx)>2||Math.abs(dy)>2)dragInfo.moved=true;const rect=mapArea.getBoundingClientRect();let nx=dragInfo.initL+dx/rect.width*100,ny=dragInfo.initT+dy/rect.height*100;nx=Math.max(0,Math.min(100,nx));ny=Math.max(0,Math.min(100,ny));dragInfo.mk.style.left=nx+'%';dragInfo.mk.style.top=ny+'%';});
+mapArea.addEventListener('pointerup',e=>{if(!dragInfo)return;const m=dragInfo.mk,idx=parseInt(m.dataset.idx),press=Date.now()-dragInfo.down;if(dragInfo.moved){CONFIG[curDay].points[idx].x=parseFloat(m.style.left);CONFIG[curDay].points[idx].y=parseFloat(m.style.top);saveConfig();}else if(press>1200){if(confirm('Eliminare il simbolo?')){CONFIG[curDay].points.splice(idx,1);renderMarkers();saveConfig();}}else{const now=Date.now();if(m.lastTap&&now-m.lastTap<400){let s=parseInt(CONFIG[curDay].points[idx].size||80);s=s===80?100:s===100?60:80;CONFIG[curDay].points[idx].size=s;renderMarkers();saveConfig();}else{const cur=CONFIG[curDay].points[idx].icon;CONFIG[curDay].points[idx].icon=ICON_KEYS[(ICON_KEYS.indexOf(cur)+1)%ICON_KEYS.length];renderMarkers();saveConfig();}m.lastTap=now;}m.releasePointerCapture(e.pointerId);m.classList.remove('dragging');dragInfo=null;});
+mapArea.addEventListener('click',e=>{if(!editing||e.target.closest('.marker'))return;const rect=mapArea.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width*100;const y=(e.clientY-rect.top)/rect.height*100;CONFIG[curDay].points.push({x,y,icon:ICON_KEYS[0],size:80});saveConfig();renderMarkers();});
+
+/* ==== INIT ==== */
+applyHeader();renderMarkers();renderTicker();buildNav();
+</script>
+</body>
+</html>
