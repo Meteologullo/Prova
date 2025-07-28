@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Mappa Meteo – FINAL</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --clr-sky-start:#4fd1ff;
+  --clr-sky-end:#0ea5e9;
+  --clr-accent:#facc15;
+  --clr-glass:rgba(255,255,255,.15);
+  --clr-glass-light:rgba(255,255,255,.25);
+  --clr-dark:#004070;
+  --side-gap:14px;
+  --marker-size:36px;
+}
+@media(min-width:768px){ :root{ --marker-size:46px; } }
+
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',sans-serif;color:#fff;}
+
+body.night{background:#011627;}
+
+#widget{
+  height:100%;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:
+    "header"
+    "map"
+    "bottom";
+  background:radial-gradient(circle at 50% 15%,var(--clr-sky-start) 0%,var(--clr-sky-end) 100%);
+}
+
+header{grid-area:header;padding:18px var(--side-gap);}
+header h1{font-family:'Baloo 2',cursive;font-size:34px;font-weight:800;line-height:1.1;}
+header p{font-size:16px;font-weight:600;opacity:.9;}
+
+#mapArea{grid-area:map;position:relative;margin:0 var(--side-gap);}
+#map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.25;}
+
+.marker{position:absolute;transform:translate(-50%,-50%);}
+.marker img{width:var(--marker-size);height:var(--marker-size);pointer-events:none;}
+
+#bottomBar{
+  grid-area:bottom;
+  padding:4px var(--side-gap) 6px;
+  backdrop-filter:blur(8px);
+  background:var(--clr-glass);
+  display:flex;flex-direction:column;gap:4px;
+}
+#ticker{display:none;font-family:'Baloo 2',cursive;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;height:22px;}
+#ticker .track{display:inline-block;animation:ticker 18s linear infinite;}
+@keyframes ticker{0%{transform:translateX(100%);}100%{transform:translateX(-100%);}}
+
+#barRow{display:flex;align-items:center;gap:10px;}
+#nav{flex:1;display:flex;gap:6px;overflow-x:auto;}
+#nav button{background:transparent;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-weight:600;white-space:nowrap;}
+#nav button.active{background:var(--clr-accent);color:#000;}
+
+.fab-btn{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(0,0,0,.35);}
+
+#panel{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:#fff;color:var(--clr-dark);border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(110%);transition:transform .35s ease;
+  max-height:85vh;overflow-y:auto;padding:20px;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:0 auto 12px;}
+
+body.panel-open{overflow:hidden;}
+</style>
+</head>
+<body>
+<div id="widget">
+  <header>
+    <h1 id="hDay">GIORNO 1</h1>
+    <p id="hDate">APRILE 2025</p>
+  </header>
+
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa"/>
+  </div>
+
+  <div id="bottomBar">
+    <div id="ticker"></div>
+    <div id="barRow">
+      <button id="themeBtn" class="fab-btn" title="Tema notte">🌙</button>
+      <nav id="nav"></nav>
+      <button id="fab" class="fab-btn" title="Admin">⚙️</button>
+    </div>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="handle"></div>
+  <h3>Demo pannello</h3>
+  <p>Qui andrebbe il contenuto di configurazione.</p>
+</div>
+
+<script>
+/* ==== DATI DI BASE (demo se non esistono) ==== */
+const demoData = {
+  "0":{
+    name:"GIORNO 1",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:18,tmax:26},
+      {name:"Catanzaro",tmin:17,tmax:25},
+      {name:"Crotone",tmin:19,tmax:27},
+      {name:"Vibo",tmin:18,tmax:24}
+    ],
+    points:[
+      {x:45,y:35,icon:"sun"},
+      {x:60,y:50,icon:"sun"},
+      {x:40,y:60,icon:"sun"},
+      {x:55,y:25,icon:"sun"},
+      {x:30,y:70,icon:"sun"},
+    ]
+  }
+};
+
+if(!localStorage.getItem("CONFIG")){
+  localStorage.setItem("CONFIG", JSON.stringify(demoData));
+}
+let CONFIG = JSON.parse(localStorage.getItem("CONFIG"));
+
+/* ==== VARIABILI E DOM ==== */
+let curDay = "0";
+const hDay=document.getElementById("hDay"),
+      hDate=document.getElementById("hDate"),
+      mapArea=document.getElementById("mapArea"),
+      nav=document.getElementById("nav"),
+      fab=document.getElementById("fab"),
+      panel=document.getElementById("panel"),
+      ticker=document.getElementById("ticker"),
+      themeBtn=document.getElementById("themeBtn");
+
+/* ==== RENDER FUNZIONI ==== */
+function renderMarkers(){
+  mapArea.querySelectorAll(".marker").forEach(el=>el.remove());
+  CONFIG[curDay].points.forEach(pt=>{
+    const m=document.createElement("div");
+    m.className="marker";
+    m.style.left=pt.x+"%";
+    m.style.top=pt.y+"%";
+    m.innerHTML='<img src="https://i.imgur.com/whB2bqE.png" alt="">';
+    mapArea.appendChild(m);
+  });
+}
+
+function renderTicker(){
+  const cities = CONFIG[curDay].cities||[];
+  if(!cities.length){ticker.style.display="none";return;}
+  ticker.style.display="block";
+  ticker.innerHTML = '<div class="track">'+cities.map(c=>\`\${c.name}: \${c.tmin}°/\${c.tmax}°\`).join(" • ")+'</div>';
+}
+
+function buildNav(){
+  nav.innerHTML="";
+  Object.keys(CONFIG).forEach(id=>{
+    const btn=document.createElement("button");
+    btn.textContent=CONFIG[id].name;
+    if(id===curDay)btn.classList.add("active");
+    btn.addEventListener("click",()=>{
+      curDay=id;
+      hDay.textContent=CONFIG[id].name;
+      hDate.textContent=CONFIG[id].date;
+      renderMarkers();
+      renderTicker();
+      nav.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    nav.appendChild(btn);
+  });
+}
+
+/* ==== EVENTI ==== */
+fab.addEventListener("click",()=>{
+  panel.classList.toggle("open");
+  document.body.classList.toggle("panel-open", panel.classList.contains("open"));
+});
+panel.addEventListener("click",e=>{
+  if(e.target===panel){
+    panel.classList.remove("open");
+    document.body.classList.remove("panel-open");
+  }
+});
+themeBtn.addEventListener("click",()=>{
+  document.body.classList.toggle("night");
+});
+
+/* ==== INIT ==== */
+hDay.textContent=CONFIG[curDay].name;
+hDate.textContent=CONFIG[curDay].date;
+renderMarkers();
+renderTicker();
+buildNav();
+</script>
+</body>
+</html>
