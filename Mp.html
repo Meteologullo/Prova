@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Mappa Meteo – FINAL FIX</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --clr-sky-start:#4fd1ff;
+  --clr-sky-end:#0ea5e9;
+  --clr-accent:#facc15;
+  --clr-glass:rgba(255,255,255,.15);
+  --clr-glass-light:rgba(255,255,255,.25);
+  --clr-dark:#004070;
+  --side-gap:14px;
+  --marker-size:36px;
+}
+@media(min-width:768px){ :root{ --marker-size:46px; } }
+
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',sans-serif;color:#fff;}
+body{overflow-x:hidden;}
+
+body.night{background:#011627;}
+body.night #widget{background:#011627;}
+
+#widget{
+  height:100%;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:
+    "header"
+    "map"
+    "bottom";
+  background:radial-gradient(circle at 50% 15%,var(--clr-sky-start) 0%,var(--clr-sky-end) 100%);
+}
+
+header{grid-area:header;padding:18px var(--side-gap);}
+header h1{font-family:'Baloo 2',cursive;font-size:34px;font-weight:800;line-height:1.1;}
+header p{font-size:16px;font-weight:600;opacity:.9;}
+
+#mapArea{grid-area:map;position:relative;margin:0 var(--side-gap);cursor:crosshair;}
+#map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.22;}
+
+.marker{position:absolute;transform:translate(-50%,-50%);user-select:none;font-size:var(--marker-size);line-height:1;transition:transform .15s}
+.map-edit .marker{cursor:pointer;}
+.marker.editing{animation:pulse .9s ease-in-out infinite alternate;}
+@keyframes pulse{from{transform:translate(-50%,-50%) scale(1);}to{transform:translate(-50%,-50%) scale(1.15);}}
+
+#bottomBar{
+  grid-area:bottom;
+  padding:4px var(--side-gap) 6px;
+  backdrop-filter:blur(8px);
+  background:var(--clr-glass);
+  display:flex;flex-direction:column;gap:4px;
+}
+#ticker{display:none;font-family:'Baloo 2',cursive;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;height:22px;}
+#ticker .track{display:inline-block;animation:ticker 18s linear infinite;}
+@keyframes ticker{0%{transform:translateX(100%);}100%{transform:translateX(-100%);}}
+
+#barRow{display:flex;align-items:center;gap:10px;}
+#nav{flex:1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
+#nav::-webkit-scrollbar{display:none;}
+#nav button{flex:0 0 auto;background:transparent;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-weight:600;white-space:nowrap;transition:background .2s}
+#nav button.active{background:var(--clr-accent);color:#000;}
+
+.fab-btn{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(0,0,0,.35);background:var(--clr-glass-light);backdrop-filter:blur(4px);border:none;color:#fff;}
+
+#panel{
+  position:fixed;left:0;right:0;bottom:0;z-index:100;
+  background:#fff;color:var(--clr-dark);border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(100%);transition:transform .35s ease;
+  max-height:85vh;overflow-y:auto;padding:20px;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:0 auto 12px;}
+
+body.panel-open{overflow:hidden;}
+</style>
+</head>
+<body>
+<div id="widget">
+  <header>
+    <h1 id="hDay">GIORNO 1</h1>
+    <p id="hDate">APRILE 2025</p>
+  </header>
+
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa"/>
+  </div>
+
+  <div id="bottomBar">
+    <div id="ticker"></div>
+    <div id="barRow">
+      <button id="themeBtn" class="fab-btn" title="Tema notte">🌙</button>
+      <nav id="nav"></nav>
+      <button id="fab" class="fab-btn" title="Pannello di controllo">⚙️</button>
+    </div>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="handle"></div>
+  <h3>Modalità modifica</h3>
+  <p>Con il pannello aperto puoi:</p>
+  <ul>
+    <li>👆 Cliccare sulla mappa per <strong>aggiungere</strong> un nuovo simbolo (☀️ di default).</li>
+    <li>🌀 Cliccare su un simbolo esistente per <strong>cambiarne</strong> il tipo (ciclo ☀️→☁️→🌧️→⛈️→…)</li>
+    <li>I cambiamenti vengono <strong>salvati</strong> automaticamente (localStorage).</li>
+  </ul>
+  <p>Chiudi il pannello per uscire dalla modalità modifica.</p>
+</div>
+
+<script>
+/* ==== DATI DI BASE (4 giorni demo) ==== */
+const demoData = {
+  "0":{
+    name:"GIORNO 1",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:18,tmax:26},
+      {name:"Catanzaro",tmin:17,tmax:25},
+      {name:"Crotone",tmin:19,tmax:27},
+      {name:"Vibo",tmin:18,tmax:24}
+    ],
+    points:[
+      {x:28,y:42,icon:"sun"},
+      {x:55,y:37,icon:"cloud"},
+      {x:46,y:59,icon:"sun"}
+    ]
+  },
+  "1":{
+    name:"GIORNO 2",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:17,tmax:24},
+      {name:"Catanzaro",tmin:16,tmax:23},
+      {name:"Crotone",tmin:18,tmax:25},
+      {name:"Vibo",tmin:17,tmax:22}
+    ],
+    points:[
+      {x:30,y:48,icon:"cloud"},
+      {x:60,y:35,icon:"rain"},
+      {x:42,y:60,icon:"cloud"}
+    ]
+  },
+  "2":{
+    name:"GIORNO 3",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:19,tmax:28},
+      {name:"Catanzaro",tmin:18,tmax:26},
+      {name:"Crotone",tmin:20,tmax:29},
+      {name:"Vibo",tmin:19,tmax:25}
+    ],
+    points:[
+      {x:43,y:40,icon:"sun"},
+      {x:58,y:52,icon:"sun"},
+      {x:35,y:65,icon:"sun"}
+    ]
+  },
+  "3":{
+    name:"GIORNO 4",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:16,tmax:22},
+      {name:"Catanzaro",tmin:15,tmax:21},
+      {name:"Crotone",tmin:17,tmax:23},
+      {name:"Vibo",tmin:16,tmax:20}
+    ],
+    points:[
+      {x:40,y:45,icon:"cloud"},
+      {x:53,y:32,icon:"rain"},
+      {x:48,y:62,icon:"thunder"}
+    ]
+  }
+};
+
+/* ==== ICON SET ==== */
+const ICONS = {
+  sun:"☀️",
+  cloud:"☁️",
+  rain:"🌧️",
+  thunder:"⛈️"
+};
+
+/* ==== STORAGE ==== */
+if(!localStorage.getItem("CONFIG")){
+  localStorage.setItem("CONFIG", JSON.stringify(demoData));
+}
+let CONFIG = JSON.parse(localStorage.getItem("CONFIG"));
+
+/* ==== VARIABILI E DOM ==== */
+let curDay = "0";
+let editing = false;
+const hDay=document.getElementById("hDay"),
+      hDate=document.getElementById("hDate"),
+      mapArea=document.getElementById("mapArea"),
+      nav=document.getElementById("nav"),
+      fab=document.getElementById("fab"),
+      panel=document.getElementById("panel"),
+      ticker=document.getElementById("ticker"),
+      themeBtn=document.getElementById("themeBtn");
+
+/* ==== FUNZIONI DI RENDER ==== */
+function renderMarkers(){
+  mapArea.querySelectorAll(".marker").forEach(el=>el.remove());
+  CONFIG[curDay].points.forEach((pt,i)=>{
+    const m=document.createElement("div");
+    m.className="marker"+(editing?" editing":"");
+    m.style.left=pt.x+"%";
+    m.style.top=pt.y+"%";
+    m.dataset.idx=i;
+    m.dataset.icon=pt.icon;
+    m.textContent=ICONS[pt.icon]||"❓";
+    mapArea.appendChild(m);
+  });
+}
+
+function renderTicker(){
+  const cities = CONFIG[curDay].cities||[];
+  if(!cities.length){ticker.style.display="none";return;}
+  ticker.style.display="block";
+  ticker.innerHTML = '<div class="track">'+cities.map(c=>`${c.name}: ${c.tmin}°/${c.tmax}°`).join(" • ")+'</div>';
+}
+
+function buildNav(){
+  nav.innerHTML="";
+  Object.keys(CONFIG).forEach(id=>{
+    const btn=document.createElement("button");
+    btn.textContent=CONFIG[id].name;
+    if(id===curDay)btn.classList.add("active");
+    btn.addEventListener("click",()=>{
+      curDay=id;
+      hDay.textContent=CONFIG[id].name;
+      hDate.textContent=CONFIG[id].date;
+      renderMarkers();
+      renderTicker();
+      nav.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    nav.appendChild(btn);
+  });
+}
+
+function saveConfig(){
+  localStorage.setItem("CONFIG", JSON.stringify(CONFIG));
+}
+
+/* ==== PANEL & EDIT MODE ==== */
+function togglePanel(){
+  panel.classList.toggle("open");
+  document.body.classList.toggle("panel-open", panel.classList.contains("open"));
+  editing = panel.classList.contains("open");
+  mapArea.classList.toggle("map-edit", editing);
+  renderMarkers();
+}
+
+/* ==== EVENTI ==== */
+fab.addEventListener("click", togglePanel);
+panel.addEventListener("click", e=>{ if(e.target===panel) togglePanel(); });
+
+themeBtn.addEventListener("click",()=>{
+  document.body.classList.toggle("night");
+  themeBtn.textContent=document.body.classList.contains("night")?"☀️":"🌙";
+});
+
+/* Aggiunta / modifica marker */
+mapArea.addEventListener("click", e=>{
+  if(!editing)return;
+  const mEl=e.target.closest('.marker');
+  if(mEl){ // cambio icona
+    const idx=parseInt(mEl.dataset.idx);
+    const cur=CONFIG[curDay].points[idx].icon;
+    const keys=Object.keys(ICONS);
+    const next=keys[(keys.indexOf(cur)+1)%keys.length];
+    CONFIG[curDay].points[idx].icon=next;
+    saveConfig();
+    renderMarkers();
+    return;
+  }
+  // nuovo marker
+  const rect=mapArea.getBoundingClientRect();
+  const x=((e.clientX-rect.left)/rect.width)*100;
+  const y=((e.clientY-rect.top)/rect.height)*100;
+  CONFIG[curDay].points.push({x,y,icon:"sun"});
+  saveConfig();
+  renderMarkers();
+});
+
+/* ==== INIT ==== */
+hDay.textContent=CONFIG[curDay].name;
+hDate.textContent=CONFIG[curDay].date;
+renderMarkers();
+renderTicker();
+buildNav();
+</script>
+</body>
+</html>
