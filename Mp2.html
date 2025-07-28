@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Mappa Meteo – versione protetta</title>
+
+<!-- Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --clr-sky-start:#4fd1ff;
+  --clr-sky-end:#0ea5e9;
+  --clr-accent:#facc15;
+  --clr-glass:rgba(255,255,255,.15);
+  --clr-glass-light:rgba(255,255,255,.25);
+  --clr-dark:#004070;
+  --side-gap:14px;
+  --marker-size:64px;   /* icone più grandi */
+}
+
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',sans-serif;color:#fff;}
+body{overflow-x:hidden;}
+
+body.night{background:#011627;}
+body.night #widget{background:#011627;}
+
+#widget{
+  height:100%;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:"header" "map" "bottom";
+  background:radial-gradient(circle at 50% 15%,var(--clr-sky-start) 0%,var(--clr-sky-end) 100%);
+}
+
+/* --- HEADER --- */
+header{grid-area:header;padding:18px var(--side-gap);}
+header h1{font-family:'Baloo 2',cursive;font-size:34px;font-weight:800;line-height:1.1;}
+header p{font-size:16px;font-weight:600;opacity:.9;}
+
+/* --- MAPPA --- */
+#mapArea{grid-area:map;position:relative;margin:0 var(--side-gap);cursor:crosshair;}
+#map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.22;}
+
+/* --- MARKER --- */
+.marker{
+  position:absolute;transform:translate(-50%,-50%);user-select:none;
+  font-size:var(--marker-size);line-height:1;
+  transition:transform .2s;
+}
+.map-edit .marker{cursor:pointer;}
+.marker.editing{animation:pulse .9s ease-in-out infinite alternate;}
+@keyframes pulse{from{transform:translate(-50%,-50%) scale(1);}to{transform:translate(-50%,-50%) scale(1.15);}}
+
+/* Animazioni specifiche */
+.marker[data-icon="sun"]{animation:spin 12s linear infinite;}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg);}}
+
+/* lieve oscillazione nuvola */
+.marker[data-icon="cloud"]{animation:float 5s ease-in-out infinite;}
+@keyframes float{0%{transform:translate(-50%,-50%) translateY(-3px);}50%{transform:translate(-50%,-50%) translateY(3px);}100%{transform:translate(-50%,-50%) translateY(-3px);}}
+
+/* pioggia: piccolo lampeggio */
+.marker[data-icon="rain"]{animation:drip 1s linear infinite;}
+@keyframes drip{0%,100%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.05);}}
+
+/* lampo: flash di opacità */
+.marker[data-icon="thunder"]{animation:flash 1.2s linear infinite;}
+@keyframes flash{0%,70%{opacity:1;}75%,80%{opacity:.2;}85%,90%{opacity:1;}}
+
+/* --- BOTTOM BAR --- */
+#bottomBar{
+  grid-area:bottom;padding:4px var(--side-gap) 6px;
+  backdrop-filter:blur(8px);background:var(--clr-glass);
+  display:flex;flex-direction:column;gap:4px;
+}
+#ticker{display:none;font-family:'Baloo 2',cursive;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;height:22px;}
+#ticker .track{display:inline-block;animation:ticker 18s linear infinite;}
+@keyframes ticker{0%{transform:translateX(100%);}100%{transform:translateX(-100%);}}
+
+/* nav */
+
+#barRow{display:flex;align-items:center;gap:10px;}
+#nav{flex:1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
+#nav::-webkit-scrollbar{display:none;}
+#nav button{flex:0 0 auto;background:transparent;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-weight:600;white-space:nowrap;transition:background .2s}
+#nav button.active{background:var(--clr-accent);color:#000;}
+
+/* fab */
+.fab-btn{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 10px rgba(0,0,0,.35);background:var(--clr-glass-light);backdrop-filter:blur(4px);border:none;color:#fff;}
+
+/* --- PANEL --- */
+#panel{
+  position:fixed;left:0;right:0;bottom:0;z-index:100;
+  background:#fff;color:var(--clr-dark);border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(100%);transition:transform .35s ease;
+  max-height:90vh;overflow-y:auto;padding:0 0 30px;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:10px auto 16px;}
+
+/* interno pannello */
+#panel-inner{padding:0 22px 30px;display:flex;flex-direction:column;gap:20px;}
+fieldset{border:1px solid #d0d0d0;border-radius:8px;padding:12px;}
+legend{padding:0 6px;font-weight:600;}
+
+label{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;font-size:14px;}
+input[type="text"],input[type="number"]{
+  padding:6px 8px;font-size:15px;border:1px solid #ccc;border-radius:6px;width:100%;
+}
+input[type="number"]{width:80px;}
+
+.city-row{display:flex;align-items:end;gap:10px;flex-wrap:wrap;}
+.city-row input[name="cname"]{flex:1 1 120px;}
+
+button.save-btn{
+  align-self:flex-end;margin-top:6px;padding:8px 16px;font-weight:600;
+  background:var(--clr-dark);color:#fff;border:none;border-radius:8px;cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div id="widget">
+  <header>
+    <h1 id="hDay">GIORNO</h1>
+    <p id="hDate">DATA</p>
+  </header>
+
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa Calabria"/>
+  </div>
+
+  <div id="bottomBar">
+    <div id="ticker"></div>
+    <div id="barRow">
+      <button id="themeBtn" class="fab-btn" title="Tema notte">🌙</button>
+      <nav id="nav"></nav>
+      <button id="fab" class="fab-btn" title="Pannello di controllo">⚙️</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pannello -->
+<div id="panel">
+  <div id="handle"></div>
+  <div id="panel-inner">
+    <!-- Contenuto dinamico -->
+  </div>
+</div>
+
+<script>
+/* ======= CONFIGURAZIONE DI BASE ======= */
+const demoData = {  // dati d'esempio
+  "0":{
+    name:"GIORNO 1",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:18,tmax:26},
+      {name:"Catanzaro",tmin:17,tmax:25},
+      {name:"Crotone",tmin:19,tmax:27},
+      {name:"Vibo",tmin:18,tmax:24}
+    ],
+    points:[
+      {x:28,y:42,icon:"sun"},
+      {x:55,y:37,icon:"cloud"},
+      {x:46,y:59,icon:"sun"}
+    ]
+  },
+  "1":{
+    name:"GIORNO 2",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:17,tmax:24},
+      {name:"Catanzaro",tmin:16,tmax:23},
+      {name:"Crotone",tmin:18,tmax:25},
+      {name:"Vibo",tmin:17,tmax:22}
+    ],
+    points:[
+      {x:30,y:48,icon:"cloud"},
+      {x:60,y:35,icon:"rain"},
+      {x:42,y:60,icon:"cloud"}
+    ]
+  },
+  "2":{
+    name:"GIORNO 3",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:19,tmax:28},
+      {name:"Catanzaro",tmin:18,tmax:26},
+      {name:"Crotone",tmin:20,tmax:29},
+      {name:"Vibo",tmin:19,tmax:25}
+    ],
+    points:[
+      {x:43,y:40,icon:"sun"},
+      {x:58,y:52,icon:"sun"},
+      {x:35,y:65,icon:"sun"}
+    ]
+  },
+  "3":{
+    name:"GIORNO 4",
+    date:"APRILE 2025",
+    cities:[
+      {name:"Cosenza",tmin:16,tmax:22},
+      {name:"Catanzaro",tmin:15,tmax:21},
+      {name:"Crotone",tmin:17,tmax:23},
+      {name:"Vibo",tmin:16,tmax:20}
+    ],
+    points:[
+      {x:40,y:45,icon:"cloud"},
+      {x:53,y:32,icon:"rain"},
+      {x:48,y:62,icon:"thunder"}
+    ]
+  }
+};
+
+const ICONS = { sun:"☀️", cloud:"☁️", rain:"🌧️", thunder:"⛈️" };
+
+/* ======= PASSWORD ======= */
+const PASSWORD = "meteo2025";  // <-- Cambia qui la tua password
+let loggedIn = false;
+
+/* ======= STORAGE ======= */
+if(!localStorage.getItem("CONFIG_SECURE")){
+  localStorage.setItem("CONFIG_SECURE", JSON.stringify(demoData));
+}
+let CONFIG = JSON.parse(localStorage.getItem("CONFIG_SECURE"));
+
+/* ======= VARIABILI ======= */
+let curDay = "0";
+let editing = false;
+
+/* ======= DOM ======= */
+const hDay=document.getElementById("hDay");
+const hDate=document.getElementById("hDate");
+const mapArea=document.getElementById("mapArea");
+const nav=document.getElementById("nav");
+const fab=document.getElementById("fab");
+const panel=document.getElementById("panel");
+const panelInner=document.getElementById("panel-inner");
+const ticker=document.getElementById("ticker");
+const themeBtn=document.getElementById("themeBtn");
+
+/* ======= RENDER ======= */
+function renderMarkers(){
+  mapArea.querySelectorAll(".marker").forEach(el=>el.remove());
+  CONFIG[curDay].points.forEach((pt,i)=>{
+    const m=document.createElement("div");
+    m.className="marker"+(editing?" editing":"");
+    m.style.left=pt.x+"%";
+    m.style.top=pt.y+"%";
+    m.dataset.idx=i;
+    m.dataset.icon=pt.icon;
+    m.textContent=ICONS[pt.icon]||"❓";
+    mapArea.appendChild(m);
+  });
+}
+
+function renderTicker(){
+  const cities = CONFIG[curDay].cities||[];
+  if(!cities.length){ticker.style.display="none";return;}
+  ticker.style.display="block";
+  ticker.innerHTML = '<div class="track">'+cities.map(c=>`${c.name}: ${c.tmin}°/${c.tmax}°`).join(" • ")+'</div>';
+}
+
+function buildNav(){
+  nav.innerHTML="";
+  Object.keys(CONFIG).forEach(id=>{
+    const btn=document.createElement("button");
+    btn.textContent=CONFIG[id].name;
+    if(id===curDay)btn.classList.add("active");
+    btn.addEventListener("click",()=>{
+      curDay=id;
+      hDay.textContent=CONFIG[id].name;
+      hDate.textContent=CONFIG[id].date;
+      renderMarkers(); renderTicker();
+      nav.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    nav.appendChild(btn);
+  });
+}
+
+/* ======= PANEL CONTENT ======= */
+function buildPanelContent(){
+  panelInner.innerHTML="";
+  const data = CONFIG[curDay];
+
+  /* --- Sezione giorno/data --- */
+  const fs1=document.createElement("fieldset");
+  fs1.innerHTML=`
+    <legend>Intestazione</legend>
+    <label>Giorno
+      <input type="text" id="inpDay" value="${data.name}">
+    </label>
+    <label>Mese / Data
+      <input type="text" id="inpDate" value="${data.date}">
+    </label>
+  `;
+  panelInner.appendChild(fs1);
+
+  /* --- Sezione temperature --- */
+  const fs2=document.createElement("fieldset");
+  fs2.innerHTML=`<legend>Temperature città</legend>`;
+  data.cities.forEach((c,i)=>{
+    const row=document.createElement("div");
+    row.className="city-row";
+    row.innerHTML=`
+      <label>Nome
+        <input type="text" name="cname" data-idx="${i}" value="${c.name}">
+      </label>
+      <label>Min
+        <input type="number" name="tmin" data-idx="${i}" value="${c.tmin}">
+      </label>
+      <label>Max
+        <input type="number" name="tmax" data-idx="${i}" value="${c.tmax}">
+      </label>
+    `;
+    fs2.appendChild(row);
+  });
+  panelInner.appendChild(fs2);
+
+  /* --- Info modifica marker --- */
+  const fs3=document.createElement("fieldset");
+  fs3.innerHTML=`
+    <legend>Modifica simboli</legend>
+    <p>- Clicca sulla mappa per <strong>aggiungere</strong> un nuovo simbolo (☀️ di default).</p>
+    <p>- Clicca su un simbolo già presente per <strong>cambiarne</strong> il tipo (ciclo ☀️→☁️→🌧️→⛈️).</p>
+  `;
+  panelInner.appendChild(fs3);
+
+  /* --- Pulsante SALVA --- */
+  const saveBtn=document.createElement("button");
+  saveBtn.textContent="Salva e chiudi";
+  saveBtn.className="save-btn";
+  saveBtn.addEventListener("click",()=>{
+    /* aggiorna header */
+    data.name=document.getElementById("inpDay").value.trim()||data.name;
+    data.date=document.getElementById("inpDate").value.trim()||data.date;
+
+    /* aggiorna città */
+    fs2.querySelectorAll('.city-row').forEach(row=>{
+      const idx=parseInt(row.querySelector('input[name="cname"]').dataset.idx);
+      const n=row.querySelector('input[name="cname"]').value.trim();
+      const tmin=parseInt(row.querySelector('input[name="tmin"]').value);
+      const tmax=parseInt(row.querySelector('input[name="tmax"]').value);
+      if(n) data.cities[idx].name=n;
+      if(!isNaN(tmin)) data.cities[idx].tmin=tmin;
+      if(!isNaN(tmax)) data.cities[idx].tmax=tmax;
+    });
+
+    saveConfig();
+    hDay.textContent=data.name;
+    hDate.textContent=data.date;
+    renderTicker(); buildNav();
+    togglePanel();
+  });
+  panelInner.appendChild(saveBtn);
+}
+
+/* ======= SALVATAGGIO ======= */
+function saveConfig(){
+  localStorage.setItem("CONFIG_SECURE", JSON.stringify(CONFIG));
+}
+
+/* ======= PANEL TOGGLE ======= */
+function togglePanel(){
+  panel.classList.toggle("open");
+  document.body.classList.toggle("panel-open", panel.classList.contains("open"));
+  editing = panel.classList.contains("open");
+  mapArea.classList.toggle("map-edit", editing);
+  renderMarkers();
+  if(editing) buildPanelContent();
+}
+
+/* ======= EVENTI ======= */
+fab.addEventListener("click", () => {
+  if(!loggedIn){
+    const pass=prompt("Inserisci password:");
+    if(pass===PASSWORD){
+      loggedIn=true;
+    }else{
+      alert("Password errata!");
+      return;
+    }
+  }
+  togglePanel();
+});
+
+panel.addEventListener("click", e=>{
+  if(e.target===panel) togglePanel();
+});
+
+themeBtn.addEventListener("click",()=>{
+  document.body.classList.toggle("night");
+  themeBtn.textContent=document.body.classList.contains("night")?"☀️":"🌙";
+});
+
+/* Aggiunta/modifica marker */
+mapArea.addEventListener("click", e=>{
+  if(!editing)return;
+  const mEl=e.target.closest('.marker');
+  if(mEl){  // cambia icona
+    const idx=parseInt(mEl.dataset.idx);
+    const cur=CONFIG[curDay].points[idx].icon;
+    const keys=Object.keys(ICONS);
+    const next=keys[(keys.indexOf(cur)+1)%keys.length];
+    CONFIG[curDay].points[idx].icon=next;
+    saveConfig();
+    renderMarkers();
+    return;
+  }
+  // nuovo marker
+  const rect=mapArea.getBoundingClientRect();
+  const x=((e.clientX-rect.left)/rect.width)*100;
+  const y=((e.clientY-rect.top)/rect.height)*100;
+  CONFIG[curDay].points.push({x,y,icon:"sun"});
+  saveConfig();
+  renderMarkers();
+});
+
+/* ======= INIT ======= */
+hDay.textContent=CONFIG[curDay].name;
+hDate.textContent=CONFIG[curDay].date;
+renderMarkers(); renderTicker(); buildNav();
+</script>
+</body>
+</html>
