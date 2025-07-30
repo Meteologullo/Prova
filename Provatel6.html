@@ -1,0 +1,274 @@
+
+<!DOCTYPE html><html lang="it"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Meteo Calabria — Dashboard Pro v4</title>
+
+<!-- Fonts & Icons -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+
+<style>
+/* ——— THEME ——— */
+:root{
+  --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+  --glass:rgba(255,255,255,.14);
+  --blur:14px;
+  --radius:18px;
+  --accent:#00d2ff;
+  --accent2:#3a7bd5;
+  --text:#ecf1f8;
+  --text-dim:#c5d0e6;
+  --marker-size:clamp(28px,7vw,56px);
+}
+@media(prefers-color-scheme:light){
+ :root{--bg:linear-gradient(135deg,#e0efff,#bee1ff 40%,#a5d4ff);
+       --glass:rgba(255,255,255,.28);--text:#07223a;--text-dim:#32506e;}
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Inter",sans-serif;background:var(--bg);color:var(--text);
+     display:flex;flex-direction:column;align-items:center;gap:22px;padding:22px 12px}
+
+/* ——— SEARCH ——— */
+#searchForm{display:flex;gap:.6rem;width:100%;max-width:820px}
+#cityInput{flex:1;border:none;border-radius:var(--radius);background:var(--glass);
+           backdrop-filter:blur(var(--blur));padding:.9rem 1.1rem;font-size:1rem;outline:none;color:var(--text)}
+#searchForm button{border:none;border-radius:var(--radius);
+                   background:linear-gradient(135deg,var(--accent),var(--accent2));
+                   color:#fff;font-weight:700;font-size:1rem;padding:.9rem 1.35rem;cursor:pointer}
+
+/* ——— WIDGET LAYOUT ——— */
+#widget{width:100%;max-width:820px;display:flex;flex-direction:column;gap:0;
+        border-radius:var(--radius);overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.32);
+        position:relative;background:var(--glass);backdrop-filter:blur(var(--blur))}
+header{padding:22px 22px 14px;font-family:"Baloo 2",cursive;text-shadow:0 2px 8px rgba(0,0,0,.3)}
+header h1{font-size:clamp(28px,7vw,40px);font-weight:800}
+header p{font-size:clamp(14px,3vw,18px);font-weight:600;opacity:.9}
+
+/* ——— MAP ——— */
+#mapWrap{width:100%;position:relative;overflow:hidden}
+#mapSVG{width:100%;height:auto;display:block;opacity:.9}
+.marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);
+        font-size:var(--marker-size);color:#fffb;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55));
+        cursor:pointer;transition:transform .2s}
+.marker:hover{transform:translate(-50%,-50%) scale(1.15)}
+.marker.edit{animation:pulse 1.2s infinite}
+@keyframes pulse{0%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.25)}100%{transform:translate(-50%,-50%) scale(1)}}
+
+/* ——— NAV DAYS ——— */
+#nav{display:flex;overflow-x:auto;background:var(--glass);backdrop-filter:blur(var(--blur));
+     padding:8px;gap:6px}
+#nav button{border:none;border-radius:12px;padding:8px 14px;font-weight:700;cursor:pointer;
+            color:var(--text);background:transparent;white-space:nowrap;transition:.2s}
+#nav button.active{background:var(--accent);color:#fff}
+#nav button:hover{background:rgba(255,255,255,.3)}
+
+/* ——— FABs ——— */
+.fab{position:absolute;bottom:16px;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+     font-size:22px;border:none;cursor:pointer;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);transition:transform .2s;
+     background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.fab:hover{transform:scale(1.1)}
+#editBtn{left:16px}
+#adminBtn{right:16px}
+
+/* ——— MODAL ——— */
+#modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0007;
+       backdrop-filter:blur(4px);z-index:99;visibility:hidden;opacity:0;transition:.25s}
+#modal.open{visibility:visible;opacity:1}
+#panel{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);
+       padding:1.4rem;width:92%;max-width:420px;color:var(--text)}
+#panel h2{margin-bottom:1rem}
+#panel .list{max-height:55vh;overflow:auto;margin-bottom:1rem}
+#panel .list div{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
+#panel button{border:none;border-radius:8px;padding:.4rem .8rem;font-weight:700;cursor:pointer}
+#panel .close{background:#d9534f;color:#fff}
+#panel .save{background:#5cb85c;color:#fff;margin-left:auto}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+         font-size:20px;color:#fff;background:#0005;backdrop-filter:blur(2px);z-index:10;text-align:center;padding:0 12px}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+         clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head><body>
+
+<!-- SEARCH -->
+<form id="searchForm">
+  <label for="cityInput" class="sr-only">Cerca città</label>
+  <input id="cityInput" placeholder="Cerca o usa 📍" autocomplete="off">
+  <button type="submit"><i class="fa-solid fa-search"></i></button>
+</form>
+
+<!-- WIDGET -->
+<div id="widget">
+  <div class="loading" id="loader">Carico dati…</div>
+  <header><h1 id="hDay">GIORNO 1</h1><p id="hDate"></p></header>
+  <div id="mapWrap">
+    <!-- Inline SVG map for sharp scaling -->
+    <img id="mapSVG" src="https://upload.wikimedia.org/wikipedia/commons/b/b3/Map_of_region_of_Calabria%2C_Italy.svg" alt="Mappa Calabria">
+  </div>
+  <nav id="nav" aria-label="Seleziona giorno"></nav>
+  <button class="fab" id="editBtn" title="Modifica mappa" aria-label="Modifica mappa"><i class="fa-solid fa-pen-to-square"></i></button>
+  <button class="fab" id="adminBtn" title="Pannello admin" aria-label="Pannello admin"><i class="fa-solid fa-gear"></i></button>
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+  <div id="panel">
+    <h2>Marker</h2>
+    <div class="list" id="markerList"></div>
+    <div style="display:flex;gap:.6rem;justify-content:flex-end">
+      <button class="save" id="exportBtn">Esporta JSON</button>
+      <button class="close" id="closeModal">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<footer style="font-size:.8rem;color:var(--text-dim);max-width:820px;text-align:center">
+Dati: <a href="https://open-meteo.com" target="_blank">Open‑Meteo</a> / Geocoding API</footer>
+
+<script>
+/* === CONFIG === */
+const MAP_BOUNDS={latMin:37.90,latMax:40.30,lonMin:15.60,lonMax:17.30};
+const DEFAULTS=[{city:"Cosenza",lat:39.299,lon:16.253},{city:"Catanzaro",lat:38.909,lon:16.587},
+{city:"Reggio Calabria",lat:38.114,lon:15.65},{city:"Crotone",lat:39.083,lon:17.125},{city:"Vibo Valentia",lat:38.673,lon:16.104}];
+const ICONS={
+ day:{0:"fa-sun",1:"fa-cloud-sun",2:"fa-cloud-sun",3:"fa-cloud",45:"fa-smog",48:"fa-smog",
+      51:"fa-cloud-rain",53:"fa-cloud-rain",55:"fa-cloud-rain",61:"fa-cloud-showers-heavy",63:"fa-cloud-showers-heavy",
+      65:"fa-cloud-showers-heavy",80:"fa-cloud-showers-heavy",81:"fa-cloud-showers-heavy",82:"fa-cloud-showers-heavy",
+      66:"fa-snowflake",67:"fa-snowflake",71:"fa-snowflake",73:"fa-snowflake",75:"fa-snowflake",77:"fa-snowflake",
+      85:"fa-snowflake",86:"fa-snowflake",95:"fa-cloud-bolt",96:"fa-cloud-bolt",99:"fa-cloud-bolt"},
+ night:{0:"fa-moon",1:"fa-moon",2:"fa-cloud-moon",3:"fa-cloud",/* others mirror day */}};
+/* === STATE === */
+let markers;
+try{markers=JSON.parse(localStorage.getItem("calMarkers"))||[...DEFAULTS];}catch(e){markers=[...DEFAULTS];}
+let DAYS=[],curDay=0,edit=false;
+const $=q=>document.querySelector(q);
+
+/* === UTILS === */
+function latLonToXY(lat,lon){
+  const x=(lon-MAP_BOUNDS.lonMin)/(MAP_BOUNDS.lonMax-MAP_BOUNDS.lonMin)*100;
+  const y=(1-(lat-MAP_BOUNDS.latMin)/(MAP_BOUNDS.latMax-MAP_BOUNDS.latMin))*100;
+  return {x,y};
+}
+function iconClass(code,isNight){
+  const map=isNight?ICONS.night:ICONS.day;
+  return map[code]||"fa-question";
+}
+function fetchForecast(lat,lon){
+  const url=\`https://api.open-meteo.com/v1/forecast?latitude=\${lat}&longitude=\${lon}&timezone=auto&daily=temperature_2m_max,temperature_2m_min,weathercode,sunrise,sunset\`;
+  return fetch(url).then(r=>r.ok?r.json():Promise.reject(r.status));
+}
+
+/* === BUILD === */
+async function loadData(){
+  $("#loader").style.display="flex";
+  try{
+    const res=await Promise.all(markers.map(m=>fetchForecast(m.lat,m.lon)));
+    const daysCount=res[0].daily.time.length;
+    DAYS=[];
+    for(let d=0;d<daysCount;d++){
+       const obj={label:"GIORNO "+(d+1),offset:d,points:[]};
+       markers.forEach((m,idx)=>{
+         const fc=res[idx].daily;
+         const {sunrise,sunset,weathercode,temperature_2m_max,temperature_2m_min}=fc;
+         // Consider always DAY icon for summaries
+         const ico=iconClass(weathercode[d],false);
+         const {x,y}=latLonToXY(m.lat,m.lon);
+         obj.points.push({city:m.city,x,y,icon:ico,
+          tmax:Math.round(temperature_2m_max[d]),tmin:Math.round(temperature_2m_min[d])});
+       });
+       DAYS.push(obj);
+    }
+    buildNav();render();
+  }catch(e){$("#loader").textContent="Errore dati: "+e;}
+}
+function buildNav(){
+  $("#nav").innerHTML=DAYS.map((d,i)=>\`<button \${i===curDay?"class='active'":""} data-i="\${i}">\${d.label}</button>\`).join("");
+  $("#nav").querySelectorAll("button").forEach(b=>b.addEventListener("click",e=>{
+    curDay=parseInt(e.currentTarget.dataset.i,10);updateNav();render();}));
+}
+function updateNav(){$("#nav").querySelectorAll("button").forEach((b,i)=>b.classList.toggle("active",i===curDay));}
+function render(){
+  const d=DAYS[curDay];if(!d)return;
+  const date=new Date();date.setDate(date.getDate()+d.offset);
+  $("#hDay").textContent=d.label;
+  $("#hDate").textContent=date.toLocaleDateString("it-IT",{weekday:"long",day:"numeric",month:"long"}).toUpperCase();
+  const wrap=$("#mapWrap");wrap.querySelectorAll(".marker").forEach(el=>el.remove());
+  d.points.forEach(p=>{
+     const el=document.createElement("i");
+     el.className="fa-solid "+p.icon+" marker"+(edit?" edit":"");
+     el.style.left=p.x+"%";el.style.top=p.y+"%";
+     el.title=\`\${p.city}: \${p.tmax}° / \${p.tmin}°\`;
+     wrap.appendChild(el);
+  });
+  $("#loader").style.display="none";
+}
+
+/* === EDIT MODE === */
+$("#editBtn").addEventListener("click",()=>{
+  edit=!edit;$("#editBtn i").className=edit?"fa-solid fa-eye":"fa-solid fa-pen-to-square";
+  document.querySelectorAll(".marker").forEach(m=>m.classList.toggle("edit",edit));
+});
+$("#mapWrap").addEventListener("dblclick",e=>{
+  if(!edit)return;
+  const rect=e.currentTarget.getBoundingClientRect();
+  const xPerc=(e.clientX-rect.left)/rect.width;
+  const yPerc=(e.clientY-rect.top)/rect.height;
+  const lat=MAP_BOUNDS.latMax-(MAP_BOUNDS.latMax-MAP_BOUNDS.latMin)*yPerc;
+  const lon=MAP_BOUNDS.lonMin+(MAP_BOUNDS.lonMax-MAP_BOUNDS.lonMin)*xPerc;
+  const city=prompt("Nome città:");
+  if(city){
+    markers.push({city,lat:+lat.toFixed(3),lon:+lon.toFixed(3)});saveMarkers();
+  }
+});
+
+/* === ADMIN MODAL === */
+$("#adminBtn").addEventListener("click",openModal);
+$("#closeModal").addEventListener("click",closeModal);
+$("#exportBtn").addEventListener("click",()=>{
+  navigator.clipboard.writeText(JSON.stringify(markers,null,2)).then(()=>alert("Copiato!"));
+});
+function openModal(){
+  const list=$("#markerList");list.innerHTML="";
+  markers.forEach((m,i)=>{
+    const row=document.createElement("div");
+    row.innerHTML=\`<span>\${m.city}</span><button data-i="\${i}" class="fa-solid fa-trash"></button>\`;
+    row.querySelector("button").addEventListener("click",e=>{
+       const idx=parseInt(e.currentTarget.dataset.i,10);
+       markers.splice(idx,1);saveMarkers();openModal();
+    });
+    list.appendChild(row);
+  });
+  $("#modal").classList.add("open");
+}
+function closeModal(){$("#modal").classList.remove("open")}
+function saveMarkers(){localStorage.setItem("calMarkers",JSON.stringify(markers));loadData();}
+
+/* === SEARCH === */
+$("#searchForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const q=$("#cityInput").value.trim();
+  if(!q)return;
+  searchCity(q);
+});
+$("#cityInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){e.preventDefault();searchCity(e.target.value.trim());}
+});
+async function searchCity(name){
+  $("#loader").style.display="flex";
+  try{
+    const api=\`https://geocoding-api.open-meteo.com/v1/search?name=\${encodeURIComponent(name)}&count=1&language=it\`;
+    const r=await fetch(api);const js=await r.json();
+    if(!js.results||!js.results.length)throw "Nessun risultato!";
+    const loc=js.results[0];
+    markers.push({city:loc.name,lat:+loc.latitude,lon:+loc.longitude});
+    saveMarkers();
+    $("#cityInput").value="";
+  }catch(err){$("#loader").textContent="Errore ricerca: "+err;setTimeout(()=>$("#loader").style.display="none",3000);}
+}
+
+/* === INIT === */
+loadData();
+</script>
+</body></html>
