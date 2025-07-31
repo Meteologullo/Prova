@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Meteo Calabria – Dashboard Unificata</title>
+
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+
+  <style>
+  /* —— Palette & Theme ——————————————— */
+  :root{
+    --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+    --glass:rgba(255,255,255,.14);
+    --blur:14px;
+    --radius:18px;
+    --accent:#00d2ff;
+    --accent2:#3a7bd5;
+    --text:#ecf1f8;
+    --marker-size:clamp(22px,5vw,48px);
+    --text-dim:#c5d0e6;
+
+    /* Widget */
+    --clr-sky:#4fd1ff;
+    --clr-sky-2:#0ea5e9;
+    --clr-night:#06214b;
+    --clr-night-2:#010c1e;
+    --clr-accent:#facc15;
+    --clr-accent-night:#ffe680;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    min-height:100vh;background:var(--bg);font-family:"Inter",sans-serif;color:var(--text);
+    display:flex;flex-direction:column;align-items:center;padding:20px 12px;
+  }
+  /* —— Search bar ——————————————— */
+  .search{display:flex;gap:.5rem;width:100%;max-width:820px;margin-bottom:20px}
+  .search input{flex:1;padding:.9rem 1.1rem;border:none;border-radius:var(--radius);background:var(--glass);backdrop-filter:blur(var(--blur));color:var(--text);font-size:1rem;outline:none;}
+  .search button{padding:.9rem 1.2rem;border:none;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:700;font-size:1rem;cursor:pointer;}
+  /* —— Main widget (map + tabelle) ——— */
+  #widget{width:100%;max-width:820px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto 1fr auto;grid-template-areas:"header header""map forecast""bottom bottom";background:radial-gradient(circle at 50% 15%,var(--clr-sky) 0%,var(--clr-sky-2) 100%);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden;position:relative;isolation:isolate;transition:background .4s;}
+  body.night #widget{background:radial-gradient(circle at 50% 15%,var(--clr-night) 0%,var(--clr-night-2) 100%);}  
+  @media(max-width:600px){#widget{grid-template-columns:1fr;grid-template-areas:"header""map""forecast""bottom";}}
+  header{grid-area:header;padding:18px 14px;text-shadow:0 2px 6px rgba(0,0,0,.5);font-family:'Baloo 2',cursive;}
+  header h1{font-size:clamp(26px,6vw,38px);font-weight:800;line-height:1.1;}
+  header p{font-size:clamp(14px,3vw,18px);margin-top:2px;font-weight:600;opacity:.9;}
+  body.night header *{filter:brightness(.88);}  
+  /* —— Map —— */
+  #mapArea{grid-area:map;position:relative;margin:0 14px 88px 14px;border-radius:6px;aspect-ratio:3/4;}
+  @media(max-width:600px){#mapArea{margin:0 14px 20px 14px;}}
+  #mapArea::before{content:"";position:absolute;inset:0;background:rgba(255,255,255,.08);border-radius:inherit;}
+  #map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:.3;filter:drop-shadow(0 0 2px rgba(0,0,0,.5));}
+  .marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-size:var(--marker-size);user-select:none;cursor:default;text-shadow:0 1px 3px rgba(0,0,0,.45);}  
+  /* —— Forecast table —— */
+  #forecast{grid-area:forecast;margin:20px 14px 0 0;border-collapse:collapse;border-radius:10px;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);font-size:13px;min-width:160px;max-width:100%;box-shadow:0 4px 12px rgba(0,0,0,.25);overflow:hidden;z-index:2;transition:background .35s;}
+  body.night #forecast{background:rgba(255,255,255,.10);}  
+  #forecast th,#forecast td{padding:4px 10px;}
+  #forecast th{background:rgba(255,255,255,.25);font-weight:700;font-family:'Baloo 2',cursive;transition:background .35s;}
+  body.night #forecast th{background:rgba(255,255,255,.18);}  
+  #forecast tr:nth-child(even) td{background:rgba(255,255,255,.05);}  
+  #forecast tr:hover td{background:rgba(255,255,255,.08);}  
+  #forecast th:first-child::before{content:"🌡️ ";}
+  #forecast td:nth-child(2),#forecast td:nth-child(3){font-weight:800;font-size:18px;}
+  /* —— Bottom nav —— */
+  #bottomBar{grid-area:bottom;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 14px;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);box-shadow:0 -4px 12px rgba(0,0,0,.25);border-top-left-radius:12px;border-top-right-radius:12px;z-index:3;transition:background .35s;}
+  body.night #bottomBar{background:rgba(255,255,255,.10);}  
+  #nav{flex:1;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;overflow-x:auto;padding:2px 0;}
+  #nav button{background:transparent;border:none;font-size:14px;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .2s,color .2s;color:#fff;white-space:nowrap;}
+  #nav button:hover{background:rgba(255,255,255,.25);}body.night #nav button:hover{background:rgba(255,255,255,.18);}#nav button.active{background:var(--clr-accent);color:#000;}body.night #nav button.active{background:var(--clr-accent-night);color:#000;}
+  .fab-btn{width:52px;height:52px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.35);transition:transform .2s,background .35s;flex-shrink:0;font-size:26px;}
+  .fab-btn:hover{transform:scale(1.08);}#fab{background:var(--clr-accent);color:#000;}body.night #fab{background:var(--clr-accent-night);}#themeBtn{background:#ffffff26;color:#fff;}body.night #themeBtn{background:#ffffff33;}
+  /* —— Extra panels —— */
+  .panel,.card{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.1rem 1.4rem;margin-bottom:1.1rem;width:100%;max-width:820px;}
+  .station-header{display:flex;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem}
+  .metric-row{display:flex;flex-wrap:wrap;gap:1rem}
+  .metric{display:flex;align-items:center;gap:.4rem;font-size:.95rem}
+  .metric i{font-size:1.1rem}
+  .main-temp{font-size:2.4rem;font-weight:600;margin-right:.3rem}
+  table.hourly{width:100%;border-collapse:collapse;font-size:.85rem}
+  table.hourly th,table.hourly td{padding:.45rem .2rem;text-align:center}
+  table.hourly th{color:var(--text);font-weight:600}
+  table.hourly tr:nth-child(even){background:rgba(255,255,255,.05)}
+  .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:.6rem}
+  .day{background:rgba(255,255,255,.08);border-radius:var(--radius);padding:.55rem .25rem;text-align:center}
+  .day i{font-size:1.3rem;margin-bottom:.2rem}
+  .day .min{color:var(--text-dim);font-size:.8rem}
+  .radar{width:100%;border:none;border-radius:var(--radius);overflow:hidden;height:450px;max-width:820px;}
+  .advice{display:flex;align-items:center;gap:.7rem;font-size:1.05rem;font-weight:600}
+  .advice.ok{color:#1dd05d}.advice.no{color:#ff6565}
+  /* —— Admin modal —— */
+  #adminPanel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:999;visibility:hidden;opacity:0;transition:opacity .25s; }
+  #adminPanel.open{visibility:visible;opacity:1;}
+  #adminPanel .modal{background:rgba(0,0,0,.85);border-radius:var(--radius);padding:1.4rem;max-width:400px;width:90%;color:var(--text);}
+  #adminPanel button{background:var(--clr-accent);border:none;border-radius:8px;font-weight:600;padding:.6rem 1rem;cursor:pointer;margin-top:1rem;}
+  footer{font-size:.8rem;color:var(--text-dim);text-align:center;margin-top:1.4rem;max-width:820px}
+  a{color:var(--accent)}
+  @media(max-width:380px){.main-temp{font-size:2rem}table.hourly{font-size:.75rem}}
+  
+
+body.modal-open{overflow:hidden}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;backdrop-filter:blur(4px);z-index:99;}
+.modal.hidden{display:none}
+.modal .box{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.4rem;max-width:500px;width:90%;color:var(--text);}
+.modal textarea{width:100%;height:250px;background:rgba(255,255,255,.1);border:none;color:var(--text);border-radius:var(--radius);padding:.6rem;font-family:monospace;}
+.modal button{border:none;cursor:pointer;border-radius:var(--radius);padding:.5rem 1rem;font-weight:700;}
+
+
+/* === Map Control Panel (imported) === */
+#panel{
+  position:absolute;left:0;right:0;bottom:0;z-index:20;
+  background:rgba(255,255,255,.95);color:#004070;
+  padding:22px 22px 30px;border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(110%);transition:transform .35s ease;
+  box-shadow:0 -6px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);
+  overflow-y:auto;max-height:85vh;font-family:'Inter',sans-serif;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:0 auto 12px;}
+#panel h3{margin:12px 0 6px;font-size:18px;font-weight:800;font-family:'Baloo 2',cursive;}
+#panel label{display:block;margin-top:12px;font-size:14px;}
+#panel input,#panel select{
+  width:100%;padding:8px 10px;font-size:15px;border:1px solid #c0c0c0;border-radius:6px;
+}
+#panel .row{display:flex;gap:10px;flex-wrap:wrap;}
+#panel button{
+  width:100%;padding:11px;font-size:16px;border:none;border-radius:8px;font-weight:700;
+  cursor:pointer;transition:filter .15s;
+}
+#panel button:hover{filter:brightness(1.08);}
+#btnSaveMarker{background:#facc15;}
+#btnDeleteMarker{background:#ff6666;color:#fff;}
+#btnSaveLayout{background:#10b981;color:#fff;}
+#btnReset{background:#ef4444;color:#fff;}
+#btnSaveForecast{background:#facc15;}
+#toast{
+  position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:8px;font-size:15px;
+  box-shadow:0 4px 10px rgba(0,0,0,.45);display:none;z-index:25;
+}
+
+.icon-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.icon-list button{border:none;background:#e5e5e5;border-radius:6px;padding:4px 8px;font-size:22px;cursor:pointer;line-height:1}
+.icon-list button.active{outline:2px solid var(--accent);background:#fff}
+
+
+  /* —— Icon picker ——— */
+  .icon-picker{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+  .icon-picker button{font-size:24px;padding:4px 6px;background:none;border:1px solid #555;border-radius:6px;cursor:pointer;}
+  .icon-picker button.active{outline:2px solid var(--accent);}
+
+
+  /* ——— Panel tidy overrides ——— */
+  #panel{display:flex;flex-direction:column;gap:14px;}
+  #panel .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  #panel h3{flex:0 0 auto;}
+
+  
+/* === Enhanced Weather Icon Styles === */
+@keyframes floatIcon {
+  0%   { transform: translate(-50%, -50%) translateY(0); }
+  50%  { transform: translate(-50%, -50%) translateY(-6px); }
+  100% { transform: translate(-50%, -50%) translateY(0); }
+}
+@keyframes pulseIcon {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.2); }
+}
+
+/* Map markers */
+.marker i{
+  font-size:46px;
+  animation:floatIcon 4s ease-in-out infinite;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.45));
+}
+/* Forecast panels */
+.day i,
+.hourly i{
+  font-size:30px;
+  animation:pulseIcon 6s ease-in-out infinite;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
+  transition:transform .25s;
+}
+.day:hover i,
+.hourly:hover i{
+  transform:scale(1.15) rotate(4deg);
+}
+
+/* Color palette per icon */
+.fa-sun{color:#facc15;}
+.fa-cloud-sun{color:#ffbe6f;}
+.fa-cloud{color:#a3bffa;}
+.fa-cloud-rain,
+.fa-cloud-showers-heavy{color:#4DB7FF;}
+.fa-cloud-meatball{color:#39c9e8;}
+.fa-smog{color:#9ca3af;}
+.fa-snowflake{color:#8ecae6;}
+.fa-bolt{color:#ffd43b;}
+
+
+  /* —— Forecast table refreshed ———————————— */
+  #forecast{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+  }
+  #forecast th,#forecast td{
+    padding:.55rem .4rem;
+    text-align:center;
+  }
+  #forecast th{
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    font-weight:600;
+  }
+  #forecast tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+
+  /* Bottom navigation bar polished */
+  #bottomBar{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-bottom-left-radius:var(--radius);
+    border-bottom-right-radius:var(--radius);
+  }
+
+  /* Hourly & Daily cards harmonised */
+  table.hourly th{
+    background:rgba(255,255,255,.09);
+  }
+  table.hourly tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+  .day{
+    background:rgba(255,255,255,.08);
+  }
+
+  @media(max-width:600px){
+    #forecast{margin:14px 0;}
+  }
+
+
+@media(max-width:600px){
+  #forecast{display:none;}
+  #bottomBar{
+    background:transparent;
+    backdrop-filter:none;
+    padding:4px 4px 0;
+  }
+  #nav{
+    gap:6px;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    justify-content:flex-start;
+  }
+  #nav button{
+    padding:4px 8px;
+    font-size:.8rem;
+  }
+  #bottomBar::-webkit-scrollbar,
+  #nav::-webkit-scrollbar{display:none;}
+  #nearestStation{margin-top:14px;}
+}
+
+
+table.hourly td:nth-child(3), table.hourly th:nth-child(3){
+  text-align:left;
+  padding-left:4px;
+}
+
+
+@media(max-width:600px){
+  #mapArea{
+    height:55vh;
+  }
+  #map{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+  }
+}
+
+</style>
+
+<style>
+/* === Mobile & Map Visual Tweaks (added) === */
+#widget{
+  background:var(--glass);
+  backdrop-filter:blur(var(--blur));
+}
+body.night #widget{
+  background:rgba(255,255,255,.08);
+}
+#mapArea::before{
+  background:rgba(255,255,255,.06);
+}
+/* Remove blue tint under map image */
+#map{
+  opacity:0.9 !important;
+  filter:none !important;
+}
+/* Reduce bottom margin on small screens */
+@media(max-width:600px){
+  #mapArea{
+    margin:0 12px 20px 12px;
+    aspect-ratio:3/4;
+  }
+  #forecast{
+    margin:10px 14px 0 14px;
+  }
+}
+
+  /* —— Forecast table refreshed ———————————— */
+  #forecast{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+  }
+  #forecast th,#forecast td{
+    padding:.55rem .4rem;
+    text-align:center;
+  }
+  #forecast th{
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    font-weight:600;
+  }
+  #forecast tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+
+  /* Bottom navigation bar polished */
+  #bottomBar{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-bottom-left-radius:var(--radius);
+    border-bottom-right-radius:var(--radius);
+  }
+
+  /* Hourly & Daily cards harmonised */
+  table.hourly th{
+    background:rgba(255,255,255,.09);
+  }
+  table.hourly tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+  .day{
+    background:rgba(255,255,255,.08);
+  }
+
+  @media(max-width:600px){
+    #forecast{margin:14px 0;}
+  }
+
+</style>
+<style>
+/* === Mobile layout refinements (2025‑07) === */
+
+/* 1. Hourly forecast: horizontal scroll + column pruning */
+@media(max-width:600px){
+  /* keep table readable while allowing swipe */
+  #hourlyPanel table.hourly{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    font-size:0.83rem;
+    min-width:550px;          /* keeps columns from squashing too much */
+  }
+}
+@media(max-width:480px){
+  /* hide less‑critical columns on very small screens */
+  /*#hourlyPanel table.hourly th:nth-child(n+4),
+  #hourlyPanel table.hourly td:nth-child(n+4){*/
+    display:none;
+  }
+  #hourlyPanel table.hourly{
+    min-width:320px;
+  }
+}
+
+/* 2. Daily/extra cards tighter padding on phones */
+@media(max-width:600px){
+  .card,
+  .panel{
+    padding:0.9rem 1.1rem;
+  }
+  .day{
+    padding:0.45rem 0.2rem;
+  }
+}
+
+/* 3. Sticky search bar for quick access */
+@media(max-width:600px){
+  .search{
+    position:sticky;
+    top:8px;
+    z-index:120;
+    margin-bottom:14px;
+  }
+}
+
+/* 4. Ensure nav pills scroll nicely edge‑to‑edge */
+#nav{
+  scroll-padding-left:12px;
+}
+</style>
+<style>
+/* === Extra breakpoint up to 900px (table condenses sooner) === */
+@media(max-width:900px){
+  /* shrink font & allow horizontal scroll earlier */
+  #hourlyPanel table.hourly{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    font-size:0.9rem;
+  }
+  /* tighten cards and map container */
+  .card,
+  .panel{
+    max-width:100%;
+  }
+}
+</style>
+<style>
+/* Orario icon cells */
+table.hourly td:nth-child(2), table.hourly th:nth-child(2){
+  text-align:center;
+  width:38px;
+}
+</style>
+</head>
+<body>
+
+<!-- —— Search —— -->
+<form class="search" id="searchForm">
+  <input autocomplete="off" id="cityInput" placeholder="Scrivi una città o usa 📍…" required />
+  <button type="submit"><i class="fa-solid fa-search"></i></button>
+</form>
+
+<!-- —— Widget map + forecast —— -->
+<div id="widget">
+  <header>
+    <h1 id="hDay">GIORNO 1</h1>
+    <p id="hDate"></p>
+  </header>
+
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa Calabria" loading="lazy" />
+  </div>
+
+  <table id="forecast" aria-label="Previsioni meteo"></table>
+
+  <div id="bottomBar">
+    <button id="themeBtn" class="fab-btn" title="Cambia tema" aria-label="Cambia tema">🌙</button>
+    <nav id="nav" aria-label="Seleziona giorno previsioni"></nav>
+    <button id="fab" class="fab-btn" title="Pannello admin" aria-label="Pannello admin">⚙️</button>
+  </div>
+  <!-- === Map Control Panel === -->
+  <div id="panel">
+    <div id="handle"></div>
+
+    <h3>Modifica Giorno</h3>
+    <label>Giorno
+      <select id="selDay"></select>
+    </label>
+    <label>Nome visualizzato
+      <input type="text" id="inpDayName">
+    </label>
+    <label>Data visualizzata
+      <input type="text" id="inpDayDate">
+    </label>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #ddd;">
+
+    <h3>Modifica Marker</h3>
+    <label>Icona (emoji)
+      <input type="text" id="inpIcon" placeholder="☀️">
+    </label>
+    <div id="iconPicker" class="icon-picker"></div>
+    <label>Dimensione marker
+      <input type="range" id="inpMarkerSize" min="24" max="64">
+    </label>
+    <div class="row">
+      <button id="btnSaveMarker">Salva marker</button>
+      <button id="btnDeleteMarker">🗑️ Elimina marker</button>
+      <button id="btnAddMarker">➕ Nuovo marker</button>
+      <button id="btnSaveLayout">💾 Layout</button>
+    </div>
+
+    
+    <div id="iconList" class="icon-list"></div>
+<hr style="margin:16px 0; border:none; border-top:1px solid #ddd;">
+
+    <h3>Modifica Tabella</h3>
+    <label>Città
+      <select id="selCity"></select>
+    </label>
+    <div class="row">
+      <label style="flex:1;">T° max
+        <input type="number" id="inpTmax">
+      </label>
+      <label style="flex:1;">T° min
+        <input type="number" id="inpTmin">
+      </label>
+    </div>
+    <button id="btnSaveForecast">Salva previsione</button>
+
+    <button id="btnReset" style="margin-top:22px;">Reset layout</button>
+  </div>
+
+  <div id="toast"></div>
+
+</div>
+
+<!-- —— Extra dynamic panels —— -->
+<section id="nearestStation"></section>
+<section id="adviceBox"></section>
+<section id="hourlyPanel"></section>
+<section id="dailyPanel"></section>
+<iframe class="radar" id="radarFrame" loading="lazy"></iframe>
+
+<!-- —— Admin Panel —— -->
+<div id="adminPanel">
+  <div class="modal">
+    <h2>Pannello di controllo</h2>
+    <p id="stationsCount"></p>
+    <button id="closeAdmin">Chiudi</button>
+    <button id="reloadBtn">Aggiorna previsioni</button>
+  </div>
+</div>
+
+<footer>Previsioni automatiche – dati Open‑Meteo integrati con la rete MLG Map.</footer>
+
+<script>
+
+/******************** COSTANTI & HELPERS *************************/
+let PROVINCES = JSON.parse(localStorage.getItem('calabriaMarkers') || '[{"city":"Cosenza","lat":39.299,"lon":16.253},{"city":"Catanzaro","lat":38.909,"lon":16.587},{"city":"Reggio Calabria","lat":38.114,"lon":15.65},{"city":"Crotone","lat":39.083,"lon":17.125},{"city":"Vibo Valentia","lat":38.673,"lon":16.104}]');
+let DAYS = [];               // Popolato dopo fetch
+let curDay = 0, night = false;
+const $ = q => document.querySelector(q);
+
+/* —— Bounding box Calabria —— */
+const CAL_ABOX = { latMin: 37.90, latMax: 40.30, lonMin: 15.60, lonMax: 17.30 };
+function latLonToXY(lat,lon){
+  const x = (lon - CAL_ABOX.lonMin)/(CAL_ABOX.lonMax - CAL_ABOX.lonMin)*100;
+  const y = (1- (lat - CAL_ABOX.latMin)/(CAL_ABOX.latMax - CAL_ABOX.latMin))*100;
+  return {x,y};
+}
+/* —— WMO → emoji —— */
+
+function wmo(code, isNight = false) {
+  switch (code) {
+    case 0:
+      return `<img src='data:image/png;base64,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' alt="Sole" width="46">`;
+    case 1:
+      return `<img src='data:image/png;base64,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' alt="Poco nuvoloso" width="46">`;
+    case 2:
+    case 3:
+      return `<img src='data:image/png;base64,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' alt="Nuvoloso" width="46">`;
+    case 45:
+    case 48:
+      return `<img src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAN8AAACDCAYAAAANtc6gAAAACXBIWXMAAC4jAAAuIwF4pT92AAALbklEQVR4nO2d4XXbOBZGr/fM/7CD5VQQbQXhVBCngjAVrFPBOBWMU8HQHdgVjFTBRBWsVMFaFWh/PCGktZJFEgAJUt89h0eOT0zRMi8f8PAA3Oz3eybIAiiA/PC14wOwOnz9AvwAlodDiKS4mYh8GXB7OArgXcef3wFPwAMmpBCjk7J8TeE+BjzvCiiBTcBzCtGZFOUrMDk+R36fb8B95PcQ4iypyJdhwt0B/xzwfdeY7C8DvqcQwPjy5ZhwJd37caHYYQKqLygGZSz5cqzJF7tp2RYJKAbnHwO/Xw5UwH9IRzywqLvk9bCFEFEZKvLlpBXpzrHDrlV9QBGd2JEvw8bWUot053ARMBv5OsQVEFO+O2ws7d8R3yMG77GmsRBRiSFfgSUu/mC8DKYvH5GAIjIh+3yuiTlG83J19O8Pgc77BUkoIhFKvlvsJh0q0m2xWs0nzhdNl9jDwPeafnvjPYToja98GSZdyNrLczjhKtqPx2WYOO893ldjgCIKPvIVmAyxo90zJtyTxzkq/JrDKkMTwekr3wNxs5i7w3tUhJt9sMSvL7hGg/AiIF3ly7EI5NOMe4sttXSho0yIJugj1pcUwpsu8hXEa2ZusQqYKsK5m2RYJPX5HTQVSQSh7TjfHfAX4cXbYen8nGFS+i/YQ2TncY7fUfQTAWgT+SrCj925Pt0D4yQxSuBPz3NoCEJ48ZZ8IfpIp3jEmm2bwOftyh1WhdMXDUEIL87Jt8AiXkjxtljEWQY8py8VflFdAorenJJvgQkSsn+XcpLiB34PGY0Bil4cyxdavDUW7VKODCGa1xJQdKaZ7Qwt3rfDOVMWD0yYEr8M6Hs0D1B0xEW+kIXRKfbt2rAA/vY8hyKgaM3Nfr8PGfGeMfGmevOV+A9BSMBpU2Djzs0D2pcmbrFMvtuuYHM4lsf/8Wa/35f433CQdlKlC75DECABp0CG/Y2a+37EXjN2Tb13yDJEs3OHRQyfWQepUeFfWCAB0yLH/h7uGHJx5lOsmtnOPs3PLSZu6kmVPlRIwKnjNta5ZXzZjvnqM9Qw9xsrVIXP3D+nlIi1uU4M/tV3kP0R6xvN/YYKKWDJPFsIY5NTCxdq7Z7YbIH8rfKyJacFvLY5baEEVClaOFyEuyPe3NKYPALluSlFPzg99ebaxAOL7rf4DcKDPcj+5vo+v1C4nayegP9iGfopigeH5OSlKUXNCHiN4jUJOR76HXtqi8vcNo6prgN7zA20m8+3oN4779oJKeAKu6Hm3m/ug7vnUsxS+vKM/V6j7883RUIKuMP+EMsA55o6OfZZlEy3OdmGr9gkcsnXk9BF6NfcDC2ZxtBAKH7lMJFc8vXnGqdfhWJK/bjjWs23yA9HxunovaWuFZV8nsRYauM7ViM7t75g6v24LSaXOzb4PwgX1LWjBZbl/NnCkXz+xBBwh/2RqoDnHIOUhWsWOTvZBkXyhSEjzp4VQ61nGpJUhdtRb6zzRAItC8kXloo4W6Q5CZO4aU6QagFzn811BkPyhackzPzIU7in9wPj3kzNfkxqWco19cY6m1Gv5AKSLw4xVoA7ps0ehaEoeC1cahlKt8dH8sI1kXzxiJGIeYsV/5+p69pELbDrdlm6nHQHvJNuUrZB8sXnHtvfYSzcONU5ctLqp72Fa3a7Y9JIvmEosCf0VG7y1HimFi7FhFMvJN9wZFgUjLmp6JyYZD+uC5JveAoUBc+xwz6bion247og+cbjHqtiSS1zODSz6sd1QfKNS45JGGNgPnVm2Y/rguRLg5zrkPDqhWsi+dIiZ34SSrgzSL40ybEytZLpJWaafbglEu4ski993KTTlKPhinq2wOyzlKGQfNPCiVgwXkTcYYItG4fogeSbLq7Q2dVhxqjBdKVpS+p6UUW2QEi+ebGg3voK6iLpSywPr26dkjbrlQhPJJ8QI3FuuXghRGQknxAjIfmEGAnJJ8RISD4hRkLyCTESkk+IkZB8QoyE5BNiJH4Z+wI8ceVU7tXhyqP6rF0pxCBMTT5X0b8APrT8mckvrirmyRRqO0tq6XwXG1phM8WXnucRwptU5SuopYuxutfqcP5NhHML0YqU5MswIe4YZqLoXDagFBMlBflyrCk41v7cj5j0QgzKmAmXApOubeIkFm5tlHLMixDXxxjyFaQhXRMJKAZnSPkK0pOuiQQUgzKEfAtst5lUpWvyGRuUvxv7QsT8iZlwyTDpUl5v8hxfUBZURCaWfHdYE3PKO/D8hgbjRURCy1dg0S7Vfby7sMOazJuRr0PMlFCzGlwT8y+GE2+HjdF9xaLUzeH4DfiEVbH48A6rCc0u/Uch+hAi8hUMt9Oq24TjgXZF0uXh//o0f1fUi9AKEQxf+R4YZo/xZ0zwPjuXLrC+m4+AqoIRwekr3wKTIWYTc4fJXeHf7wohoDKgIih95Cvxb8q9xRbLlFaBzxtCwE9c2b7hIh5dEi4ZJsSfxJvm8wkrtK4inP8H/oPnFe02HhHiIm0jX4498WM0M9eYFMsI5z7FPfC7x8/vsM9Dy1MIL9pEvgKLGqHF22L9KNccHIp7LIHSl3fY9WoIQnhxKfKVWDMzJC6Rch/4vF3IMIF8Hihr1AQVHrwV+R4IL94z9eTZMXnBIvrW4xzvUfZTeHBOvoqw43dbrPLklnT6Si/Y9ew8zvEZCSh6cixfhiVWQs5E+M7w/bq2/MB/8Pwz40dyMUGafb4Q/aAmW+zGXgY6X0xK/JvYGoQXnXCRL7R4j6Qb7U5R4ZcBBZO39L4ScTXc7Pf7kOJNfTm+J+Cj5zkUAeeB24YAXhfWN7/fZNn4enN0nORmv9/f4zfo7FhjT/4pL8ke6kEkAadDfjgK6j0/Qi95ssIkXFLvIfKzz1fhl2R5xsRLJZPpgwScNwtMtOLw9RBT4Y7ZAQ9uAaXy8NpHwG/MK9v3Qp0o8qlhdQmcyu9yhCdN2QrSWNrkHZAdV7hUdBNwzk/3ELMgYN6fUarcUm+uM0Zka8OnU+VlFZcF3FHXfM6ZAlsawxdNxo1LxmvhUohul7g5tW5neXg9J+C1iAcW+b7gPwaoBXnD0xTON0M9NM9wftHcEsvOHGdBr0k8R3V4DSGg63/MITE1Fk64Ka4H61hCt1kNa677xikJU2i+xW6ea3qA+bLAxo/H2skqNL8CmzaTaUvsFy+4XvEcJWEEnHoxwhDk1MKlmjTpwxb73ZLYn29qlISbavUd7QvRxPXj7pjHwsun+Pk3l3z9KAkn4Bwqg3y5xT6DqSVO+vBzGwLJ15+SsJONv2ITmK+FKffjjldDz2nXNN7RWH5E8vlRElbAuUfBHPv9StLtx22p6zBfsL+Fe21DfjgWjVdXK/qMPWwAyReCkvDLbXzHSvbmkODKqZuVKfbjVtQFz0vifebF4XXpviH5wlBg05FCNp/cQlMPTE/CnHSFc7K5YzQkXzgWmIChm1NTkdAVEJSkJZzbXOeJuJGtM5IvLKFXBGjSdYem2GSYbCkWMG95LVySSL7wZMTfDntNvWvTJuL7NHEzuIvDEXrCqS9OuIo0Hk4XkXzxuAP+GOB9ttT9l5+zpD1xojWPlJqSDtcaqEg4wp1D8sUlVj/wEitep8fPpcqLE1+nFtFO4bNfYzJIvvhk2I1yDdUbMVljzfknEkqa+CD5huMWk3Bq1RxjssU+s4rh+raDIfmGRVHwMqlldaMh+cahwCRMKT0/NrPox3VB8o3LPZYVvdam6Oz6cV2QfOOTYRKG3BUqZcYYo0wSyZcOOSbhFKfYXELCnUDypUeGNUVLpt0nXFGXeG3GvZQ0kXxpM6UZ3q7SJrkC5lSRfNMgxTUqd7yemjPrYYEYSL7p4WYTuGOomssVde3oEjUlvZF886Cg3t6qOHyva43mjjp6LRuvGyRaFCTfdeDEPMatTyJG4H9gXsK0mVCnrAAAAABJRU5ErkJggg==' alt="Nebbia" width="46">`;
+    case 51:
+    case 53:
+    case 55:
+      return `<img src='data:image/png;base64,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' alt="Pioviggine" width="46">`;
+    case 61:
+    case 63:
+    case 65:
+    case 80:
+    case 81:
+    case 82:
+      return `<img src='data:image/png;base64,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' alt="Pioggia" width="46">`;
+    case 66:
+    case 67:
+    case 71:
+    case 73:
+    case 75:
+    case 77:
+    case 85:
+    case 86:
+      return `<img src='data:image/png;base64,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' alt="Neve" width="46">`;
+    case 95:
+      return `<img src='data:image/png;base64,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' alt="Temporale" width="46">`;
+    case 96:
+    case 99:
+      return `<img src='data:image/png;base64,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' alt="Temporale forte" width="46">`;
+    default:
+      return `<img src='data:image/png;base64,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' alt="?" width="46">`;
+  }
+}
+}
+
+
+function wmoDesc(code){
+  switch(code){
+    case 0: return 'Sereno';
+    case 1: return 'Quasi sereno';
+    case 2: return 'Poco nuvoloso';
+    case 3: return 'Nuvoloso';
+    case 45: case 48: return 'Nebbia';
+    case 51: case 53: case 55: return 'Pioviggine';
+    case 56: case 57: return 'Brina';
+    case 61: case 63: case 65: return 'Pioggia';
+    case 66: case 67: return 'Ghiaccio';
+    case 71: case 73: case 75: return 'Neve';
+    case 77: return 'Nevischio';
+    case 80: case 81: case 82: return 'Rovesci';
+    case 85: case 86: return 'Rovesci di neve';
+    case 95: return 'Temporale';
+    case 96: case 99: return 'Temporale forte';
+    default: return '';
+  }
+}
+let LIVE=null;
+/* —— format util —— */
+const fmt=(v,unit="",d=0)=>isFinite(v)?Number(v).toFixed(d)+unit:"--";
+const toRad=d=>d*Math.PI/180;
+const haversine=(a,b,c,d)=>{const R=6371,e=toRad(c-a),f=toRad(d-b),x=Math.sin(e/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(f/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
+
+/******************** CITTÀ PRINCIPALI *************************/
+const CITIES = [
+  {city:'Cosenza',lat:39.307,lon:16.251},
+  {city:'Catanzaro',lat:38.9047,lon:16.594},
+  {city:'Reggio Calabria',lat:38.114,lon:15.6512},
+  {city:'Crotone',lat:39.080,lon:17.126},
+  {city:'Vibo Valentia',lat:38.674,lon:16.10}
+];
+
+/******************** BUILD NAV *************************/
+function buildNav(){
+  const nav=$('#nav');
+  nav.innerHTML="";
+  const frag=document.createDocumentFragment();
+  DAYS.forEach((d,i)=>{
+    const btn=document.createElement('button');btn.type='button';
+    btn.textContent=d.label;
+    if(i===curDay) btn.classList.add('active');
+    btn.addEventListener('click',()=>{curDay=i;updateNav();render();});
+    frag.appendChild(btn);
+  });
+  nav.appendChild(frag);
+}
+function updateNav(){ $('#nav').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('active',i===curDay)); }
+
+/******************** RENDER MAIN WIDGET *************************/
+function render(){
+  if(!DAYS.length) return;
+  const data=DAYS[curDay];
+  /* header */
+  $('#hDay').textContent=data.label;
+  const dt=new Date(); dt.setDate(dt.getDate()+data.offset);
+  $('#hDate').textContent=dt.toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+  /* markers */
+  const mapA=$('#mapArea');
+  mapA.querySelectorAll('.marker').forEach(m=>m.remove());
+  data.points.forEach(p=>{
+    const mk=document.createElement('div');
+    mk.className='marker';
+    mk.style.left=p.x+'%';
+    mk.style.top=p.y+'%';
+    mk.innerHTML = p.code !== undefined ? wmo(p.code, night) : p.icon;
+    mk.title=`${p.city}: ${p.tmax}° / ${p.tmin}°`;
+    mapA.appendChild(mk);
+  });
+  /* table */
+  const tbl=$('#forecast');
+  tbl.innerHTML='<tr><th>Città</th><th>Max</th><th>Min</th></tr>';
+  data.points.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.city}</td><td>${r.tmax}°</td><td>${r.tmin}°</td>`;
+    tbl.appendChild(tr);
+  });
+}
+
+/******************** OPEN‑METEO *************************/
+async function forecast(lat,lon){
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&daily=temperature_2m_max,temperature_2m_min,weathercode`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Errore meteo");
+  return r.json();
+}
+
+/******************** COSTRUISCI GIORNI PER MAPPA ***************/
+async function loadCalabria(){
+  const promises=CITIES.map(c=>forecast(c.lat,c.lon));
+  const results=await Promise.all(promises);
+  DAYS = [];
+  const daysCount = results[0].daily.time.length;
+  for(let d=0; d<daysCount; d++){
+    const dayObj = {label:`GIORNO ${d+1}`,offset:d,points:[]};
+    CITIES.forEach((c,idx)=>{
+      const fc=results[idx];
+      const {x,y}=latLonToXY(c.lat,c.lon);
+      dayObj.points.push({city:c.city,x,y,code:fc.daily.weathercode[d],icon:wmo(fc.daily.weathercode[d]),tmax:Math.round(fc.daily.temperature_2m_max[d]),tmin:Math.round(fc.daily.temperature_2m_min[d])});
+    });
+    DAYS.push(dayObj);
+  }
+  curDay=0; buildNav(); render();
+}
+window.stazioni = [
+  { nome: "Bianchi - Palinudo Staglio", mlg: true, lat: 39.11, lon: 16.42, quota: "830 m", provincia: "CS", regione: "Calabria", area: "Valle del Corace", stationId: "IBIANC4", apiKey: "2ccb91c2398a4f778b91c2398a4f772f", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Cosenza - Vaglio Lise", mlg: true, lat: 39.31, lon: 16.27, quota: "208 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN11", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-cosenza-vaglio-lise" },
+  { nome: "Amantea Spiaggia", mlg: true, lat: 39.13, lon: 16.07, quota: "0 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "IAMANT7", apiKey: "a3f4ae4f9b6d46a4b4ae4f9b6d06a494", webcam: "https://meteologullo.github.io/mappamlg/webcam_spiaggia_pulita.html", linkStazione: "https://www.meteologullo.com/stazione-amantea-spiaggia" },
+  { nome: "Monte Scuro - Celico", mlg: true, lat: 39.33, lon: 16.4, quota: "1643 m", provincia: "CS", regione: "Calabria", area: "Vetta della Sila Grande", stationId: "ICELIC3", apiKey: "2d12def7f4894eca92def7f4892eca99", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-meteo-di-monte-scuro-celico" },
+  { nome: "Cosenza - Campagnano", mlg: true, lat: 39.31, lon: 16.23, quota: "234 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN20", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-cosenza-campagnano" },
+  { nome: "Mendicino - Tivolille Pasquali", mlg: true, lat: 39.28, lon: 16.2, quota: "431 m", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera Interna", stationId: "IMENDI13", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-mendicino-tivolille" },
+  { nome: "Casali del Manco - Morelli Soprana", mlg: true, lat: 39.28, lon: 16.29, quota: "389 m", provincia: "CS", regione: "Calabria", area: "collina Valle del Crati", stationId: "ICASAL40", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-casali-del-manco-morelli-soprana" },
+  { nome: "Nuova Stazione 1", mlg: true, lat: 39.40, lon: 16.50, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Nuova Area", stationId: "INUST1", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Catanzaro Centro", lat: 38.82, lon: 16.43, quota: "320 m", provincia: "CZ", regione: "Calabria", area: "Centro città", openMeteo: true, stationId: "CATCENTRO", webcam: "", linkStazione: "#" }
+,
+  { nome: "Reggio Calabria - Centro", lat: 38.11, lon: 15.65, quota: "31 m", provincia: "RC", regione: "Calabria", area: "Area dello Stretto", openMeteo: true, stationId: "REGCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Rossano - Centro Storico", lat: 39.58, lon: 16.63, quota: "270 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ROSSCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Valentia - Monte Poro", lat: 38.63, lon: 16.05, quota: "710 m", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBOPORO", webcam: "", linkStazione: "#" },
+  { nome: "Locri Marina", lat: 38.25, lon: 16.26, quota: "12 m", provincia: "RC", regione: "Calabria", area: "Costa Ionica Reggina", openMeteo: true, stationId: "LOCRIMARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni in Fiore", lat: 39.26, lon: 16.68, quota: "1049 m", provincia: "CS", regione: "Calabria", area: "Altopiano Silano", openMeteo: true, stationId: "SGFIORE", webcam: "", linkStazione: "#" },
+  { nome: "Crotone Porto", lat: 39.08, lon: 17.12, quota: "8 m", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CROPOR", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme - Sant'Eufemia", lat: 38.91, lon: 16.24, quota: "15 m", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMSANTEUF", webcam: "", linkStazione: "#" },
+  { nome: "Scalea - Centro", lat: 39.81, lon: 15.79, quota: "25 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "SCALEACENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna - Parco Nazionale Sila Piccola", lat: 39.02, lon: 16.68, quota: "880 m", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TAVSILAPIC", webcam: "", linkStazione: "#" },
+  { nome: "Isola di Capo Rizzuto", lat: 38.96, lon: 17.09, quota: "75 m", provincia: "KR", regione: "Calabria", area: "Capo Rizzuto", openMeteo: true, stationId: "ISOCAPORIZ", webcam: "", linkStazione: "#" },
+,
+  { nome: "Cirò Marina", lat: 39.37, lon: 17.12, quota: "25 m", provincia: "KR", regione: "Calabria", area: "Alto Ionio Crotonese", openMeteo: true, stationId: "CIROMARINA", webcam: "", linkStazione: "#" },
+  { nome: "Cariati", lat: 39.5, lon: 16.96, quota: "30 m", provincia: "CS", regione: "Calabria", area: "Basso Ionio cosentino", openMeteo: true, stationId: "CARIATI", webcam: "", linkStazione: "#" },
+  { nome: "Petilia Policastro", lat: 39.13, lon: 16.77, quota: "436 m", provincia: "KR", regione: "Calabria", area: "Marchesato Crotonese", openMeteo: true, stationId: "PETILIA", webcam: "", linkStazione: "#" },
+  { nome: "Tropea", lat: 38.68, lon: 15.9, quota: "61 m", provincia: "VV", regione: "Calabria", area: "Costa degli Dei", openMeteo: true, stationId: "TROPEA", webcam: "", linkStazione: "#" },
+  { nome: "Gerace", lat: 38.27, lon: 16.23, quota: "500 m", provincia: "RC", regione: "Calabria", area: "Collina Ionica alto Reggino", openMeteo: true, stationId: "GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Spezzano della Sila", lat: 39.30, lon: 16.33, quota: "800 m", provincia: "CS", regione: "Calabria", area: "Pre-Sila Grande cosentina", openMeteo: true, stationId: "SPEZSILA", webcam: "", linkStazione: "#" },
+  { nome: "Paola", lat: 39.37, lon: 16.03, quota: "154 m", provincia: "CS", regione: "Calabria", area: "Tirreno Cosentino", openMeteo: true, stationId: "PAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere Marittimo", lat: 39.61, lon: 15.86, quota: "150 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "BELVEDERE", webcam: "", linkStazione: "#" },
+  { nome: "Mormanno", lat: 39.88, lon: 15.98, quota: "850 m", provincia: "CS", regione: "Calabria", area: "Pollino", openMeteo: true, stationId: "MORMANNO", webcam: "", linkStazione: "#" },
+  { nome: "Soverato", lat: 38.68, lon: 16.54, quota: "20 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica basso Catanzarese", openMeteo: true, stationId: "SOVERATO", webcam: "", linkStazione: "#" },
+  { nome: "Palmi", lat: 38.36, lon: 15.85, quota: "228 m", provincia: "RC", regione: "Calabria", area: "Costa Viola", openMeteo: true, stationId: "PALMI", webcam: "", linkStazione: "#" },
+  { nome: "Serrastretta", lat: 39.01, lon: 16.4, quota: "820 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "SERRASTRETTA", webcam: "", linkStazione: "#" },
+  { nome: "Santa Severina", lat: 39.21, lon: 16.97, quota: "326 m", provincia: "KR", regione: "Calabria", area: "Marchesato crotonese", openMeteo: true, stationId: "SSSEVERINA", webcam: "", linkStazione: "#" },
+  { nome: "Badolato Marina", lat: 38.6, lon: 16.55, quota: "10 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica basso Catanzarese", openMeteo: true, stationId: "BADO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Delianuova", lat: 38.2, lon: 15.88, quota: "600 m", provincia: "RC", regione: "Calabria", area: "Pre-Aspromonte Occidentale", openMeteo: true, stationId: "DELIANUOVA", webcam: "", linkStazione: "#" },
+  {"nome": "Rende", "lat": 39.3306, "lon": 16.2078, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "RENDE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Montalto Uffugo", "lat": 39.4165, "lon": 16.1985, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "MONTALTO_UFFUGO", "webcam": "", "linkStazione": "#"},{"nome": "Bisignano", "lat": 39.50, "lon": 16.27, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Collina alta Valle del Crati", "openMeteo": true, "stationId": "MONGRASSANO_SCALO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Tarsia", "lat": 39.58, "lon": 16.3167, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "TARSIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Castrovillari", "lat": 39.8167, "lon": 16.2, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Pollino", "openMeteo": true, "stationId": "CASTROVILLARI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Sibari", "lat": 39.6833, "lon": 16.5333, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sibaritide", "openMeteo": true, "stationId": "SIBARI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Villapiana", "lat": 39.84, "lon": 16.45, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sibaritide", "openMeteo": true, "stationId": "VILLAPIANA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Camigliatello Silano", "lat": 39.3306, "lon": 16.4492, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "CAMIGLIATELLO_SILANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monte Curcio", "lat": 39.317, "lon": 16.42, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "MONTE_CURCIO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Botte Donato", "lat": 39.2833, "lon": 16.45, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "BOTTE_DONATO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Daltolia", "lat": 39.033, "lon": 16.388, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Savuto", "openMeteo": true, "stationId": "DALTOLIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Rogliano", "lat": 39.1581, "lon": 16.3723, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Savuto", "openMeteo": true, "stationId": "ROGLIANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Girifalco", "lat": 38.8, "lon": 16.4167, "quota": "ND", "provincia": "CZ", "regione": "Calabria", "area": "Pre-Serre", "openMeteo": true, "stationId": "GIRIFALCO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Vibo Valentia", "lat": 38.6749, "lon": 16.1027, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "VIBO_VALENTIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Capo Vaticano", "lat": 38.6278, "lon": 15.8415, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Costa degli Dei", "openMeteo": true, "stationId": "CAPO_VATICANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Rosarno", "lat": 38.4886, "lon": 15.9738, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "ROSARNO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Gioia Tauro", "lat": 38.4236, "lon": 15.8996, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "GIOIA_TAURO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Pellaro", "lat": 38.01, "lon": 15.633, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Area dello Stretto", "openMeteo": true, "stationId": "PELLARO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Villa San Giovanni", "lat": 38.2131, "lon": 15.6414, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Area dello Stretto", "openMeteo": true, "stationId": "VILLA_SAN_GIOVANNI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Melito di Porto Salvo", "lat": 37.9167, "lon": 15.7333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "MELITO_DI_PORTO_SALVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Brancaleone", "lat": 37.95, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "BRANCALEONE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Africo Nuovo", "lat": 38.0167, "lon": 16.1333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "AFRICO_NUOVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Bovalino", "lat": 38.15, "lon": 16.2, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "BOVALINO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monasterace Marina", "lat": 38.4333, "lon": 16.5333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Meridionale", "openMeteo": true, "stationId": "MONASTERACE_MARINA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Mongiana", "lat": 38.5167, "lon": 16.3, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "MONGIANA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Fabrizia", "lat": 38.5, "lon": 16.3667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "FABRIZIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Nardodipace", "lat": 38.4833, "lon": 16.4, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "NARDODIPACE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Polistena", "lat": 38.4167, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "POLISTENA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Natoli Nuovo", "lat": 38.5167, "lon": 16.0833, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "NATOLI_NUOVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Cittanova", "lat": 38.3167, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "CITTANOVA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Zungri", "lat": 38.6167, "lon": 15.9333, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "ZUNGRI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Spilinga", "lat": 38.6, "lon": 15.8833, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "SPILINGA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Pizzo", "lat": 38.7333, "lon": 16.1667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Costa Tirrenica Vibonese", "openMeteo": true, "stationId": "PIZZO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monterosso Calabro", "lat": 38.6333, "lon": 16.2667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "MONTEROSSO_CALABRO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Cutro", "lat": 39.0167, "lon": 17.0833, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Collina Crotonese", "openMeteo": true, "stationId": "CUTRO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Capocolonna", "lat": 39.0167, "lon": 17.1333, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "CAPOCOLONNA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Marina di Strongoli", "lat": 39.3, "lon": 17.1167, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "MARINA_DI_STRONGOLI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Acerenthia - Camigliano", "lat": 39.2667, "lon": 17.0, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Collina Crotonese", "openMeteo": true, "stationId": "ACERENTHIA_-_CAMIGLIANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Torretta di Crucoli", "lat": 39.4167, "lon": 17.0333, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "TORRETTA_DI_CRUCOLI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Longobucco", "lat": 39.45, "lon": 16.65, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Greca", "openMeteo": true, "stationId": "LONGOBUCCO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Acri", "lat": 39.5, "lon": 16.3833, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Greca", "openMeteo": true, "stationId": "ACRI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Roccaforte del Greco", "lat": 38.0167, "lon": 15.85, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Aspromonte", "openMeteo": true, "stationId": "ROCCAFORTE_DEL_GRECO", "webcam": "", "linkStazione": "#"},
+  {"nome": "San Luca", "lat": 38.1333, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Aspromonte", "openMeteo": true, "stationId": "SAN_LUCA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Santa Caterina dello Ionio", "lat": 38.55, "lon": 16.5667, "quota": "ND", "provincia": "CZ", "regione": "Calabria", "area": "Costa Ionica Meridionale", "openMeteo": true, "stationId": "SANTA_CATERINA_DELLO_IONIO", "webcam": "", "linkStazione": "#"},
+  {"nome": "San Sosti", "lat": 39.66, "lon": 16.02, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle dell'Esaro", "openMeteo": true, "stationId": "SANSOSTI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Altomonte", "lat": 39.7, "lon": 16.1333, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle dell'Esaro", "openMeteo": true, "stationId": "ALTOMONTE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Roseto Capo Spulico", "lat": 39.9667, "lon": 16.5833, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Alto Ionio Cosentino", "openMeteo": true, "stationId": "ROSETO_CAPO_SPULICO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Trebisacce", "lat": 39.87, "lon": 16.53, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Alto Ionio Cosentino", "openMeteo": true, "stationId": "TREBISACCE", "webcam": "", "linkStazione": "#"}
+,
+  { nome: "Rende - Quattromiglia", lat: 39.353702, lon: 16.242313, quota: "ND", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", openMeteo: true, stationId: "RENDE_QUATTR", webcam: "", linkStazione: "#" },
+  { nome: "Torano Castello - Sartano", lat: 39.49, lon: 16.21, quota: "90", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati", openMeteo: true, stationId: "LUZZI_PETRINI", webcam: "", linkStazione: "#" },
+  { nome: "Luzzi - Petrini", lat: 39.446816, lon: 16.28, quota: "ND", provincia: "CS", regione: "Calabria", area: "Media Valle del Crati", openMeteo: true, stationId: "LUZZI_CENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Lattarico", lat: 39.464303, lon: 16.138027, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna nord", openMeteo: true, stationId: "LATTARICO", webcam: "", linkStazione: "#" },
+  { nome: "Rota Greca", lat: 39.467, lon: 16.117, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna nord", openMeteo: true, stationId: "ROTA_GRECA", webcam: "", linkStazione: "#" },
+  { nome: "Lattarico - Piretto", lat: 39.467, lon: 16.133, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera interna nord", openMeteo: true, stationId: "LATTARICO_PIRETTO", webcam: "", linkStazione: "#" },
+  { nome: "Cassano all'Ionio", lat: 39.783, lon: 16.317, quota: "ND", provincia: "CS", regione: "Calabria", area: "Piana di Sibari centrale", openMeteo: true, stationId: "CASSANO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Sibari", lat: 39.74, lon: 16.45, quota: "ND", provincia: "CS", regione: "Calabria", area: "Piana di Sibari orientale", openMeteo: true, stationId: "SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Terranova da Sibari", lat: 39.6575, lon: 16.3398, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Piana di Sibari sud", openMeteo: true, stationId: "TERRANOVA_SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Tarsia", lat: 39.62311, lon: 16.27337, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Valle del Crati nord", openMeteo: true, stationId: "TARSIA", webcam: "", linkStazione: "#" },
+  { nome: "Roggiano Gravina", lat: 39.61786, lon: 16.16173, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Valle dell'Esaro", openMeteo: true, stationId: "ROGGIANO", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro in Guarano", lat: 44.52, lon: 13.48, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Sila cosentina", openMeteo: true, stationId: "SANPIETRO_GUARANO", webcam: "", linkStazione: "#" },
+  { nome: "Marano Marchesato", lat: 39.316974, lon: 16.174788, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna sud", openMeteo: true, stationId: "MARANO_MARCH", webcam: "", linkStazione: "#" },
+  { nome: "Carolei", lat: 39.25, lon: 16.217, quota: "ND", provincia: "CS", regione: "Calabria", area: "Serre cosentine", openMeteo: true, stationId: "CAROLEI", webcam: "", linkStazione: "#" },
+  { nome: "Dipignano", lat: 39.237886, lon: 16.25324, quota: "ND", provincia: "CS", regione: "Calabria", area: "Serre cosentine", openMeteo: true, stationId: "DIPIGNANO", webcam: "", linkStazione: "#" },
+  { nome: "Mangone", lat: 39.205635, lon: 16.332584, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Savuto", openMeteo: true, stationId: "MANGONE", webcam: "", linkStazione: "#" },
+  { nome: "Altilia", lat: 39.1286, lon: 16.2532, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Savuto", openMeteo: true, stationId: "ALTILIA", webcam: "", linkStazione: "#" },
+  { nome: "Aiello Calabro", lat: 39.117215, lon: 16.166775, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina basso tirreno cosentino", openMeteo: true, stationId: "AIELLO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme", lat: 38.966667, lon: 16.299999, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMEZIA_TERME", webcam: "", linkStazione: "#" },
+  { nome: "Falerna", lat: 39.003346, lon: 16.172041, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa tirrenica catanzarese", openMeteo: true, stationId: "FALERNA", webcam: "", linkStazione: "#" },
+  { nome: "San Lucido", lat: 39.309956, lon: 16.051827, quota: "ND", provincia: "CS", regione: "Calabria", area: "Costa tirrenica cosentina", openMeteo: true, stationId: "SAN_LUCIDO", webcam: "", linkStazione: "#" },
+  { nome: "Guardia Piemontese", lat: 39.467, lon: 16.0, quota: "ND", provincia: "CS", regione: "Calabria", area: "Costa alto tirreno cosentino", openMeteo: true, stationId: "GUARDIA_PIEM", webcam: "", linkStazione: "#" },
+  { nome: "Vena di Maida", lat: 38.888685, lon: 16.407462, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "VENA_DI_MAIDA", webcam: "", linkStazione: "#" },
+  { nome: "Settingiano", lat: 38.910024, lon: 16.514955, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "SETTINGIANO", webcam: "", linkStazione: "#" },
+  { nome: "Caraffa di Catanzaro", lat: 38.88194, lon: 16.4875, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "CARAFFA", webcam: "", linkStazione: "#" },
+  { nome: "Catanzaro Lido", lat: 38.8303, lon: 16.6278, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "CATANZARO_LIDO", webcam: "", linkStazione: "#" },
+  { nome: "Simeri Mare", lat: 38.865607, lon: 16.697665, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "SIMERI_MARE", webcam: "", linkStazione: "#" },
+  { nome: "Sorbo San Basile", lat: 39.01889, lon: 16.56944, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "SORBO_BASILE", webcam: "", linkStazione: "#" },
+  { nome: "Steccato di Cutro", lat: 38.938014, lon: 16.916678, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa del basso ionio crotonese", openMeteo: true, stationId: "STECCATO_CUTRO", webcam: "", linkStazione: "#" },
+  { nome: "Cropani", lat: 38.967, lon: 16.783, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica alto catanzarese", openMeteo: true, stationId: "CROPANI", webcam: "", linkStazione: "#" },
+  { nome: "Botricello Superiore", lat: 38.93199, lon: 16.85831, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina alto ionio catanzarese", openMeteo: true, stationId: "BOTRICELLO", webcam: "", linkStazione: "#" },
+  { nome: "Acconia", lat: 38.83585, lon: 16.2653, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "ACCONIA", webcam: "", linkStazione: "#" },
+  { nome: "Curinga", lat: 38.8281, lon: 16.31344, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Valle dell'Amato", openMeteo: true, stationId: "CURINGA", webcam: "", linkStazione: "#" },
+  { nome: "Maida", lat: 38.8588, lon: 16.3628, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "MAIDA", webcam: "", linkStazione: "#" },
+  { nome: "Francavilla Angitola", lat: 38.783, lon: 16.267, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "FRANCAVILLA_ANGITOLA", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro Lametino", lat: 38.869082, lon: 16.277958, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina della Piana di Lamezia", openMeteo: true, stationId: "SANPIETRO_LAM", webcam: "", linkStazione: "#" },
+  { nome: "Squillace", lat: 38.780585, lon: 16.513228, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica del basso catanzarese", openMeteo: true, stationId: "SQUILLACE", webcam: "", linkStazione: "#" },
+  { nome: "Montepaone Lido", lat: 38.728733, lon: 16.541554, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica del basso catanzarese", openMeteo: true, stationId: "MONTEPAONE_LIDO", webcam: "", linkStazione: "#" },
+  { nome: "San Vito sullo Ionio", lat: 38.710368, lon: 16.409777, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Entroterra del basso ionio catanzarese", openMeteo: true, stationId: "SANVITO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Monterosso Calabro", lat: 38.71792, lon: 16.291973, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MONTEROSSO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "Chiaravalle Centrale", lat: 38.680996, lon: 16.411957, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Entroterra del basso ionio catanzarese", openMeteo: true, stationId: "CHIARAVALLE_C", webcam: "", linkStazione: "#" },
+  { nome: "Verbicaro", lat: 39.756, lon: 15.916, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera marittima nord", openMeteo: true, stationId: "VERBICARO", webcam: "", linkStazione: "#" },
+  { nome: "Orsomarso", lat: 39.799, lon: 15.908, quota: "ND", provincia: "CS", regione: "Calabria", area: "Catena Costiera marittima nord", openMeteo: true, stationId: "ORSOMARSO", webcam: "", linkStazione: "#" },
+  { nome: "Cirella", lat: 39.703, lon: 15.823, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto Tirreno cosentino", openMeteo: true, stationId: "CIRELLA", webcam: "", linkStazione: "#" },
+  { nome: "Praia a Mare", lat: 39.909, lon: 15.778, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "PRAIA_A_MARE", webcam: "", linkStazione: "#" },
+  { nome: "Laino Borgo", lat: 39.95, lon: 15.97, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Mercure", openMeteo: true, stationId: "LAINO_BORGO", webcam: "", linkStazione: "#" },
+  { nome: "Papasidero", lat: 39.87, lon: 15.90, quota: "ND", provincia: "CS", regione: "Calabria", area: "Borgo dell'alto tirreno", openMeteo: true, stationId: "PAPASIDERO", webcam: "", linkStazione: "#" },
+  { nome: "Acquaformosa", lat: 39.736, lon: 16.078, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "ACQUAFORMOSA", webcam: "", linkStazione: "#" },
+  { nome: "Saracena", lat: 39.849, lon: 16.11, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SARACENA", webcam: "", linkStazione: "#" },
+  { nome: "Cerchiara di Calabria", lat: 39.883, lon: 16.4, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CERCHIARA_DI_CALABRIA", webcam: "", linkStazione: "#" },
+  { nome: "San Lorenzo Bellizzi", lat: 39.88, lon: 16.33, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SAN_LORENZO_BELLIZZI", webcam: "", linkStazione: "#" },
+  { nome: "Plataci", lat: 39.90, lon: 16.43, quota: "ND", provincia: "CS", regione: "Calabria", area: "Parco Nazionale del Pollino", openMeteo: true, stationId: "PLATACI", webcam: "", linkStazione: "#" },
+  { nome: "Albidona", lat: 39.937, lon: 16.525, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ALBIDONA", webcam: "", linkStazione: "#" },
+  { nome: "Alessandria del Carretto", lat: 39.984, lon: 16.338, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "ALESSANDRIA_DEL_CARRETTO", webcam: "", linkStazione: "#" },
+  { nome: "Terranova di Pollino", lat: 40.032, lon: 16.23, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "TERRANOVA_DI_POLLINO", webcam: "", linkStazione: "#" },
+  { nome: "Castroregio", lat: 39.987, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CASTROREGIO", webcam: "", linkStazione: "#" },
+  { nome: "Oriolo", lat: 40.05, lon: 16.434, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ORIOLO", webcam: "", linkStazione: "#" },
+  { nome: "Montegiordano", lat: 40.04, lon: 16.53, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "MONTEGIORDANO", webcam: "", linkStazione: "#" },
+  { nome: "Nocara", lat: 40.09, lon: 16.48, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "NOCARA", webcam: "", linkStazione: "#" },
+  { nome: "Rocca Imperiale", lat: 40.10, lon: 16.58, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "ROCCA_IMPERIALE", webcam: "", linkStazione: "#" },
+  { nome: "Apollinara", lat: 39.70, lon: 16.41, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "APOLLINARA", webcam: "", linkStazione: "#" },
+  { nome: "Cantinella", lat: 39.66, lon: 16.44, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CANTINELLA", webcam: "", linkStazione: "#" },
+  { nome: "Corigliano Scalo", lat: 39.618, lon: 16.509, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CORIGLIANO_SCALO", webcam: "", linkStazione: "#" },
+  { nome: "San Giorgio Albanese", lat: 39.58, lon: 16.45, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SAN_GIORGIO_ALBANESE", webcam: "", linkStazione: "#" },
+  { nome: "San Demetrio Corone", lat: 39.562, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SAN_DEMETRIO_CORONE", webcam: "", linkStazione: "#" },
+  { nome: "Cozzo Carbonaro", lat: 39.46, lon: 16.20, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alta Valle del Crati", openMeteo: true, stationId: "COZZO_CARBONARO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna di Montalto Uffugo", lat: 39.415, lon: 16.246, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "TAVERNA_DI_MONTALTO_UFFUGO", webcam: "", linkStazione: "#" },
+  { nome: "Rose", lat: 39.394, lon: 16.232, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina della media Valle del Crati", openMeteo: true, stationId: "ROSE", webcam: "", linkStazione: "#" },
+  { nome: "San Vincenzo la Costa", lat: 39.374, lon: 16.162, quota: "ND", provincia: "CS", regione: "Calabria", area: "Catena Costiera interna", openMeteo: true, stationId: "SAN_VINCENZO_LA_COSTA", webcam: "", linkStazione: "#" },
+  { nome: "Lago", lat: 39.16, lon: 16.16, quota: "600", provincia: "CS", regione: "Calabria", area: "Serre Cosentine", openMeteo: true, stationId: "LAGO", webcam: "", linkStazione: "#" },
+  { nome: "San Mango d'Aquino", lat: 39.027, lon: 16.217, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina della Valle del Savuto", openMeteo: true, stationId: "SAN_MANGO_DAQUINO", webcam: "", linkStazione: "#" },
+  { nome: "Panetti", lat: 39.01, lon: 16.30, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina del Monte Reventino", openMeteo: true, stationId: "PANETTI", webcam: "", linkStazione: "#" },
+  { nome: "Cicala", lat: 39.02, lon: 16.416, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "CICALA", webcam: "", linkStazione: "#" },
+  { nome: "Panettieri", lat: 39.079, lon: 16.423, quota: "ND", provincia: "CS", regione: "Calabria", area: "Monte Reventino", openMeteo: true, stationId: "PANETTIERI", webcam: "", linkStazione: "#" },
+  { nome: "Sellia", lat: 38.832, lon: 16.517, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina dell'alto ionio catanzarese", openMeteo: true, stationId: "SELLIA", webcam: "", linkStazione: "#" },
+  { nome: "Pianopoli", lat: 38.957, lon: 16.319, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Marcellinara", openMeteo: true, stationId: "PIANOPOLI", webcam: "", linkStazione: "#" },
+  { nome: "Gizzeria", lat: 38.937, lon: 16.148, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Alto tirreno catanzarese", openMeteo: true, stationId: "GIZZERIA", webcam: "", linkStazione: "#" },
+  { nome: "Soveria Simeri", lat: 38.97, lon: 16.659, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina dell'alto ionio catanzarese", openMeteo: true, stationId: "SOVERIA_SIMERI", webcam: "", linkStazione: "#" },
+  { nome: "Mesoraca", lat: 39.096, lon: 16.789, quota: "ND", provincia: "KR", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "MESORACA", webcam: "", linkStazione: "#" },
+  { nome: "San Mauro Marchesato", lat: 39.126, lon: 16.859, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAN_MAURO_MARCHESATO", webcam: "", linkStazione: "#" },
+  { nome: "Marcedusa", lat: 39.024, lon: 16.858, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MARCEDUSA", webcam: "", linkStazione: "#" },
+  { nome: "Papanice", lat: 39.118, lon: 16.981, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "PAPANICE", webcam: "", linkStazione: "#" },
+  { nome: "Capo Colonna", lat: 39.016, lon: 17.135, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CAPO_COLONNA", webcam: "", linkStazione: "#" },
+  { nome: "Le Cannella", lat: 38.946, lon: 17.074, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "LE_CANNELLA", webcam: "", linkStazione: "#" },
+  { nome: "Le Castella", lat: 38.906, lon: 17.01, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "LE_CASTELLA", webcam: "", linkStazione: "#" },
+  { nome: "San Floro", lat: 38.899, lon: 16.486, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_FLORO", webcam: "", linkStazione: "#" },
+  { nome: "Borgia", lat: 38.882, lon: 16.507, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BORGIA", webcam: "", linkStazione: "#" },
+  { nome: "Vallefiorita", lat: 38.778, lon: 16.49, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "VALLEFIORITA", webcam: "", linkStazione: "#" },
+  { nome: "Palermiti", lat: 38.71, lon: 16.422, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PALERMITI", webcam: "", linkStazione: "#" },
+  { nome: "Petrizzi", lat: 38.637, lon: 16.474, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PETRIZZI", webcam: "", linkStazione: "#" },
+  { nome: "San Sostene", lat: 38.65, lon: 16.487, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_SOSTENE", webcam: "", linkStazione: "#" },
+  { nome: "Brognaturo", lat: 38.575, lon: 16.373, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "BROGNATURO", webcam: "", linkStazione: "#" },
+  { nome: "Badolato", lat: 38.578, lon: 16.556, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BADOLATO", webcam: "", linkStazione: "#" },
+  { nome: "Serra San Bruno", lat: 38.583, lon: 16.316, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SERRA_SAN_BRUNO", webcam: "", linkStazione: "#" },
+  { nome: "Arena", lat: 38.576, lon: 16.157, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "ARENA", webcam: "", linkStazione: "#" },
+  { nome: "Monsoreto", lat: 38.521, lon: 16.163, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MONSORETO", webcam: "", linkStazione: "#" },
+  { nome: "Paravati", lat: 38.6, lon: 16.084, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "PARAVATI", webcam: "", linkStazione: "#" },
+  { nome: "Mileto", lat: 38.606, lon: 16.067, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MILETO", webcam: "", linkStazione: "#" },
+  { nome: "Briatico", lat: 38.72, lon: 15.949, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "BRIATICO", webcam: "", linkStazione: "#" },
+  { nome: "Zambrone", lat: 38.695, lon: 15.959, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "ZAMBRONE", webcam: "", linkStazione: "#" },
+  { nome: "Caria", lat: 38.638, lon: 15.958, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "CARIA", webcam: "", linkStazione: "#" },
+  { nome: "Maierato", lat: 38.697, lon: 16.111, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MAIERATO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Marina", lat: 38.721, lon: 16.127, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Nicotera", lat: 38.533, lon: 15.933, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "NICOTERA", webcam: "", linkStazione: "#" },
+  { nome: "San Calogero", lat: 38.53, lon: 16.033, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SAN_CALOGERO", webcam: "", linkStazione: "#" },
+  { nome: "San Ferdinando", lat: 38.483, lon: 15.899, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_FERDINANDO", webcam: "", linkStazione: "#" },
+  { nome: "Taurianova", lat: 38.354, lon: 16.03, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "TAURIANOVA", webcam: "", linkStazione: "#" },
+  { nome: "Oppido Mamertina", lat: 38.351, lon: 15.986, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "OPPIDO_MAMERTINA", webcam: "", linkStazione: "#" },
+  { nome: "Siderno", lat: 38.27, lon: 16.294, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SIDERNO", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Gioiosa Ionica", lat: 38.3, lon: 16.318, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_GIOIOSA_IONICA", webcam: "", linkStazione: "#" },
+  { nome: "Roccella Ionica", lat: 38.327, lon: 16.398, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ROCCELLA_IONICA", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Caulonia", lat: 38.389, lon: 16.463, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_CAULONIA", webcam: "", linkStazione: "#" },
+  { nome: "Riace Marina", lat: 38.483, lon: 16.566, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "RIACE_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Trepitò", lat: 38.386, lon: 16.453, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "VILLAGGIO_TREPITÒ", webcam: "", linkStazione: "#" },
+  { nome: "Santa Cristina d'Aspromonte", lat: 38.275, lon: 15.954, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTA_CRISTINA_DASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Antonimina", lat: 38.195, lon: 16.097, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ANTONIMINA", webcam: "", linkStazione: "#" },
+  { nome: "Ardore", lat: 38.23, lon: 16.171, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ARDORE", webcam: "", linkStazione: "#" },
+  { nome: "Molochio", lat: 38.28, lon: 16.01, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOLOCHIO", webcam: "", linkStazione: "#" },
+  { nome: "Bagnara Calabra", lat: 38.272, lon: 15.799, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BAGNARA_CALABRA", webcam: "", linkStazione: "#" },
+  { nome: "Gallico Marina", lat: 38.17, lon: 15.65, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "GALLICO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Gregorio", lat: 38.048, lon: 15.682, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_GREGORIO", webcam: "", linkStazione: "#" },
+  { nome: "Cardeto", lat: 38.045, lon: 15.745, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "CARDETO", webcam: "", linkStazione: "#" },
+  { nome: "Amendolea", lat: 38.025, lon: 15.887, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "AMENDOLEA", webcam: "", linkStazione: "#" },
+  { nome: "Bianco", lat: 38.082, lon: 16.142, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BIANCO", webcam: "", linkStazione: "#" },
+  { nome: "Montebello Ionico", lat: 37.986, lon: 15.759, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MONTEBELLO_IONICO", webcam: "", linkStazione: "#" },
+  { nome: "Motta San Giovanni", lat: 38.013, lon: 15.706, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOTTA_SAN_GIOVANNI", webcam: "", linkStazione: "#" },
+  { nome: "Bova Marina", lat: 37.933, lon: 15.918, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BOVA_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Palizzi Marina", lat: 37.919, lon: 15.973, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PALIZZI_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Alessio in Aspromonte", lat: 38.148, lon: 15.709, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTALESSIO_IN_ASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Santo Stefano in Aspromonte", lat: 38.155, lon: 15.799, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTO_STEFANO_IN_ASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Gambarie", lat: 38.154, lon: 15.877, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "GAMBARIE", webcam: "", linkStazione: "#" },
+  { nome: "Sambatello", lat: 38.179, lon: 15.69, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAMBATELLO", webcam: "", linkStazione: "#" },
+  { nome: "Trunca", lat: 38.155, lon: 15.642, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "TRUNCA", webcam: "", linkStazione: "#" },
+  { nome: "Palizzi", lat: 37.939, lon: 15.991, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PALIZZI", webcam: "", linkStazione: "#" },
+  { nome: "Pietrapennata", lat: 38.187, lon: 15.956, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PIETRAPENNATA", webcam: "", linkStazione: "#" },
+  { nome: "Motticella", lat: 38.064, lon: 16.137, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOTTICELLA", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Agata del Bianco", lat: 38.092, lon: 16.176, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTAGATA_DEL_BIANCO", webcam: "", linkStazione: "#" },
+  { nome: "Locri", lat: 38.243, lon: 16.258, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "LOCRI", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Sant'Ilario dello Ionio", lat: 38.174, lon: 16.239, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_SANTILARIO_DELLO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Benestare", lat: 38.207, lon: 16.148, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BENESTARE", webcam: "", linkStazione: "#" },
+  { nome: "Platì", lat: 38.19, lon: 16.094, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PLATÌ", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Eufemia d'Aspromonte", lat: 38.287, lon: 15.887, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTEUFEMIA_DASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Melicuccà", lat: 38.35, lon: 15.942, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MELICUCCÀ", webcam: "", linkStazione: "#" },
+  { nome: "Monasterace", lat: 38.474, lon: 16.58, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MONASTERACE", webcam: "", linkStazione: "#" },
+  { nome: "Torre di Ruggiero", lat: 38.648, lon: 16.353, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TORRE_DI_RUGGIERO", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Angelo di Gerocarne", lat: 38.639, lon: 16.123, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SANTANGELO_DI_GEROCARNE", webcam: "", linkStazione: "#" },
+  { nome: "San Nicola da Crissa", lat: 38.635, lon: 16.205, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SAN_NICOLA_DA_CRISSA", webcam: "", linkStazione: "#" },
+  { nome: "Montepaone", lat: 38.697, lon: 16.529, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MONTEPAONE", webcam: "", linkStazione: "#" },
+  { nome: "Roccelletta", lat: 38.781, lon: 16.519, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "ROCCELLETTA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni di Gerace", lat: 38.286, lon: 16.226, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_GIOVANNI_DI_GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Ciricilla", lat: 39.012, lon: 16.365, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CIRICILLA", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Palumbo", lat: 39.215, lon: 16.762, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VILLAGGIO_PALUMBO", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Mancuso", lat: 39.022, lon: 16.608, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "VILLAGGIO_MANCUSO", webcam: "", linkStazione: "#" },
+  { nome: "Cotronei", lat: 39.16, lon: 16.773, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "COTRONEI", webcam: "", linkStazione: "#" },
+  { nome: "Caccuri", lat: 39.164, lon: 16.786, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CACCURI", webcam: "", linkStazione: "#" },
+  { nome: "Cerenzia", lat: 39.246, lon: 16.812, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CERENZIA", webcam: "", linkStazione: "#" },
+  { nome: "Castelsilano", lat: 39.238, lon: 16.844, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CASTELSILANO", webcam: "", linkStazione: "#" },
+  { nome: "Vigne", lat: 39.357, lon: 16.869, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VIGNE", webcam: "", linkStazione: "#" },
+  { nome: "Verzino", lat: 39.326, lon: 16.911, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VERZINO", webcam: "", linkStazione: "#" },
+  { nome: "Savelli", lat: 39.3, lon: 16.762, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAVELLI", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere di Spinello", lat: 39.236, lon: 16.925, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "BELVEDERE_DI_SPINELLO", webcam: "", linkStazione: "#" },
+  { nome: "Casabona", lat: 39.2, lon: 16.991, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CASABONA", webcam: "", linkStazione: "#" },
+  { nome: "San Nicola dell'Alto", lat: 39.221, lon: 17.071, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAN_NICOLA_DELLALTO", webcam: "", linkStazione: "#" },
+  { nome: "Pino Grande", lat: 39.32, lon: 16.75, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PINO_GRANDE", webcam: "", linkStazione: "#" },
+  { nome: "Lorica", lat: 39.24, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Altipiano silano", openMeteo: true, stationId: "LORICA", webcam: "", linkStazione: "#" },
+  { nome: "Bocchigliero", lat: 39.429, lon: 16.797, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "BOCCHIGLIERO", webcam: "", linkStazione: "#" },
+  { nome: "Campana", lat: 39.496, lon: 16.742, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CAMPANA", webcam: "", linkStazione: "#" },
+  { nome: "Campo San Lorenzo", lat: 39.36, lon: 16.49, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CAMPO_SAN_LORENZO", webcam: "", linkStazione: "#" },
+  { nome: "Corigliano Calabro", lat: 39.593, lon: 16.519, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CORIGLIANO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "San Giacomo d'Acri", lat: 39.485, lon: 16.357, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SAN_GIACOMO_DACRI", webcam: "", linkStazione: "#" },
+  { nome: "Pietrapaola", lat: 39.486, lon: 16.893, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PIETRAPAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Mandatoriccio", lat: 39.508, lon: 16.87, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "MANDATORICCIO", webcam: "", linkStazione: "#" },
+  { nome: "Cropalati", lat: 39.466, lon: 16.585, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CROPALATI", webcam: "", linkStazione: "#" },
+  { nome: "Paludi", lat: 39.496, lon: 16.671, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PALUDI", webcam: "", linkStazione: "#" },
+  { nome: "Mirto", lat: 39.502, lon: 16.768, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "MIRTO", webcam: "", linkStazione: "#" },
+  { nome: "Crosia", lat: 39.517, lon: 16.903, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CROSIA", webcam: "", linkStazione: "#" },
+  { nome: "Calopezzati", lat: 39.516, lon: 16.869, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CALOPEZZATI", webcam: "", linkStazione: "#" },
+  { nome: "Camigliano", lat: 38.983, lon: 16.233, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "CAMIGLIANO", webcam: "", linkStazione: "#" },
+  { nome: "Fabrizio", lat: 39.635, lon: 16.575, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "FABRIZIO", webcam: "", linkStazione: "#" },
+  { nome: "Schiavonea", lat: 39.663, lon: 16.523, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SCHIAVONEA", webcam: "", linkStazione: "#" },
+  { nome: "Laghi di Sibari", lat: 39.72, lon: 16.50, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "LAGHI_DI_SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Doria", lat: 39.73, lon: 16.35, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "DORIA", webcam: "", linkStazione: "#" },
+  { nome: "Firmo", lat: 39.72, lon: 16.17, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina sibaritide", openMeteo: true, stationId: "FIRMO", webcam: "", linkStazione: "#" },
+  { nome: "Miglierina", lat: 39.001, lon: 16.444, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MIGLIERINA", webcam: "", linkStazione: "#" },
+  { nome: "Tiriolo", lat: 38.962, lon: 16.512, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TIRIOLO", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro Apostolo", lat: 39.007, lon: 16.47, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_PIETRO_APOSTOLO", webcam: "", linkStazione: "#" },
+  { nome: "Cerva", lat: 39.029, lon: 16.572, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "CERVA", webcam: "", linkStazione: "#" },
+  { nome: "Petronà", lat: 39.118, lon: 16.632, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PETRONÀ", webcam: "", linkStazione: "#" },
+  { nome: "Belcastro", lat: 39.027, lon: 16.687, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BELCASTRO", webcam: "", linkStazione: "#" },
+  { nome: "Simeri", lat: 38.971, lon: 16.677, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SIMERI", webcam: "", linkStazione: "#" },
+  { nome: "Dulcino", lat: 39.039, lon: 16.434, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "DULCINO", webcam: "", linkStazione: "#" },
+  { nome: "Filadelfia", lat: 38.818, lon: 16.247, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "FILADELFIA", webcam: "", linkStazione: "#" },
+  { nome: "Olivara", lat: 38.77, lon: 16.21, quota: "ND", provincia: "VV", regione: "Calabria", area: "Costa vibonese", openMeteo: true, stationId: "OLIVARA", webcam: "", linkStazione: "#" }
+,
+  { nome: "Cosenza Diodato", mlg: true, lat: 39.27, lon: 16.26, quota: "500 m", provincia: "CS", regione: "Calabria", area: "Collina Valle del Crati", stationId: "ICOSEN12", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Aprigliano Guarno", mlg: true, lat: 39.24, lon: 16.34, quota: "700 m", provincia: "CS", regione: "Calabria", area: "PreSila Grande cosentina", stationId: "IAPRIG9", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  
+  { nome: "Campora San Giovanni", lat: 39.07, lon: 16.09, quota: "4 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "IAMANT5", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Catanzaro sud", lat: 38.90, lon: 16.59, quota: "280 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", stationId: "ICATAN51", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Crotone centro", lat: 39.08, lon: 17.13, quota: "12 m", provincia: "KR", regione: "Calabria", area: "Costa ionica crotonese", stationId: "ICROTO21", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Torano Castello - Scalo", lat: 39.46, lon: 16.24, quota: "89 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati", stationId: "IMONTA161", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+// ---------- SEGUONO ESEMPI DA COMPILARE ----------,
+  { nome: "Spez. Sila - Moccone", mlg: true, lat: 39.34, lon: 16.44, quota: "1300 m", provincia: "CS", regione: "Calabria", area: "Sila Grande", stationId: "ISPEZZ1", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-10" },
+  { nome: "Domanico - Potame", mlg: true, lat: 39.19, lon: 16.20, quota: "1000 m", provincia: "CS", regione: "Calabria", area: "Serre Cosentine", stationId: "IDOMAN19", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-11" },
+  { nome: "Feroleto Antico", mlg: true, lat: 38.96, lon: 16.37, quota: "225 m", provincia: "CZ", regione: "Calabria", area: "Piana Lametina", stationId: "IFEROL1", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-12" },
+  { nome: "Taverna", mlg: true, lat: 39.02, lon: 16.58, quota: "540 m", provincia: "CZ", regione: "Calabria", area: "Pre-Sila Piccola", stationId: "ITAVER2", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-13" },
+  { nome: "Soveria Mannelli", mlg: true, lat: 39.08, lon: 16.37, quota: "710 m", provincia: "CZ", regione: "Calabria", area: "Reventino interno", stationId: "ISOVER27", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-14" },
+  { nome: "Capo Bianco", mlg: true, lat: 38.91, lon: 17.11, quota: "12 m", provincia: "KR", regione: "Calabria", area: "Basso ionio crotonese", stationId: "IISOLA24", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-15" },
+  { nome: "Saracena", mlg: true, lat: 39.78, lon: 16.16, quota: "650 m", provincia: "CS", regione: "Calabria", area: "Area del Pollino", stationId: "ISARAC8", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-16" },
+  { nome: "Frascineto", mlg: true, lat: 39.83, lon: 16.26, quota: "500 m", provincia: "CS", regione: "Calabria", area: "Area del Pollino", stationId: "IFRASC28", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-17" },
+  { nome: "Catanzaro centrale", mlg: true, lat: 38.92, lon: 16.59, quota: "350 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", stationId: "ICATAN57", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-18" },
+  { nome: "Vibo V. - Olivarella", mlg: true, lat: 38.67, lon: 16.08, quota: "420 m", provincia: "VV", regione: "Calabria", area: "Monte Leone", stationId: "IVIBOV3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-19" },
+  { nome: "Catanzaro - Viale Crotone", mlg: true, lat: 38.84, lon: 16.65, quota: "32 m", provincia: "CZ", regione: "Calabria", area: "Ionio catanzarese", stationId: "ICATAN92", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-20" },
+  { nome: "Marina di Curinga", mlg: true, lat: 38.83, lon: 16.22, quota: "38 m", provincia: "CZ", regione: "Calabria", area: "Basso tirreno catanzarese", stationId: "IFRANC35", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-21" },
+  { nome: "Capo Vaticano - Frizza", mlg: true, lat: 38.63, lon: 15.83, quota: "100 m", provincia: "VV", regione: "Calabria", area: "Costa vibonese", stationId: "IRICADI98", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-22" },
+  { nome: "Reggio Calabria - Stadio", mlg: true, lat: 38.10, lon: 15.65, quota: "90 m", provincia: "RC", regione: "Calabria", area: "Area dello stretto", stationId: "IREGGI58", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-23" },
+  { nome: "San Lorenzo - Marina", mlg: true, lat: 37.92, lon: 15.80, quota: "5 m", provincia: "RC", regione: "Calabria", area: "Basso reggino", stationId: "IMELIT15", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-24" },
+  { nome: "Brancaleone Marina", mlg: true, lat: 37.96, lon: 16.10, quota: "28 m", provincia: "RC", regione: "Calabria", area: "Basso ionio reggino", stationId: "ICALABRI4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-25" },
+  { nome: "Sant'Ilario dello Ionio", mlg: true, lat: 38.21, lon: 16.19, quota: "32 m", provincia: "RC", regione: "Calabria", area: "Ionio reggino", stationId: "ISANTI149", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-26" },
+  { nome: "Siderno - Corso Garibaldi", mlg: true, lat: 38.26, lon: 16.29, quota: "70 m", provincia: "RC", regione: "Calabria", area: "Alto ionio reggino", stationId: "ISIDERNO2", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-27" },
+  { nome: "Molochio", mlg: true, lat: 38.31, lon: 16.03, quota: "120 m", provincia: "RC", regione: "Calabria", area: "Aspromonte occidentale", stationId: "IMOLOC3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-28" },
+  { nome: "Rende - Piano Monello", mlg: true, lat: 39.34, lon: 16.23, quota: "200 m", provincia: "CS", regione: "Calabria", area: "Valle del Crati", stationId: "IRENDE15", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-29" },
+  { nome: "Rende Nord", mlg: true, lat: 39.36, lon: 16.23, quota: "137 m", provincia: "CS", regione: "Calabria", area: "Media Valle del Crati", stationId: "IRENDE23", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-30" },
+  { nome: "Corigliano - Villaggio Frasso", mlg: true, lat: 39.64, lon: 16.48, quota: "80 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", stationId: "ICORIG10", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-31" },
+  { nome: "Cosenza Sud", mlg: true, lat: 39.29, lon: 16.23, quota: "310 m", provincia: "CS", regione: "Calabria", area: "Bassa Valle del Crati", stationId: "ICALABRI46", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-32" },
+  { nome: "Cosenza - Città 2000", mlg: true, lat: 40.15000, lon: 17.15000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP33", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-33" },
+  { nome: "Esempio Stazione 34", mlg: true, lat: 40.20000, lon: 17.20000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP34", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-34" },
+  { nome: "Esempio Stazione 35", mlg: true, lat: 40.25000, lon: 17.25000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP35", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-35" },
+  { nome: "Esempio Stazione 36", mlg: true, lat: 40.30000, lon: 17.30000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP36", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-36" },
+  { nome: "Esempio Stazione 37", mlg: true, lat: 40.35000, lon: 17.35000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP37", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-37" },
+  { nome: "Esempio Stazione 38", mlg: true, lat: 40.40000, lon: 17.40000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP38", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-38" },
+  { nome: "Esempio Stazione 39", mlg: true, lat: 40.45000, lon: 17.45000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP39", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-39" },
+  { nome: "Longobardi Marina", mlg: true, lat: 39.196082, lon: 16.064474, quota: "8 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "ILONGO4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Cosenza - Viale Parco", mlg: true, lat: 39.32, lon: 16.25, quota: "205 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN19", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Rende - Santa Chiara", mlg: true, lat: 39.34, lon: 16.26, quota: "182 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "IRENDE25", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "San Pietro in Guarano Est", mlg: true, lat: 39.34, lon: 16.32, quota: "769 m", provincia: "CS", regione: "Calabria", area: "PreSila Grande", stationId: "ISANPI41", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Casali del Manco - Verticelli", mlg: true, lat: 39.28, lon: 16.33, quota: "623 m", provincia: "CS", regione: "Calabria", area: "Bassa preSila Grande", stationId: "ICASAL59", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Catanzaro Santa Maria", mlg: true, lat: 38.87, lon: 16.60, quota: "27 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro orientale", stationId: "ICATAN48", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Luzzi - Cavoni", mlg: true, lat: 39.45, lon: 16.26, quota: "135 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati centro", stationId: "ILUZZI4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Capo Bonifati", mlg: true, lat: 39.55, lon: 15.87, quota: "17 m", provincia: "CS", regione: "Calabria", area: "Alto tirreno cosentino", stationId: "IBONIF3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Esempio Stazione 9", mlg: true, lat: 0, lon: 0, quota: "", provincia: "", regione: "", area: "", stationId: "ESEMPIO9", apiKey: "", webcam: "", linkStazione: "" },
+  { nome: "Esempio Stazione 10", mlg: true, lat: 0, lon: 0, quota: "", provincia: "", regione: "", area: "", stationId: "ESEMPIO10", apiKey: "", webcam: "", linkStazione: "" }
+];
+/******************** STAZIONI WU & LIVE *************************/
+const DEFAULT_WU_KEY = "e1f10a1e78da46f5b10a1e78da96f525";
+window.stazioni.forEach(s=>{ if(!s.apiKey) s.apiKey = DEFAULT_WU_KEY; });
+
+function nearestWU(lat,lon,maxKm=15){
+  let best=null,dMin=1e9;
+  window.stazioni.forEach(s=>{
+    if(!s.stationId) return;
+    const d=haversine(lat,lon,s.lat,s.lon);
+    if(d<dMin && d<=maxKm){ dMin=d; best={...s,distance:d}; }
+  });
+  return best;
+}
+
+async function wuObs(st){
+  if(!st || !st.stationId) throw new Error("Stazione non disponibile");
+  const url=`https://api.weather.com/v2/pws/observations/current?stationId=${st.stationId}&format=json&units=m&apiKey=${st.apiKey}`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("WU "+st.stationId+": "+r.status);
+  const j=await r.json();
+  const o=j.observations?.[0];
+  const m=o?.metric ?? {};
+  return {t:m.temp,ur:o.humidity,wind:m.windSpeed,rain:(m.precip_1hr||0)};
+}
+
+/******************** EXTRA PANELS (render) *********************/
+function iconFA(c){
+  const ICONS={
+    0:"fa-sun",1:"fa-cloud-sun",2:"fa-cloud",3:"fa-cloud",
+    45:"fa-smog",48:"fa-smog",
+    51:"fa-cloud-rain",53:"fa-cloud-rain",55:"fa-cloud-showers-heavy",
+    56:"fa-cloud-meatball",57:"fa-cloud-meatball",
+    61:"fa-cloud-showers-heavy",63:"fa-cloud-showers-heavy",65:"fa-cloud-showers-heavy",
+    66:"fa-snowflake",67:"fa-snowflake",
+    71:"fa-snowflake",73:"fa-snowflake",75:"fa-snowflake",77:"fa-snowflake",
+    80:"fa-cloud-showers-heavy",81:"fa-cloud-showers-heavy",82:"fa-cloud-showers-heavy",
+    85:"fa-snowflake",86:"fa-snowflake",
+    95:"fa-bolt",96:"fa-bolt",99:"fa-bolt"
+  };
+  return ICONS[c]||"fa-question";
+}
+
+function renderStation(live,name,dist){
+  const distTxt = dist<0.05 ? "dalla stazione locale"
+                : dist<10 ? `dalla stazione ${name} a ${dist.toFixed(1)} km`
+                : `dalla stazione ${name} (${dist.toFixed(0)} km)`;
+  return `
+    <div class="panel">
+      <div class="station-header">
+        <h2>Dati Live</h2>
+        <span style="font-size:.85rem;color:var(--text-dim)">${distTxt}</span>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><span class="main-temp">${fmt(live.t,"°")}</span></div>
+        <div class="metric"><i class="fa-solid fa-droplet"></i> ${fmt(live.ur,"%")}</div>
+        <div class="metric"><i class="fa-solid fa-wind"></i> ${fmt(live.wind," km/h")}</div>
+        <div class="metric"><i class="fa-solid fa-cloud-rain"></i> ${fmt(live.rain," mm",1)}</div>
+      </div>
+    </div>`;
+}
+
+function renderHourly(data,idx){
+  const rows=[];
+  for(let i=idx;i<idx+24&&i<data.hourly.time.length;i++){
+    // adjust forecast using LIVE data (temperature & humidity offsets)
+    const tempOffset = (LIVE && !isNaN(LIVE.t)) ? (LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+    const urOffset = (LIVE && !isNaN(LIVE.ur)) ? (LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+    
+    const isNightTime = data.hourly.is_day && data.hourly.is_day[i]===0;
+    
+    rows.push(
+      `<tr>
+        <td>${data.hourly.time[i].slice(11,16)}</td>
+        <td>${wmo(data.hourly.weathercode[i], isNightTime)}</td>
+        <td>${wmoDesc(data.hourly.weathercode[i])}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"t",data.hourly.temperature_2m[i]+tempOffset),"°")}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"ur",data.hourly.relativehumidity_2m[i]+urOffset),"%")}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"mm",data.hourly.precipitation[i])," mm",1)}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"prob",data.hourly.precipitation_probability[i]),"%")}</td>
+        <td>${fmt(data.hourly.wind_speed_10m[i]," km/h")}</td>
+      </tr>`
+    );
+  }
+  return `
+    <div class="card">
+      <h3>Prossime 24 h</h3>
+      <div style="overflow-x:auto">
+        <table class="hourly">
+          <thead>
+            <tr><th>Ora</th><th></th><th>Cond.</th><th>T°</th><th>UR</th><th>Pioggia</th><th>Prob%</th><th>Vento</th></tr>
+          </thead>
+          <tbody>${rows.join("")}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDaily(data){
+  let h='<div class="card"><h3>7 Giorni</h3><div class="days">';
+  for(let i=0;i<data.daily.time.length;i++){
+    h += `
+      <div class="day">
+        <div>${data.daily.time[i].slice(5)}</div>
+        <i class="fa-solid ${iconFA(data.daily.weathercode[i])}"></i>
+        <div>${fmt(data.daily.temperature_2m_max[i],"°")}</div>
+        <div class="min">${fmt(data.daily.temperature_2m_min[i],"°")}</div>
+      </div>`;
+  }
+  return h+'</div></div>';
+}
+
+function renderAdvice(live,data,idx){
+  let wet = live.rain>0.1;
+  for(let i=idx;i<idx+6&&i<data.hourly.time.length;i++){
+    if(data.hourly.precipitation_probability[i]>40||data.hourly.precipitation[i]>0.2) wet=true;
+  }
+  return `<div class="panel advice ${wet?"no":"ok"}">${wet?"🚫 Meglio rimandare":"👍 Bucato OK"}</div>`;
+}
+
+const sEl=$('#nearestStation'),hEl=$('#hourlyPanel'),dEl=$('#dailyPanel'),aEl=$('#adviceBox');
+
+/******************** GEOCODE & FORECAST DETTAGLIATO PER RICERCA ***************/
+async function geocode(q){
+  const url=`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=it&format=json`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Errore geocoding");
+  const j=await r.json();
+  if(!j.results?.length) throw new Error("Località non trovata");
+  return j.results[0];
+}
+
+async function forecastDetailed(lat,lon){
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&current_weather=true&hourly=weathercode,temperature_2m,relativehumidity_2m,precipitation,precipitation_probability,wind_speed_10m,is_day&daily=temperature_2m_max,temperature_2m_min,weathercode`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Errore meteo");
+  return r.json();
+}
+
+async function run(q){
+  try{
+    sEl.innerHTML=hEl.innerHTML=dEl.innerHTML=aEl.innerHTML="⏳";
+    const g = await geocode(q);
+    const lat=g.latitude, lon=g.longitude;
+    const fc = await forecastDetailed(lat,lon);
+    /* nearest station */
+    const st=nearestWU(lat,lon) || {nome:g.name,distance:Infinity};
+    LIVE={ t: fc.current_weather.temperature,
+               ur: fc.hourly.relativehumidity_2m[0],
+               wind: fc.current_weather.windspeed,
+               rain: fc.hourly.precipitation[0] };
+let live=LIVE;
+
+    try{
+      const obs = await wuObs(st);
+      live = obs;
+    }catch(e){ console.warn(e); }
+    sEl.innerHTML=renderStation(live,st.nome||g.name,st.distance||0);
+    const now=Date.now();
+    let idx=fc.hourly.time.findIndex(t=>Date.parse(t)>now);
+    if(idx<0) idx=fc.hourly.time.length-1;
+    hEl.innerHTML=renderHourly(fc,idx);
+    dEl.innerHTML=renderDaily(fc);
+    aEl.innerHTML=renderAdvice(live,fc,idx);
+    $('#radarFrame').src=`https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=450&zoom=6&level=surface&overlay=radar&product=ecmwf`;
+  }catch(e){
+    console.error(e);
+    alert(e.message || e);
+  }
+}
+
+/******************** THEME & ADMIN PANEL *************************/
+function toggleTheme(){
+  night = !night;
+  document.body.classList.toggle('night', night);
+  $('#themeBtn').textContent = night ? '☀️' : '🌙';
+  render();
+}
+
+$('#themeBtn').addEventListener('click',toggleTheme);
+
+const admin = $('#adminPanel');
+$('#fab').addEventListener('click', ()=>{
+  $('#stationsCount').textContent = `Stazioni caricate: ${window.stazioni.length}`;
+  admin.classList.add('open');
+});
+$('#closeAdmin').addEventListener('click', ()=>admin.classList.remove('open'));
+$('#reloadBtn').addEventListener('click', ()=>{
+  admin.classList.remove('open');
+  loadCalabria();
+});
+
+/******************** INIT *************************/
+document.getElementById('searchForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  run($('#cityInput').value.trim());
+});
+
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(p=>{
+    run(`${p.coords.latitude},${p.coords.longitude}`);
+  });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadCalabria();
+});
+
+
+/******************** ADMIN PANEL (marker edit) *********************/
+const ADMIN = {
+  open(){
+    document.body.classList.add('modal-open');
+    document.getElementById('markerJson').value = JSON.stringify(PROVINCES,null,2);
+    document.getElementById('adminOverlay').classList.remove('hidden');
+  },
+  save(){
+    try{
+      const data = JSON.parse(document.getElementById('markerJson').value);
+      if(Array.isArray(data)){
+        PROVINCES = data;
+        localStorage.setItem('calabriaMarkers',JSON.stringify(PROVINCES));
+        rebuildDays && rebuildDays();
+        ADMIN.close();
+      }
+    }catch(e){ alert('JSON non valido'); }
+  },
+  close(){
+    document.body.classList.remove('modal-open');
+    document.getElementById('adminOverlay').classList.add('hidden');
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('fab').addEventListener('click',ADMIN.open);
+  document.getElementById('closeAdmin').addEventListener('click',ADMIN.close);
+  document.getElementById('saveMarkers').addEventListener('click',ADMIN.save);
+});
+
+/******************** OVERRIDE PREVISIONI 24H *******************/
+let HOURLY_OVERRIDE = JSON.parse(localStorage.getItem("override24h")||"{}");
+function openOverride(){
+  $('#overridePanel').style.display="flex";
+  $('#overrideJSON').value = JSON.stringify(HOURLY_OVERRIDE,null,2);
+}
+function closeOverride(){ $('#overridePanel').style.display="none"; }
+$('#btnSaveOverride').onclick = ()=>{
+  try{
+    HOURLY_OVERRIDE = JSON.parse($('#overrideJSON').value||"{}");
+    localStorage.setItem("override24h", JSON.stringify(HOURLY_OVERRIDE));
+    alert("Override salvato! Aggiorna la pagina.");
+    closeOverride();
+  }catch(e){ alert("JSON non valido: "+e.message); }
+};
+$('#btnCancelOverride').onclick = closeOverride;
+
+// Merge override into forecast row builder
+function applyOverride(hh, field, original){
+  const o = HOURLY_OVERRIDE[hh];
+  if(!o || o[field] === undefined) return original;
+  return o[field];
+}
+
+
+document.getElementById('fab').addEventListener('contextmenu',e=>{
+  e.preventDefault(); openOverride();
+});
+
+</script>
+
+<!-- Admin overlay -->
+<div id="adminOverlay" class="modal hidden">
+  <div class="box">
+    <h2>Modifica marker</h2>
+    <textarea id="markerJson"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem">
+      <button id="saveMarkers">Salva</button>
+      <button id="closeAdmin">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* === Map Control Panel integrato === */
+(function(){
+  const panel=document.getElementById('panel');
+  if(!panel) return;
+
+  /* ——— Elementi DOM ——— */
+  
+        const btnAddMarker=$('#btnAddMarker'), iconList=$('#iconList');
+
+        /* —— Icon picker ——— */
+        const iconSet=['☀️','🌙','🌤️','⛅️','🌦️','🌧️','🌨️','⛈️','❓','💨','🌊','⬇️','⬆️','➡️','⬅️','↗️','↘️','↙️','↖️','〰️'];
+        const iconPicker=document.getElementById('iconPicker');
+        function buildIconPicker(selected){
+          if(!iconPicker) return;
+          iconPicker.innerHTML='';
+          iconSet.forEach(ic=>{
+            const b=document.createElement('button');
+            b.type='button';
+            b.textContent=ic;
+            if(ic===selected) b.classList.add('active');
+            b.addEventListener('click',()=>{ inpIcon.value=ic; buildIconPicker(ic); });
+            iconPicker.appendChild(b);
+          });
+        }
+
+
+        /* ——— Add new marker ——— */
+        btnAddMarker && btnAddMarker.addEventListener('click', async ()=>{
+          const query = prompt('Inserisci la località (es: "Cosenza, Italia")','');
+          if(!query) return;
+          toast('Ricerca coordinate…');
+          let lat,lon,display;
+          try{
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`);
+            const arr = await res.json();
+            if(!arr.length){ toast('Località non trovata'); return; }
+            lat = parseFloat(arr[0].lat);
+            lon = parseFloat(arr[0].lon);
+            display = arr[0].display_name.split(',')[0];
+          }catch(e){
+            console.error(e); toast('Errore geocoding'); return;
+          }
+          const {x,y}=latLonToXY(lat,lon);
+          try{
+            const data = await forecast(lat,lon);
+            const dayCount=data.daily.time.length;
+            for(let d=0;d<dayCount;d++){
+              const pt={city:display||query,
+                        x,y,lat,lon,
+                        icon:wmo(data.daily.weathercode[d]),
+                        tmax:Math.round(data.daily.temperature_2m_max[d]),
+                        tmin:Math.round(data.daily.temperature_2m_min[d])};
+              DAYS[d].points.push(pt);
+            }
+            buildSelectors();
+            updateIconList();
+            render();
+            toast('Marker aggiunto e previsioni aggiornate');
+          }catch(e){
+            console.error(e);
+            toast('Errore nel recuperare dati meteo');
+          }
+        });
+
+        /* ——— Icon list ——— */
+        function updateIconList(){
+          if(!iconList) return;
+          iconList.innerHTML='';
+          DAYS[curDay].points.forEach((p,i)=>{
+            const btn=document.createElement('button');
+            btn.type='button';
+            btn.textContent=p.icon;
+            btn.title=p.city;
+            if(i===editIdx) btn.classList.add('active');
+            btn.addEventListener('click',()=>{
+              editIdx=i; panel.classList.add('open'); editMarker.call({dataset:{idx:i}}, new Event('click'));
+              updateIconList();
+            });
+            iconList.appendChild(btn);
+          });
+        }
+        /* aggiorna lista quando si cambia giorno o rende */
+        const oldRender=window.render;
+        window.render=function(){ oldRender(); updateIconList(); }
+const selDay=$('#selDay'), inpDayName=$('#inpDayName'), inpIcon=$('#inpIcon'),
+        selCity=$('#selCity'), inpTmax=$('#inpTmax'), inpTmin=$('#inpTmin'),
+        inpMarkerSize=$('#inpMarkerSize'), toastEl=$('#toast'),
+        btnSaveMarker=$('#btnSaveMarker'), btnDeleteMarker=$('#btnDeleteMarker'),
+        btnSaveLayout=$('#btnSaveLayout'), btnReset=$('#btnReset'),
+        btnSaveForecast=$('#btnSaveForecast');
+
+  /* Clono il FAB per eliminare vecchi listener */
+  const oldFab=$('#fab');
+  const fab=oldFab.cloneNode(true);
+  oldFab.parentNode.replaceChild(fab,oldFab);
+
+  let adminMode=false, editIdx=null;
+
+  /* ——— Helper toast ——— */
+  function toast(msg){
+    toastEl.textContent=msg;
+    toastEl.style.display='block';
+    clearTimeout(toastEl._t);
+    toastEl._t=setTimeout(()=>toastEl.style.display='none',2100);
+  }
+
+  /* ——— Toggle adminMode con click sul FAB ——— */
+  fab.addEventListener('click',e=>{
+    e.preventDefault(); e.stopImmediatePropagation();
+    adminMode=!adminMode;
+    fab.textContent=adminMode?'🔒':'⚙️';
+    toast(adminMode?'Modalità admin attiva':'Admin disattivata');
+    render();            // ricollega drag/click ai marker
+  });
+
+  /* ——— Costruisci combo giorno/città ——— */
+  function buildSelectors(){
+    selDay.innerHTML=''; DAYS.forEach((d,i)=>selDay.add(new Option(d.label,i)));
+    selCity.innerHTML=''; (window.CITIES||[]).forEach(c=>selCity.add(new Option(c.city||c,c.city||c)));
+  }
+  buildSelectors();
+
+  /* ——— Estendo render() per gesti admin ——— */
+  const _render=window.render;
+  window.render=function(){
+    _render && _render();
+    if(!adminMode) return;
+
+    const mapArea=$('#mapArea');
+    mapArea.querySelectorAll('.marker').forEach((mk,i)=>{
+      mk.dataset.idx=i;
+      mk.style.cursor='grab';
+      mk.removeEventListener('click',editMarker);
+      mk.addEventListener('click',editMarker);
+      mk.removeEventListener('pointerdown',dragStart);
+      mk.addEventListener('pointerdown',dragStart);
+    });
+  };
+
+  /* ——— Drag marker ——— */
+  function dragStart(ev){
+    const mk=this; const idx=+this.dataset.idx;
+    const rect=mk.parentElement.getBoundingClientRect();
+    mk.setPointerCapture(ev.pointerId);
+    const move=e=>{
+      const x=((e.clientX-rect.left)/rect.width)*100;
+      const y=((e.clientY-rect.top)/rect.height)*100;
+      mk.style.left=Math.min(Math.max(0,x),100)+'%';
+      mk.style.top=Math.min(Math.max(0,y),100)+'%';
+    };
+    const up=e=>{
+      mk.releasePointerCapture(e.pointerId);
+      DAYS[curDay].points[idx].x=parseFloat(mk.style.left);
+      DAYS[curDay].points[idx].y=parseFloat(mk.style.top);
+      mk.removeEventListener('pointermove',move);
+      mk.removeEventListener('pointerup',up);
+    };
+    mk.addEventListener('pointermove',move);
+    mk.addEventListener('pointerup',up);
+  }
+
+  /* ——— Click marker → apre pannello ——— */
+  function editMarker(e){
+    editIdx=+this.dataset.idx;
+    const pt=DAYS[curDay].points[editIdx];
+    selDay.value=curDay;
+    inpDayName.value=DAYS[curDay].label;
+    inpIcon.value=pt.icon;
+    buildIconPicker(pt.icon);
+    selCity.value=pt.city||'';
+    inpTmax.value=pt.tmax||'';
+    inpTmin.value=pt.tmin||'';
+    panel.classList.add('open');
+    e.stopPropagation();
+  }
+
+  /* —— Chiudi pannello cliccando fuori —— */
+  $('#widget').addEventListener('click',()=>panel.classList.remove('open'));
+  panel.addEventListener('click',e=>e.stopPropagation());
+
+  /* —— Salva marker —— */
+  btnSaveMarker.addEventListener('click',()=>{
+    if(editIdx===null) return toast('Nessun marker selezionato');
+    const pt=DAYS[curDay].points[editIdx];
+    pt.icon=inpIcon.value.trim()||pt.icon;
+    pt.code = undefined;
+    pt.city=selCity.value;
+    pt.tmax=parseFloat(inpTmax.value)||pt.tmax;
+    pt.tmin=parseFloat(inpTmin.value)||pt.tmin;
+    panel.classList.remove('open'); editIdx=null; render();
+  });
+
+  /* —— Elimina marker —— */
+  btnDeleteMarker.addEventListener('click',()=>{
+    if(editIdx===null) return toast('Nessun marker selezionato');
+    DAYS[curDay].points.splice(editIdx,1);
+    panel.classList.remove('open'); editIdx=null; render();
+  });
+
+  /* —— Slider dimensione marker —— */
+  inpMarkerSize.addEventListener('input',e=>{
+    document.documentElement.style.setProperty('--marker-size',e.target.value+'px');
+  });
+
+  /* —— Salva layout —— */
+  btnSaveLayout.addEventListener('click',()=>{
+    localStorage.setItem('CALABRIA_MAP_LAYOUT_V1',JSON.stringify(DAYS));
+    toast('Layout salvato');
+  });
+  btnReset.addEventListener('click',()=>{localStorage.removeItem('CALABRIA_MAP_LAYOUT_V1'); location.reload();});
+
+  /* —— Salva dati tabella —— */
+  btnSaveForecast.addEventListener('click',()=>{
+    const city=selCity.value;
+    DAYS[curDay].points.forEach(p=>{
+      if(p.city===city){
+        p.tmax=parseFloat(inpTmax.value)||p.tmax;
+        p.tmin=parseFloat(inpTmin.value)||p.tmin;
+      }
+    });
+    panel.classList.remove('open'); render();
+  });
+
+  /* —— Sincronizza nome giono —— */
+  inpDayName.addEventListener('change',()=>{
+    DAYS[curDay].label=inpDayName.value.trim()||DAYS[curDay].label;
+    if(typeof buildNav==='function') buildNav();
+  });
+
+  /* —— Carica layout salvato —— */
+  try{
+    const mem=localStorage.getItem('CALABRIA_MAP_LAYOUT_V1');
+    if(mem){
+      const saved=JSON.parse(mem);
+      if(Array.isArray(saved) && saved.length===DAYS.length){
+        DAYS.splice(0,DAYS.length,...saved);
+      }
+    }
+  }catch(e){}
+
+})();
+</script>
+
+<!-- Hidden override editor -->
+<div id="overridePanel" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:var(--bg);padding:18px;border-radius:var(--radius);max-width:90%;width:480px;max-height:90vh;overflow:auto;color:var(--text)">
+    <h2>Modifica previsione 24 h</h2>
+    <p>Inserisci un blocco JSON con <code>{ora:"HH:MM", t:°, ur:%, mm:precip, prob:%}</code>. Solo i campi presenti sovrascrivono il valore.</p>
+    <textarea id="overrideJSON" style="width:100%;height:200px;"></textarea>
+    <div style="display:flex;gap:12px;margin-top:14px;justify-content:flex-end">
+      <button id="btnCancelOverride">Annulla</button>
+      <button id="btnSaveOverride">Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- Patch v7.1 --- real-time bias + regional override --- */
+// === Real‑time bias function ===
+const originalRenderHourly = window.renderHourly;
+window.renderHourly = function(data, idx){
+    if(typeof LIVE === "object" && LIVE){
+        const tempBias = (!isNaN(LIVE.t) && !isNaN(data.hourly.temperature_2m[idx])) ? (LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+        const rhBias   = (!isNaN(LIVE.ur) && !isNaN(data.hourly.relativehumidity_2m[idx])) ? (LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+        for(let i=idx; i<Math.min(idx+24, data.hourly.time.length); i++){
+            data.hourly.temperature_2m[i] += tempBias;
+            data.hourly.relativehumidity_2m[i] += rhBias;
+            if(LIVE.rain > 0.1 && i-idx < 3) data.hourly.weathercode[i] = 61; // override first 3h as 'rain'
+        }
+    }
+    return originalRenderHourly.call(this, data, idx);
+};
+
+// === Daily regional override ===
+let DAILY_OVERRIDE = JSON.parse(localStorage.getItem("dailyOverride")||"{}");
+
+function saveDailyOverride(dateKey, city, obj){
+    if(!DAILY_OVERRIDE[dateKey]) DAILY_OVERRIDE[dateKey] = {};
+    DAILY_OVERRIDE[dateKey][city] = { ...(DAILY_OVERRIDE[dateKey][city]||{}), ...obj };
+    localStorage.setItem("dailyOverride", JSON.stringify(DAILY_OVERRIDE));
+}
+
+function applyDailyOverride(dateKey, city, field, original){
+    const o = DAILY_OVERRIDE?.[dateKey]?.[city];
+    return (o && o[field] !== undefined) ? o[field] : original;
+}
+
+// Patch loadCalabria to inject overrides
+const originalLoadCalabria = window.loadCalabria;
+window.loadCalabria = async function() {
+    await originalLoadCalabria();
+    DAYS.forEach(dayObj => {
+        const baseDate = new Date(); baseDate.setHours(0,0,0,0);
+        baseDate.setDate(baseDate.getDate() + dayObj.offset);
+        const keyStr = baseDate.toISOString().slice(0,10);
+        dayObj.points.forEach(pt => {
+            pt.tmax = applyDailyOverride(keyStr, pt.city, "tmax", pt.tmax);
+            pt.tmin = applyDailyOverride(keyStr, pt.city, "tmin", pt.tmin);
+            const newCode = applyDailyOverride(keyStr, pt.city, "code", pt.code);
+            if(newCode !== pt.code) {
+                pt.code = newCode;
+                pt.icon = wmo(newCode);
+            }
+            pt.icon = applyDailyOverride(keyStr, pt.city, "icon", pt.icon);
+        });
+    });
+    render();
+};
+
+// Extend existing 'Salva previsione' button to persist override
+if(typeof btnSaveForecast !== "undefined" && btnSaveForecast){
+    btnSaveForecast.addEventListener("click", () => {
+        const city = selCity.value;
+        const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + curDay);
+        const key = d.toISOString().slice(0,10);
+        const obj = {
+            tmax: inpTmax.value ? parseFloat(inpTmax.value) : undefined,
+            tmin: inpTmin.value ? parseFloat(inpTmin.value) : undefined
+        };
+        saveDailyOverride(key, city, obj);
+    });
+}
+</script>
+</body>
+</html>
