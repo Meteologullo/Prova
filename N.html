@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Meteo Calabria – Dashboard Unificata</title>
+
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+
+  <style>
+  /* —— Palette & Theme ——————————————— */
+  :root{
+    --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+    --glass:rgba(255,255,255,.14);
+    --blur:14px;
+    --radius:18px;
+    --accent:#00d2ff;
+    --accent2:#3a7bd5;
+    --text:#ecf1f8;
+    --marker-size:clamp(22px,5vw,48px);
+    --text-dim:#c5d0e6;
+
+    /* Widget */
+    --clr-sky:#4fd1ff;
+    --clr-sky-2:#0ea5e9;
+    --clr-night:#06214b;
+    --clr-night-2:#010c1e;
+    --clr-accent:#facc15;
+    --clr-accent-night:#ffe680;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    min-height:100vh;background:var(--bg);font-family:"Inter",sans-serif;color:var(--text);
+    display:flex;flex-direction:column;align-items:center;padding:20px 12px;
+  }
+  /* —— Search bar ——————————————— */
+  .search{display:flex;gap:.5rem;width:100%;max-width:820px;margin-bottom:20px}
+  .search input{flex:1;padding:.9rem 1.1rem;border:none;border-radius:var(--radius);background:var(--glass);backdrop-filter:blur(var(--blur));color:var(--text);font-size:1rem;outline:none;}
+  .search button{padding:.9rem 1.2rem;border:none;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:700;font-size:1rem;cursor:pointer;}
+  /* —— Main widget (map + tabelle) ——— */
+  #widget{width:100%;max-width:820px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto 1fr auto;grid-template-areas:"header header""map forecast""bottom bottom";background:radial-gradient(circle at 50% 15%,var(--clr-sky) 0%,var(--clr-sky-2) 100%);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden;position:relative;isolation:isolate;transition:background .4s;}
+  body.night #widget{background:radial-gradient(circle at 50% 15%,var(--clr-night) 0%,var(--clr-night-2) 100%);}  
+  @media(max-width:600px){#widget{grid-template-columns:1fr;grid-template-areas:"header""map""forecast""bottom";}}
+  header{grid-area:header;padding:18px 14px;text-shadow:0 2px 6px rgba(0,0,0,.5);font-family:'Baloo 2',cursive;}
+  header h1{font-size:clamp(26px,6vw,38px);font-weight:800;line-height:1.1;}
+  header p{font-size:clamp(14px,3vw,18px);margin-top:2px;font-weight:600;opacity:.9;}
+  body.night header *{filter:brightness(.88);}  
+  /* —— Map —— */
+  #mapArea{grid-area:map;position:relative;margin:0 14px 88px 14px;border-radius:6px;aspect-ratio:3/4;}
+  @media(max-width:600px){#mapArea{margin:0 14px 20px 14px;}}
+  #mapArea::before{content:"";position:absolute;inset:0;background:rgba(255,255,255,.08);border-radius:inherit;}
+  #map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:.3;filter:drop-shadow(0 0 2px rgba(0,0,0,.5));}
+  .marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-size:var(--marker-size);user-select:none;cursor:default;text-shadow:0 1px 3px rgba(0,0,0,.45);}  
+  /* —— Forecast table —— */
+  #forecast{grid-area:forecast;margin:20px 14px 0 0;border-collapse:collapse;border-radius:10px;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);font-size:13px;min-width:160px;max-width:100%;box-shadow:0 4px 12px rgba(0,0,0,.25);overflow:hidden;z-index:2;transition:background .35s;}
+  body.night #forecast{background:rgba(255,255,255,.10);}  
+  #forecast th,#forecast td{padding:4px 10px;}
+  #forecast th{background:rgba(255,255,255,.25);font-weight:700;font-family:'Baloo 2',cursive;transition:background .35s;}
+  body.night #forecast th{background:rgba(255,255,255,.18);}  
+  #forecast tr:nth-child(even) td{background:rgba(255,255,255,.05);}  
+  #forecast tr:hover td{background:rgba(255,255,255,.08);}  
+  #forecast th:first-child::before{content:"🌡️ ";}
+  #forecast td:nth-child(2),#forecast td:nth-child(3){font-weight:800;font-size:18px;}
+  /* —— Bottom nav —— */
+  #bottomBar{grid-area:bottom;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 14px;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);box-shadow:0 -4px 12px rgba(0,0,0,.25);border-top-left-radius:12px;border-top-right-radius:12px;z-index:3;transition:background .35s;}
+  body.night #bottomBar{background:rgba(255,255,255,.10);}  
+  #nav{flex:1;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;overflow-x:auto;padding:2px 0;}
+  #nav button{background:transparent;border:none;font-size:14px;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .2s,color .2s;color:#fff;white-space:nowrap;}
+  #nav button:hover{background:rgba(255,255,255,.25);}body.night #nav button:hover{background:rgba(255,255,255,.18);}#nav button.active{background:var(--clr-accent);color:#000;}body.night #nav button.active{background:var(--clr-accent-night);color:#000;}
+  .fab-btn{width:52px;height:52px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.35);transition:transform .2s,background .35s;flex-shrink:0;font-size:26px;}
+  .fab-btn:hover{transform:scale(1.08);}#fab{background:var(--clr-accent);color:#000;}body.night #fab{background:var(--clr-accent-night);}#themeBtn{background:#ffffff26;color:#fff;}body.night #themeBtn{background:#ffffff33;}
+  /* —— Extra panels —— */
+  .panel,.card{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.1rem 1.4rem;margin-bottom:1.1rem;width:100%;max-width:820px;}
+  .station-header{display:flex;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem}
+  .metric-row{display:flex;flex-wrap:wrap;gap:1rem}
+  .metric{display:flex;align-items:center;gap:.4rem;font-size:.95rem}
+  .metric i{font-size:1.1rem}
+  .main-temp{font-size:2.4rem;font-weight:600;margin-right:.3rem}
+  table.hourly{width:100%;border-collapse:collapse;font-size:.85rem}
+  table.hourly th,table.hourly td{padding:.45rem .2rem;text-align:center}
+  table.hourly th{color:var(--text);font-weight:600}
+  table.hourly tr:nth-child(even){background:rgba(255,255,255,.05)}
+  .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:.6rem}
+  .day{background:rgba(255,255,255,.08);border-radius:var(--radius);padding:.55rem .25rem;text-align:center}
+  .day i{font-size:1.3rem;margin-bottom:.2rem}
+  .day .min{color:var(--text-dim);font-size:.8rem}
+  .radar{width:100%;border:none;border-radius:var(--radius);overflow:hidden;height:450px;max-width:820px;}
+  .advice{display:flex;align-items:center;gap:.7rem;font-size:1.05rem;font-weight:600}
+  .advice.ok{color:#1dd05d}.advice.no{color:#ff6565}
+  /* —— Admin modal —— */
+  #adminPanel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:999;visibility:hidden;opacity:0;transition:opacity .25s; }
+  #adminPanel.open{visibility:visible;opacity:1;}
+  #adminPanel .modal{background:rgba(0,0,0,.85);border-radius:var(--radius);padding:1.4rem;max-width:400px;width:90%;color:var(--text);}
+  #adminPanel button{background:var(--clr-accent);border:none;border-radius:8px;font-weight:600;padding:.6rem 1rem;cursor:pointer;margin-top:1rem;}
+  footer{font-size:.8rem;color:var(--text-dim);text-align:center;margin-top:1.4rem;max-width:820px}
+  a{color:var(--accent)}
+  @media(max-width:380px){.main-temp{font-size:2rem}table.hourly{font-size:.75rem}}
+  
+
+body.modal-open{overflow:hidden}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;backdrop-filter:blur(4px);z-index:99;}
+.modal.hidden{display:none}
+.modal .box{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.4rem;max-width:500px;width:90%;color:var(--text);}
+.modal textarea{width:100%;height:250px;background:rgba(255,255,255,.1);border:none;color:var(--text);border-radius:var(--radius);padding:.6rem;font-family:monospace;}
+.modal button{border:none;cursor:pointer;border-radius:var(--radius);padding:.5rem 1rem;font-weight:700;}
+
+
+/* === Map Control Panel (imported) === */
+#panel{
+  position:absolute;left:0;right:0;bottom:0;z-index:20;
+  background:rgba(255,255,255,.95);color:#004070;
+  padding:22px 22px 30px;border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(110%);transition:transform .35s ease;
+  box-shadow:0 -6px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);
+  overflow-y:auto;max-height:85vh;font-family:'Inter',sans-serif;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:0 auto 12px;}
+#panel h3{margin:12px 0 6px;font-size:18px;font-weight:800;font-family:'Baloo 2',cursive;}
+#panel label{display:block;margin-top:12px;font-size:14px;}
+#panel input,#panel select{
+  width:100%;padding:8px 10px;font-size:15px;border:1px solid #c0c0c0;border-radius:6px;
+}
+#panel .row{display:flex;gap:10px;flex-wrap:wrap;}
+#panel button{
+  width:100%;padding:11px;font-size:16px;border:none;border-radius:8px;font-weight:700;
+  cursor:pointer;transition:filter .15s;
+}
+#panel button:hover{filter:brightness(1.08);}
+#btnSaveMarker{background:#facc15;}
+#btnDeleteMarker{background:#ff6666;color:#fff;}
+#btnSaveLayout{background:#10b981;color:#fff;}
+#btnReset{background:#ef4444;color:#fff;}
+#btnSaveForecast{background:#facc15;}
+#toast{
+  position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:8px;font-size:15px;
+  box-shadow:0 4px 10px rgba(0,0,0,.45);display:none;z-index:25;
+}
+
+.icon-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.icon-list button{border:none;background:#e5e5e5;border-radius:6px;padding:4px 8px;font-size:22px;cursor:pointer;line-height:1}
+.icon-list button.active{outline:2px solid var(--accent);background:#fff}
+
+
+  /* —— Icon picker ——— */
+  .icon-picker{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+  .icon-picker button{font-size:24px;padding:4px 6px;background:none;border:1px solid #555;border-radius:6px;cursor:pointer;}
+  .icon-picker button.active{outline:2px solid var(--accent);}
+
+
+  /* ——— Panel tidy overrides ——— */
+  #panel{display:flex;flex-direction:column;gap:14px;}
+  #panel .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  #panel h3{flex:0 0 auto;}
+
+  
+/* === Enhanced Weather Icon Styles === */
+@keyframes floatIcon {
+  0%   { transform: translate(-50%, -50%) translateY(0); }
+  50%  { transform: translate(-50%, -50%) translateY(-6px); }
+  100% { transform: translate(-50%, -50%) translateY(0); }
+}
+@keyframes pulseIcon {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.2); }
+}
+
+/* Map markers */
+.marker i{
+  font-size:46px;
+  animation:floatIcon 4s ease-in-out infinite;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.45));
+}
+/* Forecast panels */
+.day i,
+.hourly i{
+  font-size:30px;
+  animation:pulseIcon 6s ease-in-out infinite;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
+  transition:transform .25s;
+}
+.day:hover i,
+.hourly:hover i{
+  transform:scale(1.15) rotate(4deg);
+}
+
+/* Color palette per icon */
+.fa-sun{color:#facc15;}
+.fa-cloud-sun{color:#ffbe6f;}
+.fa-cloud{color:#a3bffa;}
+.fa-cloud-rain,
+.fa-cloud-showers-heavy{color:#4DB7FF;}
+.fa-cloud-meatball{color:#39c9e8;}
+.fa-smog{color:#9ca3af;}
+.fa-snowflake{color:#8ecae6;}
+.fa-bolt{color:#ffd43b;}
+
+
+  /* —— Forecast table refreshed ———————————— */
+  #forecast{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+  }
+  #forecast th,#forecast td{
+    padding:.55rem .4rem;
+    text-align:center;
+  }
+  #forecast th{
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    font-weight:600;
+  }
+  #forecast tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+
+  /* Bottom navigation bar polished */
+  #bottomBar{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-bottom-left-radius:var(--radius);
+    border-bottom-right-radius:var(--radius);
+  }
+
+  /* Hourly & Daily cards harmonised */
+  table.hourly th{
+    background:rgba(255,255,255,.09);
+  }
+  table.hourly tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+  .day{
+    background:rgba(255,255,255,.08);
+  }
+
+  @media(max-width:600px){
+    #forecast{margin:14px 0;}
+  }
+
+
+@media(max-width:600px){
+  #forecast{display:none;}
+  #bottomBar{
+    background:transparent;
+    backdrop-filter:none;
+    padding:4px 4px 0;
+  }
+  #nav{
+    gap:6px;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    justify-content:flex-start;
+  }
+  #nav button{
+    padding:4px 8px;
+    font-size:.8rem;
+  }
+  #bottomBar::-webkit-scrollbar,
+  #nav::-webkit-scrollbar{display:none;}
+  #nearestStation{margin-top:14px;}
+}
+
+
+table.hourly td:nth-child(3), table.hourly th:nth-child(3){
+  text-align:left;
+  padding-left:4px;
+}
+
+
+@media(max-width:600px){
+  #mapArea{
+    height:55vh;
+  }
+  #map{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+  }
+}
+
+</style>
+
+<style>
+/* === Mobile & Map Visual Tweaks (added) === */
+#widget{
+  background:var(--glass);
+  backdrop-filter:blur(var(--blur));
+}
+body.night #widget{
+  background:rgba(255,255,255,.08);
+}
+#mapArea::before{
+  background:rgba(255,255,255,.06);
+}
+/* Remove blue tint under map image */
+#map{
+  opacity:0.9 !important;
+  filter:none !important;
+}
+/* Reduce bottom margin on small screens */
+@media(max-width:600px){
+  #mapArea{
+    margin:0 12px 20px 12px;
+    aspect-ratio:3/4;
+  }
+  #forecast{
+    margin:10px 14px 0 14px;
+  }
+}
+
+  /* —— Forecast table refreshed ———————————— */
+  #forecast{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+  }
+  #forecast th,#forecast td{
+    padding:.55rem .4rem;
+    text-align:center;
+  }
+  #forecast th{
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    font-weight:600;
+  }
+  #forecast tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+
+  /* Bottom navigation bar polished */
+  #bottomBar{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-bottom-left-radius:var(--radius);
+    border-bottom-right-radius:var(--radius);
+  }
+
+  /* Hourly & Daily cards harmonised */
+  table.hourly th{
+    background:rgba(255,255,255,.09);
+  }
+  table.hourly tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+  .day{
+    background:rgba(255,255,255,.08);
+  }
+
+  @media(max-width:600px){
+    #forecast{margin:14px 0;}
+  }
+
+</style>
+<style>
+/* === Mobile layout refinements (2025‑07) === */
+
+/* 1. Hourly forecast: horizontal scroll + column pruning */
+@media(max-width:600px){
+  /* keep table readable while allowing swipe */
+  #hourlyPanel table.hourly{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    font-size:0.83rem;
+    min-width:550px;          /* keeps columns from squashing too much */
+  }
+}
+@media(max-width:480px){
+  /* hide less‑critical columns on very small screens */
+  /*#hourlyPanel table.hourly th:nth-child(n+4),
+  #hourlyPanel table.hourly td:nth-child(n+4){*/
+    display:none;
+  }
+  #hourlyPanel table.hourly{
+    min-width:320px;
+  }
+}
+
+/* 2. Daily/extra cards tighter padding on phones */
+@media(max-width:600px){
+  .card,
+  .panel{
+    padding:0.9rem 1.1rem;
+  }
+  .day{
+    padding:0.45rem 0.2rem;
+  }
+}
+
+/* 3. Sticky search bar for quick access */
+@media(max-width:600px){
+  .search{
+    position:sticky;
+    top:8px;
+    z-index:120;
+    margin-bottom:14px;
+  }
+}
+
+/* 4. Ensure nav pills scroll nicely edge‑to‑edge */
+#nav{
+  scroll-padding-left:12px;
+}
+</style>
+<style>
+/* === Extra breakpoint up to 900px (table condenses sooner) === */
+@media(max-width:900px){
+  /* shrink font & allow horizontal scroll earlier */
+  #hourlyPanel table.hourly{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    font-size:0.9rem;
+  }
+  /* tighten cards and map container */
+  .card,
+  .panel{
+    max-width:100%;
+  }
+}
+</style>
+<style>
+/* Orario icon cells */
+table.hourly td:nth-child(2), table.hourly th:nth-child(2){
+  text-align:center;
+  width:38px;
+}
+</style>
+</head>
+<body>
+
+<!-- —— Search —— -->
+<form class="search" id="searchForm">
+  <input autocomplete="off" id="cityInput" placeholder="Scrivi una città o usa 📍…" required />
+  <button type="submit"><i class="fa-solid fa-search"></i></button>
+</form>
+
+<!-- —— Widget map + forecast —— -->
+<div id="widget">
+  <header>
+    <h1 id="hDay">GIORNO 1</h1>
+    <p id="hDate"></p>
+  </header>
+
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa Calabria" loading="lazy" />
+  </div>
+
+  <table id="forecast" aria-label="Previsioni meteo"></table>
+
+  <div id="bottomBar">
+    <button id="themeBtn" class="fab-btn" title="Cambia tema" aria-label="Cambia tema">🌙</button>
+    <nav id="nav" aria-label="Seleziona giorno previsioni"></nav>
+    <button id="fab" class="fab-btn" title="Pannello admin" aria-label="Pannello admin">⚙️</button>
+  </div>
+  <!-- === Map Control Panel === -->
+  <div id="panel">
+    <div id="handle"></div>
+
+    <h3>Modifica Giorno</h3>
+    <label>Giorno
+      <select id="selDay"></select>
+    </label>
+    <label>Nome visualizzato
+      <input type="text" id="inpDayName">
+    </label>
+    <label>Data visualizzata
+      <input type="text" id="inpDayDate">
+    </label>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #ddd;">
+
+    <h3>Modifica Marker</h3>
+    <label>Icona (emoji)
+      <input type="text" id="inpIcon" placeholder="☀️">
+    </label>
+    <div id="iconPicker" class="icon-picker"></div>
+    <label>Dimensione marker
+      <input type="range" id="inpMarkerSize" min="24" max="64">
+    </label>
+    <div class="row">
+      <button id="btnSaveMarker">Salva marker</button>
+      <button id="btnDeleteMarker">🗑️ Elimina marker</button>
+      <button id="btnAddMarker">➕ Nuovo marker</button>
+      <button id="btnSaveLayout">💾 Layout</button>
+    </div>
+
+    
+    <div id="iconList" class="icon-list"></div>
+<hr style="margin:16px 0; border:none; border-top:1px solid #ddd;">
+
+    <h3>Modifica Tabella</h3>
+    <label>Città
+      <select id="selCity"></select>
+    </label>
+    <div class="row">
+      <label style="flex:1;">T° max
+        <input type="number" id="inpTmax">
+      </label>
+      <label style="flex:1;">T° min
+        <input type="number" id="inpTmin">
+      </label>
+    </div>
+    <button id="btnSaveForecast">Salva previsione</button>
+
+    <button id="btnReset" style="margin-top:22px;">Reset layout</button>
+  </div>
+
+  <div id="toast"></div>
+
+</div>
+
+<!-- —— Extra dynamic panels —— -->
+<section id="nearestStation"></section>
+<section id="adviceBox"></section>
+<section id="hourlyPanel"></section>
+<section id="dailyPanel"></section>
+<iframe class="radar" id="radarFrame" loading="lazy"></iframe>
+
+<!-- —— Admin Panel —— -->
+<div id="adminPanel">
+  <div class="modal">
+    <h2>Pannello di controllo</h2>
+    <p id="stationsCount"></p>
+    <button id="closeAdmin">Chiudi</button>
+    <button id="reloadBtn">Aggiorna previsioni</button>
+  </div>
+</div>
+
+<footer>Previsioni automatiche – dati Open‑Meteo integrati con la rete MLG Map.</footer>
+
+<script>
+
+/******************** COSTANTI & HELPERS *************************/
+let PROVINCES = JSON.parse(localStorage.getItem('calabriaMarkers') || '[{"city":"Cosenza","lat":39.299,"lon":16.253},{"city":"Catanzaro","lat":38.909,"lon":16.587},{"city":"Reggio Calabria","lat":38.114,"lon":15.65},{"city":"Crotone","lat":39.083,"lon":17.125},{"city":"Vibo Valentia","lat":38.673,"lon":16.104}]');
+let DAYS = [];               // Popolato dopo fetch
+let curDay = 0, night = false;
+const $ = q => document.querySelector(q);
+
+/* —— Bounding box Calabria —— */
+const CAL_ABOX = { latMin: 37.90, latMax: 40.30, lonMin: 15.60, lonMax: 17.30 };
+function latLonToXY(lat,lon){
+  const x = (lon - CAL_ABOX.lonMin)/(CAL_ABOX.lonMax - CAL_ABOX.lonMin)*100;
+  const y = (1- (lat - CAL_ABOX.latMin)/(CAL_ABOX.latMax - CAL_ABOX.latMin))*100;
+  return {x,y};
+}
+/* —— WMO → emoji —— */
+
+function wmo(code,isNight=false){
+  switch(code){
+    case 0: return isNight ? '🌙' : '☀️';
+    case 1: return isNight ? '🌙' : '🌤️';
+    case 2:
+    case 3: return isNight ? '☁️' : '⛅️';
+    case 45:
+    case 48: return '🌫️';
+    case 51:
+    case 53:
+    case 55: return isNight ? '🌧️' : '🌦️';
+    case 61:
+    case 63:
+    case 65:
+    case 80:
+    case 81:
+    case 82: return '🌧️';
+    case 66:
+    case 67:
+    case 71:
+    case 73:
+    case 75:
+    case 77:
+    case 85:
+    case 86: return '🌨️';
+    case 95:
+    case 96:
+    case 99: return '⛈️';
+    default: return '❓';
+  }
+}
+
+
+function wmoDesc(code){
+  switch(code){
+    case 0: return 'Sereno';
+    case 1: return 'Quasi sereno';
+    case 2: return 'Poco nuvoloso';
+    case 3: return 'Nuvoloso';
+    case 45: case 48: return 'Nebbia';
+    case 51: case 53: case 55: return 'Pioviggine';
+    case 56: case 57: return 'Brina';
+    case 61: case 63: case 65: return 'Pioggia';
+    case 66: case 67: return 'Ghiaccio';
+    case 71: case 73: case 75: return 'Neve';
+    case 77: return 'Nevischio';
+    case 80: case 81: case 82: return 'Rovesci';
+    case 85: case 86: return 'Rovesci di neve';
+    case 95: return 'Temporale';
+    case 96: case 99: return 'Temporale forte';
+    default: return '';
+  }
+}
+let LIVE=null;
+/* —— format util —— */
+const fmt=(v,unit="",d=0)=>isFinite(v)?Number(v).toFixed(d)+unit:"--";
+const toRad=d=>d*Math.PI/180;
+const haversine=(a,b,c,d)=>{const R=6371,e=toRad(c-a),f=toRad(d-b),x=Math.sin(e/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(f/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
+
+/******************** CITTÀ PRINCIPALI *************************/
+const CITIES = [
+  {city:'Cosenza',lat:39.307,lon:16.251},
+  {city:'Catanzaro',lat:38.9047,lon:16.594},
+  {city:'Reggio Calabria',lat:38.114,lon:15.6512},
+  {city:'Crotone',lat:39.080,lon:17.126},
+  {city:'Vibo Valentia',lat:38.674,lon:16.10}
+];
+
+/******************** BUILD NAV *************************/
+function buildNav(){
+  const nav=$('#nav');
+  nav.innerHTML="";
+  const frag=document.createDocumentFragment();
+  DAYS.forEach((d,i)=>{
+    const btn=document.createElement('button');btn.type='button';
+    btn.textContent=d.label;
+    if(i===curDay) btn.classList.add('active');
+    btn.addEventListener('click',()=>{curDay=i;updateNav();render();});
+    frag.appendChild(btn);
+  });
+  nav.appendChild(frag);
+}
+function updateNav(){ $('#nav').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('active',i===curDay)); }
+
+/******************** RENDER MAIN WIDGET *************************/
+function render(){
+  if(!DAYS.length) return;
+  const data=DAYS[curDay];
+  /* header */
+  $('#hDay').textContent=data.label;
+  const dt=new Date(); dt.setDate(dt.getDate()+data.offset);
+  $('#hDate').textContent=dt.toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+  /* markers */
+  const mapA=$('#mapArea');
+  mapA.querySelectorAll('.marker').forEach(m=>m.remove());
+  data.points.forEach(p=>{
+    const mk=document.createElement('div');
+    mk.className='marker';
+    mk.style.left=p.x+'%';
+    mk.style.top=p.y+'%';
+    mk.textContent = p.code !== undefined ? wmo(p.code, night) : p.icon;
+    mk.title=`${p.city}: ${p.tmax}° / ${p.tmin}°`;
+    mapA.appendChild(mk);
+  });
+  /* table */
+  const tbl=$('#forecast');
+  tbl.innerHTML='<tr><th>Città</th><th>Max</th><th>Min</th></tr>';
+  data.points.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.city}</td><td>${r.tmax}°</td><td>${r.tmin}°</td>`;
+    tbl.appendChild(tr);
+  });
+}
+
+/******************** OPEN‑METEO *************************/
+async function forecast(lat,lon){
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&daily=temperature_2m_max,temperature_2m_min,weathercode`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Errore meteo");
+  return r.json();
+}
+
+/******************** COSTRUISCI GIORNI PER MAPPA ***************/
+async function loadCalabria(){
+  const promises=CITIES.map(c=>forecast(c.lat,c.lon));
+  const results=await Promise.all(promises);
+  DAYS = [];
+  const daysCount = results[0].daily.time.length;
+  for(let d=0; d<daysCount; d++){
+    const dayObj = {label:`GIORNO ${d+1}`,offset:d,points:[]};
+    CITIES.forEach((c,idx)=>{
+      const fc=results[idx];
+      const {x,y}=latLonToXY(c.lat,c.lon);
+      dayObj.points.push({city:c.city,x,y,code:fc.daily.weathercode[d],icon:wmo(fc.daily.weathercode[d]),tmax:Math.round(fc.daily.temperature_2m_max[d]),tmin:Math.round(fc.daily.temperature_2m_min[d])});
+    });
+    DAYS.push(dayObj);
+  }
+  curDay=0; buildNav(); render();
+}
+window.stazioni = [
+  { nome: "Bianchi - Palinudo Staglio", mlg: true, lat: 39.11, lon: 16.42, quota: "830 m", provincia: "CS", regione: "Calabria", area: "Valle del Corace", stationId: "IBIANC4", apiKey: "2ccb91c2398a4f778b91c2398a4f772f", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Cosenza - Vaglio Lise", mlg: true, lat: 39.31, lon: 16.27, quota: "208 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN11", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-cosenza-vaglio-lise" },
+  { nome: "Amantea Spiaggia", mlg: true, lat: 39.13, lon: 16.07, quota: "0 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "IAMANT7", apiKey: "a3f4ae4f9b6d46a4b4ae4f9b6d06a494", webcam: "https://meteologullo.github.io/mappamlg/webcam_spiaggia_pulita.html", linkStazione: "https://www.meteologullo.com/stazione-amantea-spiaggia" },
+  { nome: "Monte Scuro - Celico", mlg: true, lat: 39.33, lon: 16.4, quota: "1643 m", provincia: "CS", regione: "Calabria", area: "Vetta della Sila Grande", stationId: "ICELIC3", apiKey: "2d12def7f4894eca92def7f4892eca99", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-meteo-di-monte-scuro-celico" },
+  { nome: "Cosenza - Campagnano", mlg: true, lat: 39.31, lon: 16.23, quota: "234 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN20", apiKey: "844d02e7e12049ef8d02e7e120b9ef68", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-cosenza-campagnano" },
+  { nome: "Mendicino - Tivolille Pasquali", mlg: true, lat: 39.28, lon: 16.2, quota: "431 m", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera Interna", stationId: "IMENDI13", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-mendicino-tivolille" },
+  { nome: "Casali del Manco - Morelli Soprana", mlg: true, lat: 39.28, lon: 16.29, quota: "389 m", provincia: "CS", regione: "Calabria", area: "collina Valle del Crati", stationId: "ICASAL40", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://www.meteologullo.com/stazione-casali-del-manco-morelli-soprana" },
+  { nome: "Nuova Stazione 1", mlg: true, lat: 39.40, lon: 16.50, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Nuova Area", stationId: "INUST1", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/nuova-stazione-1" },
+  { nome: "Catanzaro Centro", lat: 38.82, lon: 16.43, quota: "320 m", provincia: "CZ", regione: "Calabria", area: "Centro città", openMeteo: true, stationId: "CATCENTRO", webcam: "", linkStazione: "#" }
+,
+  { nome: "Reggio Calabria - Centro", lat: 38.11, lon: 15.65, quota: "31 m", provincia: "RC", regione: "Calabria", area: "Area dello Stretto", openMeteo: true, stationId: "REGCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Rossano - Centro Storico", lat: 39.58, lon: 16.63, quota: "270 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ROSSCENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Valentia - Monte Poro", lat: 38.63, lon: 16.05, quota: "710 m", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBOPORO", webcam: "", linkStazione: "#" },
+  { nome: "Locri Marina", lat: 38.25, lon: 16.26, quota: "12 m", provincia: "RC", regione: "Calabria", area: "Costa Ionica Reggina", openMeteo: true, stationId: "LOCRIMARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni in Fiore", lat: 39.26, lon: 16.68, quota: "1049 m", provincia: "CS", regione: "Calabria", area: "Altopiano Silano", openMeteo: true, stationId: "SGFIORE", webcam: "", linkStazione: "#" },
+  { nome: "Crotone Porto", lat: 39.08, lon: 17.12, quota: "8 m", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CROPOR", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme - Sant'Eufemia", lat: 38.91, lon: 16.24, quota: "15 m", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMSANTEUF", webcam: "", linkStazione: "#" },
+  { nome: "Scalea - Centro", lat: 39.81, lon: 15.79, quota: "25 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "SCALEACENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna - Parco Nazionale Sila Piccola", lat: 39.02, lon: 16.68, quota: "880 m", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TAVSILAPIC", webcam: "", linkStazione: "#" },
+  { nome: "Isola di Capo Rizzuto", lat: 38.96, lon: 17.09, quota: "75 m", provincia: "KR", regione: "Calabria", area: "Capo Rizzuto", openMeteo: true, stationId: "ISOCAPORIZ", webcam: "", linkStazione: "#" },
+,
+  { nome: "Cirò Marina", lat: 39.37, lon: 17.12, quota: "25 m", provincia: "KR", regione: "Calabria", area: "Alto Ionio Crotonese", openMeteo: true, stationId: "CIROMARINA", webcam: "", linkStazione: "#" },
+  { nome: "Cariati", lat: 39.5, lon: 16.96, quota: "30 m", provincia: "CS", regione: "Calabria", area: "Basso Ionio cosentino", openMeteo: true, stationId: "CARIATI", webcam: "", linkStazione: "#" },
+  { nome: "Petilia Policastro", lat: 39.13, lon: 16.77, quota: "436 m", provincia: "KR", regione: "Calabria", area: "Marchesato Crotonese", openMeteo: true, stationId: "PETILIA", webcam: "", linkStazione: "#" },
+  { nome: "Tropea", lat: 38.68, lon: 15.9, quota: "61 m", provincia: "VV", regione: "Calabria", area: "Costa degli Dei", openMeteo: true, stationId: "TROPEA", webcam: "", linkStazione: "#" },
+  { nome: "Gerace", lat: 38.27, lon: 16.23, quota: "500 m", provincia: "RC", regione: "Calabria", area: "Collina Ionica alto Reggino", openMeteo: true, stationId: "GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Spezzano della Sila", lat: 39.30, lon: 16.33, quota: "800 m", provincia: "CS", regione: "Calabria", area: "Pre-Sila Grande cosentina", openMeteo: true, stationId: "SPEZSILA", webcam: "", linkStazione: "#" },
+  { nome: "Paola", lat: 39.37, lon: 16.03, quota: "154 m", provincia: "CS", regione: "Calabria", area: "Tirreno Cosentino", openMeteo: true, stationId: "PAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere Marittimo", lat: 39.61, lon: 15.86, quota: "150 m", provincia: "CS", regione: "Calabria", area: "Alto Tirreno Cosentino", openMeteo: true, stationId: "BELVEDERE", webcam: "", linkStazione: "#" },
+  { nome: "Mormanno", lat: 39.88, lon: 15.98, quota: "850 m", provincia: "CS", regione: "Calabria", area: "Pollino", openMeteo: true, stationId: "MORMANNO", webcam: "", linkStazione: "#" },
+  { nome: "Soverato", lat: 38.68, lon: 16.54, quota: "20 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica basso Catanzarese", openMeteo: true, stationId: "SOVERATO", webcam: "", linkStazione: "#" },
+  { nome: "Palmi", lat: 38.36, lon: 15.85, quota: "228 m", provincia: "RC", regione: "Calabria", area: "Costa Viola", openMeteo: true, stationId: "PALMI", webcam: "", linkStazione: "#" },
+  { nome: "Serrastretta", lat: 39.01, lon: 16.4, quota: "820 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "SERRASTRETTA", webcam: "", linkStazione: "#" },
+  { nome: "Santa Severina", lat: 39.21, lon: 16.97, quota: "326 m", provincia: "KR", regione: "Calabria", area: "Marchesato crotonese", openMeteo: true, stationId: "SSSEVERINA", webcam: "", linkStazione: "#" },
+  { nome: "Badolato Marina", lat: 38.6, lon: 16.55, quota: "10 m", provincia: "CZ", regione: "Calabria", area: "Costa Ionica basso Catanzarese", openMeteo: true, stationId: "BADO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Delianuova", lat: 38.2, lon: 15.88, quota: "600 m", provincia: "RC", regione: "Calabria", area: "Pre-Aspromonte Occidentale", openMeteo: true, stationId: "DELIANUOVA", webcam: "", linkStazione: "#" },
+  {"nome": "Rende", "lat": 39.3306, "lon": 16.2078, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "RENDE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Montalto Uffugo", "lat": 39.4165, "lon": 16.1985, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "MONTALTO_UFFUGO", "webcam": "", "linkStazione": "#"},{"nome": "Bisignano", "lat": 39.50, "lon": 16.27, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Collina alta Valle del Crati", "openMeteo": true, "stationId": "MONGRASSANO_SCALO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Tarsia", "lat": 39.58, "lon": 16.3167, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Crati", "openMeteo": true, "stationId": "TARSIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Castrovillari", "lat": 39.8167, "lon": 16.2, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Pollino", "openMeteo": true, "stationId": "CASTROVILLARI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Sibari", "lat": 39.6833, "lon": 16.5333, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sibaritide", "openMeteo": true, "stationId": "SIBARI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Villapiana", "lat": 39.84, "lon": 16.45, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sibaritide", "openMeteo": true, "stationId": "VILLAPIANA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Camigliatello Silano", "lat": 39.3306, "lon": 16.4492, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "CAMIGLIATELLO_SILANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monte Curcio", "lat": 39.317, "lon": 16.42, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "MONTE_CURCIO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Botte Donato", "lat": 39.2833, "lon": 16.45, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Grande", "openMeteo": true, "stationId": "BOTTE_DONATO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Daltolia", "lat": 39.033, "lon": 16.388, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Savuto", "openMeteo": true, "stationId": "DALTOLIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Rogliano", "lat": 39.1581, "lon": 16.3723, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle del Savuto", "openMeteo": true, "stationId": "ROGLIANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Girifalco", "lat": 38.8, "lon": 16.4167, "quota": "ND", "provincia": "CZ", "regione": "Calabria", "area": "Pre-Serre", "openMeteo": true, "stationId": "GIRIFALCO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Vibo Valentia", "lat": 38.6749, "lon": 16.1027, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "VIBO_VALENTIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Capo Vaticano", "lat": 38.6278, "lon": 15.8415, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Costa degli Dei", "openMeteo": true, "stationId": "CAPO_VATICANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Rosarno", "lat": 38.4886, "lon": 15.9738, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "ROSARNO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Gioia Tauro", "lat": 38.4236, "lon": 15.8996, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "GIOIA_TAURO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Pellaro", "lat": 38.01, "lon": 15.633, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Area dello Stretto", "openMeteo": true, "stationId": "PELLARO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Villa San Giovanni", "lat": 38.2131, "lon": 15.6414, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Area dello Stretto", "openMeteo": true, "stationId": "VILLA_SAN_GIOVANNI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Melito di Porto Salvo", "lat": 37.9167, "lon": 15.7333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "MELITO_DI_PORTO_SALVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Brancaleone", "lat": 37.95, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "BRANCALEONE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Africo Nuovo", "lat": 38.0167, "lon": 16.1333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "AFRICO_NUOVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Bovalino", "lat": 38.15, "lon": 16.2, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Reggina", "openMeteo": true, "stationId": "BOVALINO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monasterace Marina", "lat": 38.4333, "lon": 16.5333, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Costa Ionica Meridionale", "openMeteo": true, "stationId": "MONASTERACE_MARINA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Mongiana", "lat": 38.5167, "lon": 16.3, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "MONGIANA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Fabrizia", "lat": 38.5, "lon": 16.3667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "FABRIZIA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Nardodipace", "lat": 38.4833, "lon": 16.4, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Serre Vibonesi", "openMeteo": true, "stationId": "NARDODIPACE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Polistena", "lat": 38.4167, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "POLISTENA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Natoli Nuovo", "lat": 38.5167, "lon": 16.0833, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "NATOLI_NUOVO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Cittanova", "lat": 38.3167, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Piana di Gioia Tauro", "openMeteo": true, "stationId": "CITTANOVA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Zungri", "lat": 38.6167, "lon": 15.9333, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "ZUNGRI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Spilinga", "lat": 38.6, "lon": 15.8833, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "SPILINGA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Pizzo", "lat": 38.7333, "lon": 16.1667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Costa Tirrenica Vibonese", "openMeteo": true, "stationId": "PIZZO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Monterosso Calabro", "lat": 38.6333, "lon": 16.2667, "quota": "ND", "provincia": "VV", "regione": "Calabria", "area": "Entroterra Vibonese", "openMeteo": true, "stationId": "MONTEROSSO_CALABRO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Cutro", "lat": 39.0167, "lon": 17.0833, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Collina Crotonese", "openMeteo": true, "stationId": "CUTRO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Capocolonna", "lat": 39.0167, "lon": 17.1333, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "CAPOCOLONNA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Marina di Strongoli", "lat": 39.3, "lon": 17.1167, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "MARINA_DI_STRONGOLI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Acerenthia - Camigliano", "lat": 39.2667, "lon": 17.0, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Collina Crotonese", "openMeteo": true, "stationId": "ACERENTHIA_-_CAMIGLIANO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Torretta di Crucoli", "lat": 39.4167, "lon": 17.0333, "quota": "ND", "provincia": "KR", "regione": "Calabria", "area": "Costa Ionica Crotonese", "openMeteo": true, "stationId": "TORRETTA_DI_CRUCOLI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Longobucco", "lat": 39.45, "lon": 16.65, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Greca", "openMeteo": true, "stationId": "LONGOBUCCO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Acri", "lat": 39.5, "lon": 16.3833, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Sila Greca", "openMeteo": true, "stationId": "ACRI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Roccaforte del Greco", "lat": 38.0167, "lon": 15.85, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Aspromonte", "openMeteo": true, "stationId": "ROCCAFORTE_DEL_GRECO", "webcam": "", "linkStazione": "#"},
+  {"nome": "San Luca", "lat": 38.1333, "lon": 16.0833, "quota": "ND", "provincia": "RC", "regione": "Calabria", "area": "Aspromonte", "openMeteo": true, "stationId": "SAN_LUCA", "webcam": "", "linkStazione": "#"},
+  {"nome": "Santa Caterina dello Ionio", "lat": 38.55, "lon": 16.5667, "quota": "ND", "provincia": "CZ", "regione": "Calabria", "area": "Costa Ionica Meridionale", "openMeteo": true, "stationId": "SANTA_CATERINA_DELLO_IONIO", "webcam": "", "linkStazione": "#"},
+  {"nome": "San Sosti", "lat": 39.66, "lon": 16.02, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle dell'Esaro", "openMeteo": true, "stationId": "SANSOSTI", "webcam": "", "linkStazione": "#"},
+  {"nome": "Altomonte", "lat": 39.7, "lon": 16.1333, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Valle dell'Esaro", "openMeteo": true, "stationId": "ALTOMONTE", "webcam": "", "linkStazione": "#"},
+  {"nome": "Roseto Capo Spulico", "lat": 39.9667, "lon": 16.5833, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Alto Ionio Cosentino", "openMeteo": true, "stationId": "ROSETO_CAPO_SPULICO", "webcam": "", "linkStazione": "#"},
+  {"nome": "Trebisacce", "lat": 39.87, "lon": 16.53, "quota": "ND", "provincia": "CS", "regione": "Calabria", "area": "Alto Ionio Cosentino", "openMeteo": true, "stationId": "TREBISACCE", "webcam": "", "linkStazione": "#"}
+,
+  { nome: "Rende - Quattromiglia", lat: 39.353702, lon: 16.242313, quota: "ND", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", openMeteo: true, stationId: "RENDE_QUATTR", webcam: "", linkStazione: "#" },
+  { nome: "Torano Castello - Sartano", lat: 39.49, lon: 16.21, quota: "90", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati", openMeteo: true, stationId: "LUZZI_PETRINI", webcam: "", linkStazione: "#" },
+  { nome: "Luzzi - Petrini", lat: 39.446816, lon: 16.28, quota: "ND", provincia: "CS", regione: "Calabria", area: "Media Valle del Crati", openMeteo: true, stationId: "LUZZI_CENTRO", webcam: "", linkStazione: "#" },
+  { nome: "Lattarico", lat: 39.464303, lon: 16.138027, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna nord", openMeteo: true, stationId: "LATTARICO", webcam: "", linkStazione: "#" },
+  { nome: "Rota Greca", lat: 39.467, lon: 16.117, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna nord", openMeteo: true, stationId: "ROTA_GRECA", webcam: "", linkStazione: "#" },
+  { nome: "Lattarico - Piretto", lat: 39.467, lon: 16.133, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera interna nord", openMeteo: true, stationId: "LATTARICO_PIRETTO", webcam: "", linkStazione: "#" },
+  { nome: "Cassano all'Ionio", lat: 39.783, lon: 16.317, quota: "ND", provincia: "CS", regione: "Calabria", area: "Piana di Sibari centrale", openMeteo: true, stationId: "CASSANO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Sibari", lat: 39.74, lon: 16.45, quota: "ND", provincia: "CS", regione: "Calabria", area: "Piana di Sibari orientale", openMeteo: true, stationId: "SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Terranova da Sibari", lat: 39.6575, lon: 16.3398, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Piana di Sibari sud", openMeteo: true, stationId: "TERRANOVA_SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Tarsia", lat: 39.62311, lon: 16.27337, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Valle del Crati nord", openMeteo: true, stationId: "TARSIA", webcam: "", linkStazione: "#" },
+  { nome: "Roggiano Gravina", lat: 39.61786, lon: 16.16173, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina Valle dell'Esaro", openMeteo: true, stationId: "ROGGIANO", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro in Guarano", lat: 44.52, lon: 13.48, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Sila cosentina", openMeteo: true, stationId: "SANPIETRO_GUARANO", webcam: "", linkStazione: "#" },
+  { nome: "Marano Marchesato", lat: 39.316974, lon: 16.174788, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena costiera interna sud", openMeteo: true, stationId: "MARANO_MARCH", webcam: "", linkStazione: "#" },
+  { nome: "Carolei", lat: 39.25, lon: 16.217, quota: "ND", provincia: "CS", regione: "Calabria", area: "Serre cosentine", openMeteo: true, stationId: "CAROLEI", webcam: "", linkStazione: "#" },
+  { nome: "Dipignano", lat: 39.237886, lon: 16.25324, quota: "ND", provincia: "CS", regione: "Calabria", area: "Serre cosentine", openMeteo: true, stationId: "DIPIGNANO", webcam: "", linkStazione: "#" },
+  { nome: "Mangone", lat: 39.205635, lon: 16.332584, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Savuto", openMeteo: true, stationId: "MANGONE", webcam: "", linkStazione: "#" },
+  { nome: "Altilia", lat: 39.1286, lon: 16.2532, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Savuto", openMeteo: true, stationId: "ALTILIA", webcam: "", linkStazione: "#" },
+  { nome: "Aiello Calabro", lat: 39.117215, lon: 16.166775, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina basso tirreno cosentino", openMeteo: true, stationId: "AIELLO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "Lamezia Terme", lat: 38.966667, lon: 16.299999, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "LAMEZIA_TERME", webcam: "", linkStazione: "#" },
+  { nome: "Falerna", lat: 39.003346, lon: 16.172041, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa tirrenica catanzarese", openMeteo: true, stationId: "FALERNA", webcam: "", linkStazione: "#" },
+  { nome: "San Lucido", lat: 39.309956, lon: 16.051827, quota: "ND", provincia: "CS", regione: "Calabria", area: "Costa tirrenica cosentina", openMeteo: true, stationId: "SAN_LUCIDO", webcam: "", linkStazione: "#" },
+  { nome: "Guardia Piemontese", lat: 39.467, lon: 16.0, quota: "ND", provincia: "CS", regione: "Calabria", area: "Costa alto tirreno cosentino", openMeteo: true, stationId: "GUARDIA_PIEM", webcam: "", linkStazione: "#" },
+  { nome: "Vena di Maida", lat: 38.888685, lon: 16.407462, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "VENA_DI_MAIDA", webcam: "", linkStazione: "#" },
+  { nome: "Settingiano", lat: 38.910024, lon: 16.514955, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "SETTINGIANO", webcam: "", linkStazione: "#" },
+  { nome: "Caraffa di Catanzaro", lat: 38.88194, lon: 16.4875, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "CARAFFA", webcam: "", linkStazione: "#" },
+  { nome: "Catanzaro Lido", lat: 38.8303, lon: 16.6278, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "CATANZARO_LIDO", webcam: "", linkStazione: "#" },
+  { nome: "Simeri Mare", lat: 38.865607, lon: 16.697665, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa Ionica Catanzarese", openMeteo: true, stationId: "SIMERI_MARE", webcam: "", linkStazione: "#" },
+  { nome: "Sorbo San Basile", lat: 39.01889, lon: 16.56944, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "SORBO_BASILE", webcam: "", linkStazione: "#" },
+  { nome: "Steccato di Cutro", lat: 38.938014, lon: 16.916678, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa del basso ionio crotonese", openMeteo: true, stationId: "STECCATO_CUTRO", webcam: "", linkStazione: "#" },
+  { nome: "Cropani", lat: 38.967, lon: 16.783, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica alto catanzarese", openMeteo: true, stationId: "CROPANI", webcam: "", linkStazione: "#" },
+  { nome: "Botricello Superiore", lat: 38.93199, lon: 16.85831, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina alto ionio catanzarese", openMeteo: true, stationId: "BOTRICELLO", webcam: "", linkStazione: "#" },
+  { nome: "Acconia", lat: 38.83585, lon: 16.2653, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Piana di Lamezia", openMeteo: true, stationId: "ACCONIA", webcam: "", linkStazione: "#" },
+  { nome: "Curinga", lat: 38.8281, lon: 16.31344, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Valle dell'Amato", openMeteo: true, stationId: "CURINGA", webcam: "", linkStazione: "#" },
+  { nome: "Maida", lat: 38.8588, lon: 16.3628, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", openMeteo: true, stationId: "MAIDA", webcam: "", linkStazione: "#" },
+  { nome: "Francavilla Angitola", lat: 38.783, lon: 16.267, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "FRANCAVILLA_ANGITOLA", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro Lametino", lat: 38.869082, lon: 16.277958, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina della Piana di Lamezia", openMeteo: true, stationId: "SANPIETRO_LAM", webcam: "", linkStazione: "#" },
+  { nome: "Squillace", lat: 38.780585, lon: 16.513228, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica del basso catanzarese", openMeteo: true, stationId: "SQUILLACE", webcam: "", linkStazione: "#" },
+  { nome: "Montepaone Lido", lat: 38.728733, lon: 16.541554, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Costa ionica del basso catanzarese", openMeteo: true, stationId: "MONTEPAONE_LIDO", webcam: "", linkStazione: "#" },
+  { nome: "San Vito sullo Ionio", lat: 38.710368, lon: 16.409777, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Entroterra del basso ionio catanzarese", openMeteo: true, stationId: "SANVITO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Monterosso Calabro", lat: 38.71792, lon: 16.291973, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MONTEROSSO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "Chiaravalle Centrale", lat: 38.680996, lon: 16.411957, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Entroterra del basso ionio catanzarese", openMeteo: true, stationId: "CHIARAVALLE_C", webcam: "", linkStazione: "#" },
+  { nome: "Verbicaro", lat: 39.756, lon: 15.916, quota: "ND", provincia: "CS", regione: "Calabria", area: "Pre-Catena Costiera marittima nord", openMeteo: true, stationId: "VERBICARO", webcam: "", linkStazione: "#" },
+  { nome: "Orsomarso", lat: 39.799, lon: 15.908, quota: "ND", provincia: "CS", regione: "Calabria", area: "Catena Costiera marittima nord", openMeteo: true, stationId: "ORSOMARSO", webcam: "", linkStazione: "#" },
+  { nome: "Cirella", lat: 39.703, lon: 15.823, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto Tirreno cosentino", openMeteo: true, stationId: "CIRELLA", webcam: "", linkStazione: "#" },
+  { nome: "Praia a Mare", lat: 39.909, lon: 15.778, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "PRAIA_A_MARE", webcam: "", linkStazione: "#" },
+  { nome: "Laino Borgo", lat: 39.95, lon: 15.97, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Mercure", openMeteo: true, stationId: "LAINO_BORGO", webcam: "", linkStazione: "#" },
+  { nome: "Papasidero", lat: 39.87, lon: 15.90, quota: "ND", provincia: "CS", regione: "Calabria", area: "Borgo dell'alto tirreno", openMeteo: true, stationId: "PAPASIDERO", webcam: "", linkStazione: "#" },
+  { nome: "Acquaformosa", lat: 39.736, lon: 16.078, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "ACQUAFORMOSA", webcam: "", linkStazione: "#" },
+  { nome: "Saracena", lat: 39.849, lon: 16.11, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SARACENA", webcam: "", linkStazione: "#" },
+  { nome: "Cerchiara di Calabria", lat: 39.883, lon: 16.4, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CERCHIARA_DI_CALABRIA", webcam: "", linkStazione: "#" },
+  { nome: "San Lorenzo Bellizzi", lat: 39.88, lon: 16.33, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SAN_LORENZO_BELLIZZI", webcam: "", linkStazione: "#" },
+  { nome: "Plataci", lat: 39.90, lon: 16.43, quota: "ND", provincia: "CS", regione: "Calabria", area: "Parco Nazionale del Pollino", openMeteo: true, stationId: "PLATACI", webcam: "", linkStazione: "#" },
+  { nome: "Albidona", lat: 39.937, lon: 16.525, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ALBIDONA", webcam: "", linkStazione: "#" },
+  { nome: "Alessandria del Carretto", lat: 39.984, lon: 16.338, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "ALESSANDRIA_DEL_CARRETTO", webcam: "", linkStazione: "#" },
+  { nome: "Terranova di Pollino", lat: 40.032, lon: 16.23, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "TERRANOVA_DI_POLLINO", webcam: "", linkStazione: "#" },
+  { nome: "Castroregio", lat: 39.987, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CASTROREGIO", webcam: "", linkStazione: "#" },
+  { nome: "Oriolo", lat: 40.05, lon: 16.434, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "ORIOLO", webcam: "", linkStazione: "#" },
+  { nome: "Montegiordano", lat: 40.04, lon: 16.53, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "MONTEGIORDANO", webcam: "", linkStazione: "#" },
+  { nome: "Nocara", lat: 40.09, lon: 16.48, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "NOCARA", webcam: "", linkStazione: "#" },
+  { nome: "Rocca Imperiale", lat: 40.10, lon: 16.58, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "ROCCA_IMPERIALE", webcam: "", linkStazione: "#" },
+  { nome: "Apollinara", lat: 39.70, lon: 16.41, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "APOLLINARA", webcam: "", linkStazione: "#" },
+  { nome: "Cantinella", lat: 39.66, lon: 16.44, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CANTINELLA", webcam: "", linkStazione: "#" },
+  { nome: "Corigliano Scalo", lat: 39.618, lon: 16.509, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CORIGLIANO_SCALO", webcam: "", linkStazione: "#" },
+  { nome: "San Giorgio Albanese", lat: 39.58, lon: 16.45, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SAN_GIORGIO_ALBANESE", webcam: "", linkStazione: "#" },
+  { nome: "San Demetrio Corone", lat: 39.562, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SAN_DEMETRIO_CORONE", webcam: "", linkStazione: "#" },
+  { nome: "Cozzo Carbonaro", lat: 39.46, lon: 16.20, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alta Valle del Crati", openMeteo: true, stationId: "COZZO_CARBONARO", webcam: "", linkStazione: "#" },
+  { nome: "Taverna di Montalto Uffugo", lat: 39.415, lon: 16.246, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "TAVERNA_DI_MONTALTO_UFFUGO", webcam: "", linkStazione: "#" },
+  { nome: "Rose", lat: 39.394, lon: 16.232, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina della media Valle del Crati", openMeteo: true, stationId: "ROSE", webcam: "", linkStazione: "#" },
+  { nome: "San Vincenzo la Costa", lat: 39.374, lon: 16.162, quota: "ND", provincia: "CS", regione: "Calabria", area: "Catena Costiera interna", openMeteo: true, stationId: "SAN_VINCENZO_LA_COSTA", webcam: "", linkStazione: "#" },
+  { nome: "Lago", lat: 39.16, lon: 16.16, quota: "600", provincia: "CS", regione: "Calabria", area: "Serre Cosentine", openMeteo: true, stationId: "LAGO", webcam: "", linkStazione: "#" },
+  { nome: "San Mango d'Aquino", lat: 39.027, lon: 16.217, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina della Valle del Savuto", openMeteo: true, stationId: "SAN_MANGO_DAQUINO", webcam: "", linkStazione: "#" },
+  { nome: "Panetti", lat: 39.01, lon: 16.30, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina del Monte Reventino", openMeteo: true, stationId: "PANETTI", webcam: "", linkStazione: "#" },
+  { nome: "Cicala", lat: 39.02, lon: 16.416, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "CICALA", webcam: "", linkStazione: "#" },
+  { nome: "Panettieri", lat: 39.079, lon: 16.423, quota: "ND", provincia: "CS", regione: "Calabria", area: "Monte Reventino", openMeteo: true, stationId: "PANETTIERI", webcam: "", linkStazione: "#" },
+  { nome: "Sellia", lat: 38.832, lon: 16.517, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina dell'alto ionio catanzarese", openMeteo: true, stationId: "SELLIA", webcam: "", linkStazione: "#" },
+  { nome: "Pianopoli", lat: 38.957, lon: 16.319, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Istmo di Marcellinara", openMeteo: true, stationId: "PIANOPOLI", webcam: "", linkStazione: "#" },
+  { nome: "Gizzeria", lat: 38.937, lon: 16.148, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Alto tirreno catanzarese", openMeteo: true, stationId: "GIZZERIA", webcam: "", linkStazione: "#" },
+  { nome: "Soveria Simeri", lat: 38.97, lon: 16.659, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Collina dell'alto ionio catanzarese", openMeteo: true, stationId: "SOVERIA_SIMERI", webcam: "", linkStazione: "#" },
+  { nome: "Mesoraca", lat: 39.096, lon: 16.789, quota: "ND", provincia: "KR", regione: "Calabria", area: "Pre-Sila catanzarese", openMeteo: true, stationId: "MESORACA", webcam: "", linkStazione: "#" },
+  { nome: "San Mauro Marchesato", lat: 39.126, lon: 16.859, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAN_MAURO_MARCHESATO", webcam: "", linkStazione: "#" },
+  { nome: "Marcedusa", lat: 39.024, lon: 16.858, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MARCEDUSA", webcam: "", linkStazione: "#" },
+  { nome: "Papanice", lat: 39.118, lon: 16.981, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "PAPANICE", webcam: "", linkStazione: "#" },
+  { nome: "Capo Colonna", lat: 39.016, lon: 17.135, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CAPO_COLONNA", webcam: "", linkStazione: "#" },
+  { nome: "Le Cannella", lat: 38.946, lon: 17.074, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "LE_CANNELLA", webcam: "", linkStazione: "#" },
+  { nome: "Le Castella", lat: 38.906, lon: 17.01, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "LE_CASTELLA", webcam: "", linkStazione: "#" },
+  { nome: "San Floro", lat: 38.899, lon: 16.486, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_FLORO", webcam: "", linkStazione: "#" },
+  { nome: "Borgia", lat: 38.882, lon: 16.507, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BORGIA", webcam: "", linkStazione: "#" },
+  { nome: "Vallefiorita", lat: 38.778, lon: 16.49, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "VALLEFIORITA", webcam: "", linkStazione: "#" },
+  { nome: "Palermiti", lat: 38.71, lon: 16.422, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PALERMITI", webcam: "", linkStazione: "#" },
+  { nome: "Petrizzi", lat: 38.637, lon: 16.474, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PETRIZZI", webcam: "", linkStazione: "#" },
+  { nome: "San Sostene", lat: 38.65, lon: 16.487, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_SOSTENE", webcam: "", linkStazione: "#" },
+  { nome: "Brognaturo", lat: 38.575, lon: 16.373, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "BROGNATURO", webcam: "", linkStazione: "#" },
+  { nome: "Badolato", lat: 38.578, lon: 16.556, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BADOLATO", webcam: "", linkStazione: "#" },
+  { nome: "Serra San Bruno", lat: 38.583, lon: 16.316, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SERRA_SAN_BRUNO", webcam: "", linkStazione: "#" },
+  { nome: "Arena", lat: 38.576, lon: 16.157, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "ARENA", webcam: "", linkStazione: "#" },
+  { nome: "Monsoreto", lat: 38.521, lon: 16.163, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MONSORETO", webcam: "", linkStazione: "#" },
+  { nome: "Paravati", lat: 38.6, lon: 16.084, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "PARAVATI", webcam: "", linkStazione: "#" },
+  { nome: "Mileto", lat: 38.606, lon: 16.067, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MILETO", webcam: "", linkStazione: "#" },
+  { nome: "Briatico", lat: 38.72, lon: 15.949, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "BRIATICO", webcam: "", linkStazione: "#" },
+  { nome: "Zambrone", lat: 38.695, lon: 15.959, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "ZAMBRONE", webcam: "", linkStazione: "#" },
+  { nome: "Caria", lat: 38.638, lon: 15.958, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "CARIA", webcam: "", linkStazione: "#" },
+  { nome: "Maierato", lat: 38.697, lon: 16.111, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "MAIERATO", webcam: "", linkStazione: "#" },
+  { nome: "Vibo Marina", lat: 38.721, lon: 16.127, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "VIBO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Nicotera", lat: 38.533, lon: 15.933, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "NICOTERA", webcam: "", linkStazione: "#" },
+  { nome: "San Calogero", lat: 38.53, lon: 16.033, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SAN_CALOGERO", webcam: "", linkStazione: "#" },
+  { nome: "San Ferdinando", lat: 38.483, lon: 15.899, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_FERDINANDO", webcam: "", linkStazione: "#" },
+  { nome: "Taurianova", lat: 38.354, lon: 16.03, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "TAURIANOVA", webcam: "", linkStazione: "#" },
+  { nome: "Oppido Mamertina", lat: 38.351, lon: 15.986, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "OPPIDO_MAMERTINA", webcam: "", linkStazione: "#" },
+  { nome: "Siderno", lat: 38.27, lon: 16.294, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SIDERNO", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Gioiosa Ionica", lat: 38.3, lon: 16.318, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_GIOIOSA_IONICA", webcam: "", linkStazione: "#" },
+  { nome: "Roccella Ionica", lat: 38.327, lon: 16.398, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ROCCELLA_IONICA", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Caulonia", lat: 38.389, lon: 16.463, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_CAULONIA", webcam: "", linkStazione: "#" },
+  { nome: "Riace Marina", lat: 38.483, lon: 16.566, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "RIACE_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Trepitò", lat: 38.386, lon: 16.453, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "VILLAGGIO_TREPITÒ", webcam: "", linkStazione: "#" },
+  { nome: "Santa Cristina d'Aspromonte", lat: 38.275, lon: 15.954, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTA_CRISTINA_DASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Antonimina", lat: 38.195, lon: 16.097, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ANTONIMINA", webcam: "", linkStazione: "#" },
+  { nome: "Ardore", lat: 38.23, lon: 16.171, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "ARDORE", webcam: "", linkStazione: "#" },
+  { nome: "Molochio", lat: 38.28, lon: 16.01, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOLOCHIO", webcam: "", linkStazione: "#" },
+  { nome: "Bagnara Calabra", lat: 38.272, lon: 15.799, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BAGNARA_CALABRA", webcam: "", linkStazione: "#" },
+  { nome: "Gallico Marina", lat: 38.17, lon: 15.65, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "GALLICO_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "San Gregorio", lat: 38.048, lon: 15.682, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_GREGORIO", webcam: "", linkStazione: "#" },
+  { nome: "Cardeto", lat: 38.045, lon: 15.745, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "CARDETO", webcam: "", linkStazione: "#" },
+  { nome: "Amendolea", lat: 38.025, lon: 15.887, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "AMENDOLEA", webcam: "", linkStazione: "#" },
+  { nome: "Bianco", lat: 38.082, lon: 16.142, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BIANCO", webcam: "", linkStazione: "#" },
+  { nome: "Montebello Ionico", lat: 37.986, lon: 15.759, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MONTEBELLO_IONICO", webcam: "", linkStazione: "#" },
+  { nome: "Motta San Giovanni", lat: 38.013, lon: 15.706, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOTTA_SAN_GIOVANNI", webcam: "", linkStazione: "#" },
+  { nome: "Bova Marina", lat: 37.933, lon: 15.918, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BOVA_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Palizzi Marina", lat: 37.919, lon: 15.973, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PALIZZI_MARINA", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Alessio in Aspromonte", lat: 38.148, lon: 15.709, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTALESSIO_IN_ASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Santo Stefano in Aspromonte", lat: 38.155, lon: 15.799, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTO_STEFANO_IN_ASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Gambarie", lat: 38.154, lon: 15.877, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "GAMBARIE", webcam: "", linkStazione: "#" },
+  { nome: "Sambatello", lat: 38.179, lon: 15.69, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAMBATELLO", webcam: "", linkStazione: "#" },
+  { nome: "Trunca", lat: 38.155, lon: 15.642, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "TRUNCA", webcam: "", linkStazione: "#" },
+  { nome: "Palizzi", lat: 37.939, lon: 15.991, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PALIZZI", webcam: "", linkStazione: "#" },
+  { nome: "Pietrapennata", lat: 38.187, lon: 15.956, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PIETRAPENNATA", webcam: "", linkStazione: "#" },
+  { nome: "Motticella", lat: 38.064, lon: 16.137, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MOTTICELLA", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Agata del Bianco", lat: 38.092, lon: 16.176, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTAGATA_DEL_BIANCO", webcam: "", linkStazione: "#" },
+  { nome: "Locri", lat: 38.243, lon: 16.258, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "LOCRI", webcam: "", linkStazione: "#" },
+  { nome: "Marina di Sant'Ilario dello Ionio", lat: 38.174, lon: 16.239, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MARINA_DI_SANTILARIO_DELLO_IONIO", webcam: "", linkStazione: "#" },
+  { nome: "Benestare", lat: 38.207, lon: 16.148, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "BENESTARE", webcam: "", linkStazione: "#" },
+  { nome: "Platì", lat: 38.19, lon: 16.094, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "PLATÌ", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Eufemia d'Aspromonte", lat: 38.287, lon: 15.887, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SANTEUFEMIA_DASPROMONTE", webcam: "", linkStazione: "#" },
+  { nome: "Melicuccà", lat: 38.35, lon: 15.942, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MELICUCCÀ", webcam: "", linkStazione: "#" },
+  { nome: "Monasterace", lat: 38.474, lon: 16.58, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "MONASTERACE", webcam: "", linkStazione: "#" },
+  { nome: "Torre di Ruggiero", lat: 38.648, lon: 16.353, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TORRE_DI_RUGGIERO", webcam: "", linkStazione: "#" },
+  { nome: "Sant'Angelo di Gerocarne", lat: 38.639, lon: 16.123, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SANTANGELO_DI_GEROCARNE", webcam: "", linkStazione: "#" },
+  { nome: "San Nicola da Crissa", lat: 38.635, lon: 16.205, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "SAN_NICOLA_DA_CRISSA", webcam: "", linkStazione: "#" },
+  { nome: "Montepaone", lat: 38.697, lon: 16.529, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MONTEPAONE", webcam: "", linkStazione: "#" },
+  { nome: "Roccelletta", lat: 38.781, lon: 16.519, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "ROCCELLETTA", webcam: "", linkStazione: "#" },
+  { nome: "San Giovanni di Gerace", lat: 38.286, lon: 16.226, quota: "ND", provincia: "RC", regione: "Calabria", area: "Aspromonte", openMeteo: true, stationId: "SAN_GIOVANNI_DI_GERACE", webcam: "", linkStazione: "#" },
+  { nome: "Ciricilla", lat: 39.012, lon: 16.365, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CIRICILLA", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Palumbo", lat: 39.215, lon: 16.762, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VILLAGGIO_PALUMBO", webcam: "", linkStazione: "#" },
+  { nome: "Villaggio Mancuso", lat: 39.022, lon: 16.608, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "VILLAGGIO_MANCUSO", webcam: "", linkStazione: "#" },
+  { nome: "Cotronei", lat: 39.16, lon: 16.773, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "COTRONEI", webcam: "", linkStazione: "#" },
+  { nome: "Caccuri", lat: 39.164, lon: 16.786, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CACCURI", webcam: "", linkStazione: "#" },
+  { nome: "Cerenzia", lat: 39.246, lon: 16.812, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CERENZIA", webcam: "", linkStazione: "#" },
+  { nome: "Castelsilano", lat: 39.238, lon: 16.844, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CASTELSILANO", webcam: "", linkStazione: "#" },
+  { nome: "Vigne", lat: 39.357, lon: 16.869, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VIGNE", webcam: "", linkStazione: "#" },
+  { nome: "Verzino", lat: 39.326, lon: 16.911, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "VERZINO", webcam: "", linkStazione: "#" },
+  { nome: "Savelli", lat: 39.3, lon: 16.762, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAVELLI", webcam: "", linkStazione: "#" },
+  { nome: "Belvedere di Spinello", lat: 39.236, lon: 16.925, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "BELVEDERE_DI_SPINELLO", webcam: "", linkStazione: "#" },
+  { nome: "Casabona", lat: 39.2, lon: 16.991, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "CASABONA", webcam: "", linkStazione: "#" },
+  { nome: "San Nicola dell'Alto", lat: 39.221, lon: 17.071, quota: "ND", provincia: "KR", regione: "Calabria", area: "Costa Ionica Crotonese", openMeteo: true, stationId: "SAN_NICOLA_DELLALTO", webcam: "", linkStazione: "#" },
+  { nome: "Pino Grande", lat: 39.32, lon: 16.75, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PINO_GRANDE", webcam: "", linkStazione: "#" },
+  { nome: "Lorica", lat: 39.24, lon: 16.51, quota: "ND", provincia: "CS", regione: "Calabria", area: "Altipiano silano", openMeteo: true, stationId: "LORICA", webcam: "", linkStazione: "#" },
+  { nome: "Bocchigliero", lat: 39.429, lon: 16.797, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "BOCCHIGLIERO", webcam: "", linkStazione: "#" },
+  { nome: "Campana", lat: 39.496, lon: 16.742, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CAMPANA", webcam: "", linkStazione: "#" },
+  { nome: "Campo San Lorenzo", lat: 39.36, lon: 16.49, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "CAMPO_SAN_LORENZO", webcam: "", linkStazione: "#" },
+  { nome: "Corigliano Calabro", lat: 39.593, lon: 16.519, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CORIGLIANO_CALABRO", webcam: "", linkStazione: "#" },
+  { nome: "San Giacomo d'Acri", lat: 39.485, lon: 16.357, quota: "ND", provincia: "CS", regione: "Calabria", area: "Valle del Crati", openMeteo: true, stationId: "SAN_GIACOMO_DACRI", webcam: "", linkStazione: "#" },
+  { nome: "Pietrapaola", lat: 39.486, lon: 16.893, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PIETRAPAOLA", webcam: "", linkStazione: "#" },
+  { nome: "Mandatoriccio", lat: 39.508, lon: 16.87, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "MANDATORICCIO", webcam: "", linkStazione: "#" },
+  { nome: "Cropalati", lat: 39.466, lon: 16.585, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CROPALATI", webcam: "", linkStazione: "#" },
+  { nome: "Paludi", lat: 39.496, lon: 16.671, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "PALUDI", webcam: "", linkStazione: "#" },
+  { nome: "Mirto", lat: 39.502, lon: 16.768, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "MIRTO", webcam: "", linkStazione: "#" },
+  { nome: "Crosia", lat: 39.517, lon: 16.903, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CROSIA", webcam: "", linkStazione: "#" },
+  { nome: "Calopezzati", lat: 39.516, lon: 16.869, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "CALOPEZZATI", webcam: "", linkStazione: "#" },
+  { nome: "Camigliano", lat: 38.983, lon: 16.233, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "CAMIGLIANO", webcam: "", linkStazione: "#" },
+  { nome: "Fabrizio", lat: 39.635, lon: 16.575, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "FABRIZIO", webcam: "", linkStazione: "#" },
+  { nome: "Schiavonea", lat: 39.663, lon: 16.523, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "SCHIAVONEA", webcam: "", linkStazione: "#" },
+  { nome: "Laghi di Sibari", lat: 39.72, lon: 16.50, quota: "ND", provincia: "CS", regione: "Calabria", area: "Alto ionio cosentino", openMeteo: true, stationId: "LAGHI_DI_SIBARI", webcam: "", linkStazione: "#" },
+  { nome: "Doria", lat: 39.73, lon: 16.35, quota: "ND", provincia: "CS", regione: "Calabria", area: "Sibaritide", openMeteo: true, stationId: "DORIA", webcam: "", linkStazione: "#" },
+  { nome: "Firmo", lat: 39.72, lon: 16.17, quota: "ND", provincia: "CS", regione: "Calabria", area: "Collina sibaritide", openMeteo: true, stationId: "FIRMO", webcam: "", linkStazione: "#" },
+  { nome: "Miglierina", lat: 39.001, lon: 16.444, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "MIGLIERINA", webcam: "", linkStazione: "#" },
+  { nome: "Tiriolo", lat: 38.962, lon: 16.512, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "TIRIOLO", webcam: "", linkStazione: "#" },
+  { nome: "San Pietro Apostolo", lat: 39.007, lon: 16.47, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SAN_PIETRO_APOSTOLO", webcam: "", linkStazione: "#" },
+  { nome: "Cerva", lat: 39.029, lon: 16.572, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "CERVA", webcam: "", linkStazione: "#" },
+  { nome: "Petronà", lat: 39.118, lon: 16.632, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "PETRONÀ", webcam: "", linkStazione: "#" },
+  { nome: "Belcastro", lat: 39.027, lon: 16.687, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "BELCASTRO", webcam: "", linkStazione: "#" },
+  { nome: "Simeri", lat: 38.971, lon: 16.677, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "SIMERI", webcam: "", linkStazione: "#" },
+  { nome: "Dulcino", lat: 39.039, lon: 16.434, quota: "ND", provincia: "CZ", regione: "Calabria", area: "Presila Catanzarese", openMeteo: true, stationId: "DULCINO", webcam: "", linkStazione: "#" },
+  { nome: "Filadelfia", lat: 38.818, lon: 16.247, quota: "ND", provincia: "VV", regione: "Calabria", area: "Entroterra Vibonese", openMeteo: true, stationId: "FILADELFIA", webcam: "", linkStazione: "#" },
+  { nome: "Olivara", lat: 38.77, lon: 16.21, quota: "ND", provincia: "VV", regione: "Calabria", area: "Costa vibonese", openMeteo: true, stationId: "OLIVARA", webcam: "", linkStazione: "#" }
+,
+  { nome: "Cosenza Diodato", mlg: true, lat: 39.27, lon: 16.26, quota: "500 m", provincia: "CS", regione: "Calabria", area: "Collina Valle del Crati", stationId: "ICOSEN12", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Aprigliano Guarno", mlg: true, lat: 39.24, lon: 16.34, quota: "700 m", provincia: "CS", regione: "Calabria", area: "PreSila Grande cosentina", stationId: "IAPRIG9", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  
+  { nome: "Campora San Giovanni", lat: 39.07, lon: 16.09, quota: "4 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "IAMANT5", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Catanzaro sud", lat: 38.90, lon: 16.59, quota: "280 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", stationId: "ICATAN51", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Crotone centro", lat: 39.08, lon: 17.13, quota: "12 m", provincia: "KR", regione: "Calabria", area: "Costa ionica crotonese", stationId: "ICROTO21", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+  { nome: "Torano Castello - Scalo", lat: 39.46, lon: 16.24, quota: "89 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati", stationId: "IMONTA161", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "#" },
+// ---------- SEGUONO ESEMPI DA COMPILARE ----------,
+  { nome: "Spez. Sila - Moccone", mlg: true, lat: 39.34, lon: 16.44, quota: "1300 m", provincia: "CS", regione: "Calabria", area: "Sila Grande", stationId: "ISPEZZ1", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-10" },
+  { nome: "Domanico - Potame", mlg: true, lat: 39.19, lon: 16.20, quota: "1000 m", provincia: "CS", regione: "Calabria", area: "Serre Cosentine", stationId: "IDOMAN19", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-11" },
+  { nome: "Feroleto Antico", mlg: true, lat: 38.96, lon: 16.37, quota: "225 m", provincia: "CZ", regione: "Calabria", area: "Piana Lametina", stationId: "IFEROL1", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-12" },
+  { nome: "Taverna", mlg: true, lat: 39.02, lon: 16.58, quota: "540 m", provincia: "CZ", regione: "Calabria", area: "Pre-Sila Piccola", stationId: "ITAVER2", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-13" },
+  { nome: "Soveria Mannelli", mlg: true, lat: 39.08, lon: 16.37, quota: "710 m", provincia: "CZ", regione: "Calabria", area: "Reventino interno", stationId: "ISOVER27", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-14" },
+  { nome: "Capo Bianco", mlg: true, lat: 38.91, lon: 17.11, quota: "12 m", provincia: "KR", regione: "Calabria", area: "Basso ionio crotonese", stationId: "IISOLA24", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-15" },
+  { nome: "Saracena", mlg: true, lat: 39.78, lon: 16.16, quota: "650 m", provincia: "CS", regione: "Calabria", area: "Area del Pollino", stationId: "ISARAC8", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-16" },
+  { nome: "Frascineto", mlg: true, lat: 39.83, lon: 16.26, quota: "500 m", provincia: "CS", regione: "Calabria", area: "Area del Pollino", stationId: "IFRASC28", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-17" },
+  { nome: "Catanzaro centrale", mlg: true, lat: 38.92, lon: 16.59, quota: "350 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro", stationId: "ICATAN57", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-18" },
+  { nome: "Vibo V. - Olivarella", mlg: true, lat: 38.67, lon: 16.08, quota: "420 m", provincia: "VV", regione: "Calabria", area: "Monte Leone", stationId: "IVIBOV3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-19" },
+  { nome: "Catanzaro - Viale Crotone", mlg: true, lat: 38.84, lon: 16.65, quota: "32 m", provincia: "CZ", regione: "Calabria", area: "Ionio catanzarese", stationId: "ICATAN92", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-20" },
+  { nome: "Marina di Curinga", mlg: true, lat: 38.83, lon: 16.22, quota: "38 m", provincia: "CZ", regione: "Calabria", area: "Basso tirreno catanzarese", stationId: "IFRANC35", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-21" },
+  { nome: "Capo Vaticano - Frizza", mlg: true, lat: 38.63, lon: 15.83, quota: "100 m", provincia: "VV", regione: "Calabria", area: "Costa vibonese", stationId: "IRICADI98", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-22" },
+  { nome: "Reggio Calabria - Stadio", mlg: true, lat: 38.10, lon: 15.65, quota: "90 m", provincia: "RC", regione: "Calabria", area: "Area dello stretto", stationId: "IREGGI58", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-23" },
+  { nome: "San Lorenzo - Marina", mlg: true, lat: 37.92, lon: 15.80, quota: "5 m", provincia: "RC", regione: "Calabria", area: "Basso reggino", stationId: "IMELIT15", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-24" },
+  { nome: "Brancaleone Marina", mlg: true, lat: 37.96, lon: 16.10, quota: "28 m", provincia: "RC", regione: "Calabria", area: "Basso ionio reggino", stationId: "ICALABRI4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-25" },
+  { nome: "Sant'Ilario dello Ionio", mlg: true, lat: 38.21, lon: 16.19, quota: "32 m", provincia: "RC", regione: "Calabria", area: "Ionio reggino", stationId: "ISANTI149", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-26" },
+  { nome: "Siderno - Corso Garibaldi", mlg: true, lat: 38.26, lon: 16.29, quota: "70 m", provincia: "RC", regione: "Calabria", area: "Alto ionio reggino", stationId: "ISIDERNO2", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-27" },
+  { nome: "Molochio", mlg: true, lat: 38.31, lon: 16.03, quota: "120 m", provincia: "RC", regione: "Calabria", area: "Aspromonte occidentale", stationId: "IMOLOC3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-28" },
+  { nome: "Rende - Piano Monello", mlg: true, lat: 39.34, lon: 16.23, quota: "200 m", provincia: "CS", regione: "Calabria", area: "Valle del Crati", stationId: "IRENDE15", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-29" },
+  { nome: "Rende Nord", mlg: true, lat: 39.36, lon: 16.23, quota: "137 m", provincia: "CS", regione: "Calabria", area: "Media Valle del Crati", stationId: "IRENDE23", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-30" },
+  { nome: "Corigliano - Villaggio Frasso", mlg: true, lat: 39.64, lon: 16.48, quota: "80 m", provincia: "CS", regione: "Calabria", area: "Sibaritide", stationId: "ICORIG10", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-31" },
+  { nome: "Cosenza Sud", mlg: true, lat: 39.29, lon: 16.23, quota: "310 m", provincia: "CS", regione: "Calabria", area: "Bassa Valle del Crati", stationId: "ICALABRI46", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-32" },
+  { nome: "Cosenza - Città 2000", mlg: true, lat: 40.15000, lon: 17.15000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP33", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-33" },
+  { nome: "Esempio Stazione 34", mlg: true, lat: 40.20000, lon: 17.20000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP34", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-34" },
+  { nome: "Esempio Stazione 35", mlg: true, lat: 40.25000, lon: 17.25000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP35", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-35" },
+  { nome: "Esempio Stazione 36", mlg: true, lat: 40.30000, lon: 17.30000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP36", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-36" },
+  { nome: "Esempio Stazione 37", mlg: true, lat: 40.35000, lon: 17.35000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP37", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-37" },
+  { nome: "Esempio Stazione 38", mlg: true, lat: 40.40000, lon: 17.40000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP38", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-38" },
+  { nome: "Esempio Stazione 39", mlg: true, lat: 40.45000, lon: 17.45000, quota: "100 m", provincia: "CS", regione: "Calabria", area: "Area di Test", stationId: "IESEMP39", apiKey: "123456789", webcam: "", linkStazione: "https://esempio.it/stazioni/esempio-stazione-39" },
+  { nome: "Longobardi Marina", mlg: true, lat: 39.196082, lon: 16.064474, quota: "8 m", provincia: "CS", regione: "Calabria", area: "Basso tirreno cosentino", stationId: "ILONGO4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Cosenza - Viale Parco", mlg: true, lat: 39.32, lon: 16.25, quota: "205 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "ICOSEN19", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Rende - Santa Chiara", mlg: true, lat: 39.34, lon: 16.26, quota: "182 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati sud", stationId: "IRENDE25", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "San Pietro in Guarano Est", mlg: true, lat: 39.34, lon: 16.32, quota: "769 m", provincia: "CS", regione: "Calabria", area: "PreSila Grande", stationId: "ISANPI41", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Casali del Manco - Verticelli", mlg: true, lat: 39.28, lon: 16.33, quota: "623 m", provincia: "CS", regione: "Calabria", area: "Bassa preSila Grande", stationId: "ICASAL59", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Catanzaro Santa Maria", mlg: true, lat: 38.87, lon: 16.60, quota: "27 m", provincia: "CZ", regione: "Calabria", area: "Istmo di Catanzaro orientale", stationId: "ICATAN48", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Luzzi - Cavoni", mlg: true, lat: 39.45, lon: 16.26, quota: "135 m", provincia: "CS", regione: "Calabria", area: "Fondovalle del Crati centro", stationId: "ILUZZI4", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Capo Bonifati", mlg: true, lat: 39.55, lon: 15.87, quota: "17 m", provincia: "CS", regione: "Calabria", area: "Alto tirreno cosentino", stationId: "IBONIF3", apiKey: "e1f10a1e78da46f5b10a1e78da96f525", webcam: "", linkStazione: "" },
+  { nome: "Esempio Stazione 9", mlg: true, lat: 0, lon: 0, quota: "", provincia: "", regione: "", area: "", stationId: "ESEMPIO9", apiKey: "", webcam: "", linkStazione: "" },
+  { nome: "Esempio Stazione 10", mlg: true, lat: 0, lon: 0, quota: "", provincia: "", regione: "", area: "", stationId: "ESEMPIO10", apiKey: "", webcam: "", linkStazione: "" }
+];
+/******************** STAZIONI WU & LIVE *************************/
+const DEFAULT_WU_KEY = "e1f10a1e78da46f5b10a1e78da96f525";
+window.stazioni.forEach(s=>{ if(!s.apiKey) s.apiKey = DEFAULT_WU_KEY; });
+
+function nearestWU(lat,lon,maxKm=15){
+  let best=null,dMin=1e9;
+  window.stazioni.forEach(s=>{
+    if(!s.stationId) return;
+    const d=haversine(lat,lon,s.lat,s.lon);
+    if(d<dMin && d<=maxKm){ dMin=d; best={...s,distance:d}; }
+  });
+  return best;
+}
+
+async function wuObs(st){
+  if(!st || !st.stationId) throw new Error("Stazione non disponibile");
+  const url=`https://api.weather.com/v2/pws/observations/current?stationId=${st.stationId}&format=json&units=m&apiKey=${st.apiKey}`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("WU "+st.stationId+": "+r.status);
+  const j=await r.json();
+  const o=j.observations?.[0];
+  const m=o?.metric ?? {};
+  return {t:m.temp,ur:o.humidity,wind:m.windSpeed,rain:(m.precip_1hr||0)};
+}
+
+/******************** EXTRA PANELS (render) *********************/
+function iconFA(c){
+  const ICONS={
+    0:"fa-sun",1:"fa-cloud-sun",2:"fa-cloud",3:"fa-cloud",
+    45:"fa-smog",48:"fa-smog",
+    51:"fa-cloud-rain",53:"fa-cloud-rain",55:"fa-cloud-showers-heavy",
+    56:"fa-cloud-meatball",57:"fa-cloud-meatball",
+    61:"fa-cloud-showers-heavy",63:"fa-cloud-showers-heavy",65:"fa-cloud-showers-heavy",
+    66:"fa-snowflake",67:"fa-snowflake",
+    71:"fa-snowflake",73:"fa-snowflake",75:"fa-snowflake",77:"fa-snowflake",
+    80:"fa-cloud-showers-heavy",81:"fa-cloud-showers-heavy",82:"fa-cloud-showers-heavy",
+    85:"fa-snowflake",86:"fa-snowflake",
+    95:"fa-bolt",96:"fa-bolt",99:"fa-bolt"
+  };
+  return ICONS[c]||"fa-question";
+}
+
+function renderStation(live,name,dist){
+  const distTxt = dist<0.05 ? "dalla stazione locale"
+                : dist<10 ? `dalla stazione ${name} a ${dist.toFixed(1)} km`
+                : `dalla stazione ${name} (${dist.toFixed(0)} km)`;
+  return `
+    <div class="panel">
+      <div class="station-header">
+        <h2>Dati Live</h2>
+        <span style="font-size:.85rem;color:var(--text-dim)">${distTxt}</span>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><span class="main-temp">${fmt(live.t,"°")}</span></div>
+        <div class="metric"><i class="fa-solid fa-droplet"></i> ${fmt(live.ur,"%")}</div>
+        <div class="metric"><i class="fa-solid fa-wind"></i> ${fmt(live.wind," km/h")}</div>
+        <div class="metric"><i class="fa-solid fa-cloud-rain"></i> ${fmt(live.rain," mm",1)}</div>
+      </div>
+    </div>`;
+}
+
+function renderHourly(data,idx){
+  const rows=[];
+  for(let i=idx;i<idx+24&&i<data.hourly.time.length;i++){
+    // adjust forecast using LIVE data (temperature & humidity offsets)
+    const tempOffset = (LIVE && !isNaN(LIVE.t)) ? (LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+    const urOffset = (LIVE && !isNaN(LIVE.ur)) ? (LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+    
+    const isNightTime = data.hourly.is_day && data.hourly.is_day[i]===0;
+    
+    rows.push(
+      `<tr>
+        <td>${data.hourly.time[i].slice(11,16)}</td>
+        <td>${wmo(data.hourly.weathercode[i], isNightTime)}</td>
+        <td>${wmoDesc(data.hourly.weathercode[i])}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"t",data.hourly.temperature_2m[i]+tempOffset),"°")}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"ur",data.hourly.relativehumidity_2m[i]+urOffset),"%")}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"mm",data.hourly.precipitation[i])," mm",1)}</td>
+        <td>${fmt(applyOverride(data.hourly.time[i].slice(11,16),"prob",data.hourly.precipitation_probability[i]),"%")}</td>
+        <td>${fmt(data.hourly.wind_speed_10m[i]," km/h")}</td>
+      </tr>`
+    );
+  }
+  return `
+    <div class="card">
+      <h3>Prossime 24 h</h3>
+      <div style="overflow-x:auto">
+        <table class="hourly">
+          <thead>
+            <tr><th>Ora</th><th></th><th>Cond.</th><th>T°</th><th>UR</th><th>Pioggia</th><th>Prob%</th><th>Vento</th></tr>
+          </thead>
+          <tbody>${rows.join("")}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDaily(data){
+  let h='<div class="card"><h3>7 Giorni</h3><div class="days">';
+  for(let i=0;i<data.daily.time.length;i++){
+    h += `
+      <div class="day">
+        <div>${data.daily.time[i].slice(5)}</div>
+        <i class="fa-solid ${iconFA(data.daily.weathercode[i])}"></i>
+        <div>${fmt(data.daily.temperature_2m_max[i],"°")}</div>
+        <div class="min">${fmt(data.daily.temperature_2m_min[i],"°")}</div>
+      </div>`;
+  }
+  return h+'</div></div>';
+}
+
+function renderAdvice(live,data,idx){
+  let wet = live.rain>0.1;
+  for(let i=idx;i<idx+6&&i<data.hourly.time.length;i++){
+    if(data.hourly.precipitation_probability[i]>40||data.hourly.precipitation[i]>0.2) wet=true;
+  }
+  return `<div class="panel advice ${wet?"no":"ok"}">${wet?"🚫 Meglio rimandare":"👍 Bucato OK"}</div>`;
+}
+
+const sEl=$('#nearestStation'),hEl=$('#hourlyPanel'),dEl=$('#dailyPanel'),aEl=$('#adviceBox');
+
+/******************** GEOCODE & FORECAST DETTAGLIATO PER RICERCA ***************/
+async function geocode(q){
+  const url=`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=it&format=json`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Errore geocoding");
+  const j=await r.json();
+  if(!j.results?.length) throw new Error("Località non trovata");
+  return j.results[0];
+}
+
+async function forecastDetailed(lat,lon){
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&current_weather=true&hourly=weathercode,temperature_2m,relativehumidity_2m,precipitation,precipitation_probability,wind_speed_10m,is_day&daily=temperature_2m_max,temperature_2m_min,weathercode`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Errore meteo");
+  return r.json();
+}
+
+async function run(q){
+  try{
+    sEl.innerHTML=hEl.innerHTML=dEl.innerHTML=aEl.innerHTML="⏳";
+    const g = await geocode(q);
+    const lat=g.latitude, lon=g.longitude;
+    const fc = await forecastDetailed(lat,lon);
+    /* nearest station */
+    const st=nearestWU(lat,lon) || {nome:g.name,distance:Infinity};
+    LIVE={ t: fc.current_weather.temperature,
+               ur: fc.hourly.relativehumidity_2m[0],
+               wind: fc.current_weather.windspeed,
+               rain: fc.hourly.precipitation[0] };
+let live=LIVE;
+
+    try{
+      const obs = await wuObs(st);
+      live = obs;
+    }catch(e){ console.warn(e); }
+    sEl.innerHTML=renderStation(live,st.nome||g.name,st.distance||0);
+    const now=Date.now();
+    let idx=fc.hourly.time.findIndex(t=>Date.parse(t)>now);
+    if(idx<0) idx=fc.hourly.time.length-1;
+    hEl.innerHTML=renderHourly(fc,idx);
+    dEl.innerHTML=renderDaily(fc);
+    aEl.innerHTML=renderAdvice(live,fc,idx);
+    $('#radarFrame').src=`https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=650&height=450&zoom=6&level=surface&overlay=radar&product=ecmwf`;
+  }catch(e){
+    console.error(e);
+    alert(e.message || e);
+  }
+}
+
+/******************** THEME & ADMIN PANEL *************************/
+function toggleTheme(){
+  night = !night;
+  document.body.classList.toggle('night', night);
+  $('#themeBtn').textContent = night ? '☀️' : '🌙';
+  render();
+}
+
+$('#themeBtn').addEventListener('click',toggleTheme);
+
+const admin = $('#adminPanel');
+$('#fab').addEventListener('click', ()=>{
+  $('#stationsCount').textContent = `Stazioni caricate: ${window.stazioni.length}`;
+  admin.classList.add('open');
+});
+$('#closeAdmin').addEventListener('click', ()=>admin.classList.remove('open'));
+$('#reloadBtn').addEventListener('click', ()=>{
+  admin.classList.remove('open');
+  loadCalabria();
+});
+
+/******************** INIT *************************/
+document.getElementById('searchForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  run($('#cityInput').value.trim());
+});
+
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(p=>{
+    run(`${p.coords.latitude},${p.coords.longitude}`);
+  });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadCalabria();
+});
+
+
+/******************** ADMIN PANEL (marker edit) *********************/
+const ADMIN = {
+  open(){
+    document.body.classList.add('modal-open');
+    document.getElementById('markerJson').value = JSON.stringify(PROVINCES,null,2);
+    document.getElementById('adminOverlay').classList.remove('hidden');
+  },
+  save(){
+    try{
+      const data = JSON.parse(document.getElementById('markerJson').value);
+      if(Array.isArray(data)){
+        PROVINCES = data;
+        localStorage.setItem('calabriaMarkers',JSON.stringify(PROVINCES));
+        rebuildDays && rebuildDays();
+        ADMIN.close();
+      }
+    }catch(e){ alert('JSON non valido'); }
+  },
+  close(){
+    document.body.classList.remove('modal-open');
+    document.getElementById('adminOverlay').classList.add('hidden');
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('fab').addEventListener('click',ADMIN.open);
+  document.getElementById('closeAdmin').addEventListener('click',ADMIN.close);
+  document.getElementById('saveMarkers').addEventListener('click',ADMIN.save);
+});
+
+/******************** OVERRIDE PREVISIONI 24H *******************/
+let HOURLY_OVERRIDE = JSON.parse(localStorage.getItem("override24h")||"{}");
+function openOverride(){
+  $('#overridePanel').style.display="flex";
+  $('#overrideJSON').value = JSON.stringify(HOURLY_OVERRIDE,null,2);
+}
+function closeOverride(){ $('#overridePanel').style.display="none"; }
+$('#btnSaveOverride').onclick = ()=>{
+  try{
+    HOURLY_OVERRIDE = JSON.parse($('#overrideJSON').value||"{}");
+    localStorage.setItem("override24h", JSON.stringify(HOURLY_OVERRIDE));
+    alert("Override salvato! Aggiorna la pagina.");
+    closeOverride();
+  }catch(e){ alert("JSON non valido: "+e.message); }
+};
+$('#btnCancelOverride').onclick = closeOverride;
+
+// Merge override into forecast row builder
+function applyOverride(hh, field, original){
+  const o = HOURLY_OVERRIDE[hh];
+  if(!o || o[field] === undefined) return original;
+  return o[field];
+}
+
+
+document.getElementById('fab').addEventListener('contextmenu',e=>{
+  e.preventDefault(); openOverride();
+});
+
+</script>
+
+<!-- Admin overlay -->
+<div id="adminOverlay" class="modal hidden">
+  <div class="box">
+    <h2>Modifica marker</h2>
+    <textarea id="markerJson"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem">
+      <button id="saveMarkers">Salva</button>
+      <button id="closeAdmin">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* === Map Control Panel integrato === */
+(function(){
+  const panel=document.getElementById('panel');
+  if(!panel) return;
+
+  /* ——— Elementi DOM ——— */
+  
+        const btnAddMarker=$('#btnAddMarker'), iconList=$('#iconList');
+
+        /* —— Icon picker ——— */
+        const iconSet=['☀️','🌙','🌤️','⛅️','🌦️','🌧️','🌨️','⛈️','❓','💨','🌊','⬇️','⬆️','➡️','⬅️','↗️','↘️','↙️','↖️','〰️'];
+        const iconPicker=document.getElementById('iconPicker');
+        function buildIconPicker(selected){
+          if(!iconPicker) return;
+          iconPicker.innerHTML='';
+          iconSet.forEach(ic=>{
+            const b=document.createElement('button');
+            b.type='button';
+            b.textContent=ic;
+            if(ic===selected) b.classList.add('active');
+            b.addEventListener('click',()=>{ inpIcon.value=ic; buildIconPicker(ic); });
+            iconPicker.appendChild(b);
+          });
+        }
+
+
+        /* ——— Add new marker ——— */
+        btnAddMarker && btnAddMarker.addEventListener('click', async ()=>{
+          const query = prompt('Inserisci la località (es: "Cosenza, Italia")','');
+          if(!query) return;
+          toast('Ricerca coordinate…');
+          let lat,lon,display;
+          try{
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`);
+            const arr = await res.json();
+            if(!arr.length){ toast('Località non trovata'); return; }
+            lat = parseFloat(arr[0].lat);
+            lon = parseFloat(arr[0].lon);
+            display = arr[0].display_name.split(',')[0];
+          }catch(e){
+            console.error(e); toast('Errore geocoding'); return;
+          }
+          const {x,y}=latLonToXY(lat,lon);
+          try{
+            const data = await forecast(lat,lon);
+            const dayCount=data.daily.time.length;
+            for(let d=0;d<dayCount;d++){
+              const pt={city:display||query,
+                        x,y,lat,lon,
+                        icon:wmo(data.daily.weathercode[d]),
+                        tmax:Math.round(data.daily.temperature_2m_max[d]),
+                        tmin:Math.round(data.daily.temperature_2m_min[d])};
+              DAYS[d].points.push(pt);
+            }
+            buildSelectors();
+            updateIconList();
+            render();
+            toast('Marker aggiunto e previsioni aggiornate');
+          }catch(e){
+            console.error(e);
+            toast('Errore nel recuperare dati meteo');
+          }
+        });
+
+        /* ——— Icon list ——— */
+        function updateIconList(){
+          if(!iconList) return;
+          iconList.innerHTML='';
+          DAYS[curDay].points.forEach((p,i)=>{
+            const btn=document.createElement('button');
+            btn.type='button';
+            btn.textContent=p.icon;
+            btn.title=p.city;
+            if(i===editIdx) btn.classList.add('active');
+            btn.addEventListener('click',()=>{
+              editIdx=i; panel.classList.add('open'); editMarker.call({dataset:{idx:i}}, new Event('click'));
+              updateIconList();
+            });
+            iconList.appendChild(btn);
+          });
+        }
+        /* aggiorna lista quando si cambia giorno o rende */
+        const oldRender=window.render;
+        window.render=function(){ oldRender(); updateIconList(); }
+const selDay=$('#selDay'), inpDayName=$('#inpDayName'), inpIcon=$('#inpIcon'),
+        selCity=$('#selCity'), inpTmax=$('#inpTmax'), inpTmin=$('#inpTmin'),
+        inpMarkerSize=$('#inpMarkerSize'), toastEl=$('#toast'),
+        btnSaveMarker=$('#btnSaveMarker'), btnDeleteMarker=$('#btnDeleteMarker'),
+        btnSaveLayout=$('#btnSaveLayout'), btnReset=$('#btnReset'),
+        btnSaveForecast=$('#btnSaveForecast');
+
+  /* Clono il FAB per eliminare vecchi listener */
+  const oldFab=$('#fab');
+  const fab=oldFab.cloneNode(true);
+  oldFab.parentNode.replaceChild(fab,oldFab);
+
+  let adminMode=false, editIdx=null;
+
+  /* ——— Helper toast ——— */
+  function toast(msg){
+    toastEl.textContent=msg;
+    toastEl.style.display='block';
+    clearTimeout(toastEl._t);
+    toastEl._t=setTimeout(()=>toastEl.style.display='none',2100);
+  }
+
+  /* ——— Toggle adminMode con click sul FAB ——— */
+  fab.addEventListener('click',e=>{
+    e.preventDefault(); e.stopImmediatePropagation();
+    adminMode=!adminMode;
+    fab.textContent=adminMode?'🔒':'⚙️';
+    toast(adminMode?'Modalità admin attiva':'Admin disattivata');
+    render();            // ricollega drag/click ai marker
+  });
+
+  /* ——— Costruisci combo giorno/città ——— */
+  function buildSelectors(){
+    selDay.innerHTML=''; DAYS.forEach((d,i)=>selDay.add(new Option(d.label,i)));
+    selCity.innerHTML=''; (window.CITIES||[]).forEach(c=>selCity.add(new Option(c.city||c,c.city||c)));
+  }
+  buildSelectors();
+
+  /* ——— Estendo render() per gesti admin ——— */
+  const _render=window.render;
+  window.render=function(){
+    _render && _render();
+    if(!adminMode) return;
+
+    const mapArea=$('#mapArea');
+    mapArea.querySelectorAll('.marker').forEach((mk,i)=>{
+      mk.dataset.idx=i;
+      mk.style.cursor='grab';
+      mk.removeEventListener('click',editMarker);
+      mk.addEventListener('click',editMarker);
+      mk.removeEventListener('pointerdown',dragStart);
+      mk.addEventListener('pointerdown',dragStart);
+    });
+  };
+
+  /* ——— Drag marker ——— */
+  function dragStart(ev){
+    const mk=this; const idx=+this.dataset.idx;
+    const rect=mk.parentElement.getBoundingClientRect();
+    mk.setPointerCapture(ev.pointerId);
+    const move=e=>{
+      const x=((e.clientX-rect.left)/rect.width)*100;
+      const y=((e.clientY-rect.top)/rect.height)*100;
+      mk.style.left=Math.min(Math.max(0,x),100)+'%';
+      mk.style.top=Math.min(Math.max(0,y),100)+'%';
+    };
+    const up=e=>{
+      mk.releasePointerCapture(e.pointerId);
+      DAYS[curDay].points[idx].x=parseFloat(mk.style.left);
+      DAYS[curDay].points[idx].y=parseFloat(mk.style.top);
+      mk.removeEventListener('pointermove',move);
+      mk.removeEventListener('pointerup',up);
+    };
+    mk.addEventListener('pointermove',move);
+    mk.addEventListener('pointerup',up);
+  }
+
+  /* ——— Click marker → apre pannello ——— */
+  function editMarker(e){
+    editIdx=+this.dataset.idx;
+    const pt=DAYS[curDay].points[editIdx];
+    selDay.value=curDay;
+    inpDayName.value=DAYS[curDay].label;
+    inpIcon.value=pt.icon;
+    buildIconPicker(pt.icon);
+    selCity.value=pt.city||'';
+    inpTmax.value=pt.tmax||'';
+    inpTmin.value=pt.tmin||'';
+    panel.classList.add('open');
+    e.stopPropagation();
+  }
+
+  /* —— Chiudi pannello cliccando fuori —— */
+  $('#widget').addEventListener('click',()=>panel.classList.remove('open'));
+  panel.addEventListener('click',e=>e.stopPropagation());
+
+  /* —— Salva marker —— */
+  btnSaveMarker.addEventListener('click',()=>{
+    if(editIdx===null) return toast('Nessun marker selezionato');
+    const pt=DAYS[curDay].points[editIdx];
+    pt.icon=inpIcon.value.trim()||pt.icon;
+    pt.code = undefined;
+    pt.city=selCity.value;
+    pt.tmax=parseFloat(inpTmax.value)||pt.tmax;
+    pt.tmin=parseFloat(inpTmin.value)||pt.tmin;
+    panel.classList.remove('open'); editIdx=null; render();
+  });
+
+  /* —— Elimina marker —— */
+  btnDeleteMarker.addEventListener('click',()=>{
+    if(editIdx===null) return toast('Nessun marker selezionato');
+    DAYS[curDay].points.splice(editIdx,1);
+    panel.classList.remove('open'); editIdx=null; render();
+  });
+
+  /* —— Slider dimensione marker —— */
+  inpMarkerSize.addEventListener('input',e=>{
+    document.documentElement.style.setProperty('--marker-size',e.target.value+'px');
+  });
+
+  /* —— Salva layout —— */
+  btnSaveLayout.addEventListener('click',()=>{
+    localStorage.setItem('CALABRIA_MAP_LAYOUT_V1',JSON.stringify(DAYS));
+    toast('Layout salvato');
+  });
+  btnReset.addEventListener('click',()=>{localStorage.removeItem('CALABRIA_MAP_LAYOUT_V1'); location.reload();});
+
+  /* —— Salva dati tabella —— */
+  btnSaveForecast.addEventListener('click',()=>{
+    const city=selCity.value;
+    DAYS[curDay].points.forEach(p=>{
+      if(p.city===city){
+        p.tmax=parseFloat(inpTmax.value)||p.tmax;
+        p.tmin=parseFloat(inpTmin.value)||p.tmin;
+      }
+    });
+    panel.classList.remove('open'); render();
+  });
+
+  /* —— Sincronizza nome giono —— */
+  inpDayName.addEventListener('change',()=>{
+    DAYS[curDay].label=inpDayName.value.trim()||DAYS[curDay].label;
+    if(typeof buildNav==='function') buildNav();
+  });
+
+  /* —— Carica layout salvato —— */
+  try{
+    const mem=localStorage.getItem('CALABRIA_MAP_LAYOUT_V1');
+    if(mem){
+      const saved=JSON.parse(mem);
+      if(Array.isArray(saved) && saved.length===DAYS.length){
+        DAYS.splice(0,DAYS.length,...saved);
+      }
+    }
+  }catch(e){}
+
+})();
+</script>
+
+<!-- Hidden override editor -->
+<div id="overridePanel" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:var(--bg);padding:18px;border-radius:var(--radius);max-width:90%;width:480px;max-height:90vh;overflow:auto;color:var(--text)">
+    <h2>Modifica previsione 24 h</h2>
+    <p>Inserisci un blocco JSON con <code>{ora:"HH:MM", t:°, ur:%, mm:precip, prob:%}</code>. Solo i campi presenti sovrascrivono il valore.</p>
+    <textarea id="overrideJSON" style="width:100%;height:200px;"></textarea>
+    <div style="display:flex;gap:12px;margin-top:14px;justify-content:flex-end">
+      <button id="btnCancelOverride">Annulla</button>
+      <button id="btnSaveOverride">Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- Patch v7.1 --- real-time bias + regional override --- */
+// === Real‑time bias function ===
+const originalRenderHourly = window.renderHourly;
+window.renderHourly = function(data, idx){
+    if(typeof LIVE === "object" && LIVE){
+        const tempBias = (!isNaN(LIVE.t) && !isNaN(data.hourly.temperature_2m[idx])) ? (LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+        const rhBias   = (!isNaN(LIVE.ur) && !isNaN(data.hourly.relativehumidity_2m[idx])) ? (LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+        for(let i=idx; i<Math.min(idx+24, data.hourly.time.length); i++){
+            data.hourly.temperature_2m[i] += tempBias;
+            data.hourly.relativehumidity_2m[i] += rhBias;
+            if(LIVE.rain > 0.1 && i-idx < 3) data.hourly.weathercode[i] = 61; // override first 3h as 'rain'
+        }
+    }
+    return originalRenderHourly.call(this, data, idx);
+};
+
+// === Daily regional override ===
+let DAILY_OVERRIDE = JSON.parse(localStorage.getItem("dailyOverride")||"{}");
+
+function saveDailyOverride(dateKey, city, obj){
+    if(!DAILY_OVERRIDE[dateKey]) DAILY_OVERRIDE[dateKey] = {};
+    DAILY_OVERRIDE[dateKey][city] = { ...(DAILY_OVERRIDE[dateKey][city]||{}), ...obj };
+    localStorage.setItem("dailyOverride", JSON.stringify(DAILY_OVERRIDE));
+}
+
+function applyDailyOverride(dateKey, city, field, original){
+    const o = DAILY_OVERRIDE?.[dateKey]?.[city];
+    return (o && o[field] !== undefined) ? o[field] : original;
+}
+
+// Patch loadCalabria to inject overrides
+const originalLoadCalabria = window.loadCalabria;
+window.loadCalabria = async function() {
+    await originalLoadCalabria();
+    DAYS.forEach(dayObj => {
+        const baseDate = new Date(); baseDate.setHours(0,0,0,0);
+        baseDate.setDate(baseDate.getDate() + dayObj.offset);
+        const keyStr = baseDate.toISOString().slice(0,10);
+        dayObj.points.forEach(pt => {
+            pt.tmax = applyDailyOverride(keyStr, pt.city, "tmax", pt.tmax);
+            pt.tmin = applyDailyOverride(keyStr, pt.city, "tmin", pt.tmin);
+            const newCode = applyDailyOverride(keyStr, pt.city, "code", pt.code);
+            if(newCode !== pt.code) {
+                pt.code = newCode;
+                pt.icon = wmo(newCode);
+            }
+            pt.icon = applyDailyOverride(keyStr, pt.city, "icon", pt.icon);
+        });
+    });
+    render();
+};
+
+// Extend existing 'Salva previsione' button to persist override
+if(typeof btnSaveForecast !== "undefined" && btnSaveForecast){
+    btnSaveForecast.addEventListener("click", () => {
+        const city = selCity.value;
+        const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + curDay);
+        const key = d.toISOString().slice(0,10);
+        const obj = {
+            tmax: inpTmax.value ? parseFloat(inpTmax.value) : undefined,
+            tmin: inpTmin.value ? parseFloat(inpTmin.value) : undefined
+        };
+        saveDailyOverride(key, city, obj);
+    });
+}
+</script>
+
+
+<!-- Begin improved icon mapping override -->
+<script>
+const RAW_BASE = 'https://raw.githubusercontent.com/Meteologullo/mappamlg/main/';
+
+const ICON_FILES = {
+  0: { day: "Sereno giorno.PNG", night: "Sereno notte.PNG" },
+  1: { day: "Parzialmente nuvoloso giorno.PNG", night: "Parz nuvoloso notte.PNG" },
+  2: { day: "Poco nuvoloso giorno.PNG", night: "Poco nuvoloso notte.PNG" },
+  3: { day: "Nuvoloso.PNG" },
+  45: { day: "Nebbia nuvole basse.PNG" },
+  48: { day: "Nebbia nuvole basse.PNG" },
+  51: { day: "Pioggia debole.PNG" },
+  53: { day: "Pioggia moderata.PNG" },
+  55: { day: "Pioggia mista a neve.PNG" },
+  61: { day: "Pioggia .PNG" },
+  63: { day: "Pioggia moderata.PNG" },
+  65: { day: "Pioggia moderata.PNG" },
+  80: { day: "Possibili piovaschi giorno.PNG", night: "Possibili piovaschi notte.PNG" },
+  81: { day: "Possibili temporali.PNG" },
+  82: { day: "Possibili temporali.PNG" },
+  71: { day: "Neve .PNG" },
+  73: { day: "Neve .PNG" },
+  75: { day: "Neve .PNG" },
+  77: { day: "Neve .PNG" },
+  85: { day: "Neve .PNG" },
+  86: { day: "Neve .PNG" },
+  95: { day: "Possibili temporali.PNG" },
+  96: { day: "Possibili temporali.PNG" },
+  99: { day: "Possibili temporali.PNG" },
+};
+
+// inserisce stile
+(function(){
+  const style = document.createElement('style');
+  style.textContent = `
+    .weather-icon { width:1.3em; height:1.3em; vertical-align:middle; display:inline-block; object-fit:contain; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); margin-right:2px; }
+  `;
+  document.head.appendChild(style);
+})();
+
+function getEmojiFallback(code, isNight=false){
+  try { return typeof wmo==='function'? wmo(code, isNight) : '❓'; } catch(e){ return '❓'; }
+}
+function weatherIconHTML(code, isNight=false){
+  const emojiFallback = getEmojiFallback(code, isNight) || '❓';
+  const entry = ICON_FILES[code];
+  if(!entry) return emojiFallback;
+  let filename = isNight? (entry.night || entry.day) : entry.day;
+  if(!filename) return emojiFallback;
+  const encoded = encodeURIComponent(filename);
+  const url = `${RAW_BASE}${encoded}`;
+  let altText = '';
+  try{ altText = typeof wmoDesc==='function'? wmoDesc(code) : ''; } catch(e){}
+  return `<img class="weather-icon" src="${url}" alt="${altText}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${emojiFallback}'))" aria-label="${altText}">`;
+}
+
+// aggiorna i marker che ci sono
+function patchMarkers(){
+  if(!window.DAYS || window.curDay===undefined) return;
+  const data = window.DAYS[window.curDay];
+  const mapA = document.querySelector('#mapArea');
+  if(!mapA) return;
+  const markers = mapA.querySelectorAll('.marker');
+  markers.forEach((mk, idx)=>{
+    const p = data.points[idx];
+    if(!p) return;
+    const isNightFlag = !!window.night;
+    if(p.code !== undefined){
+      const newHtml = weatherIconHTML(p.code, isNightFlag);
+      if(mk.innerHTML !== newHtml){
+        mk.innerHTML = newHtml;
+      }
+    } else {
+      mk.textContent = p.icon || '';
+    }
+  });
+}
+
+// override delle tabelle hourly/daily mantenendo quasi identica la struttura originale
+function overrideTables(){
+  if(typeof window.renderHourly==='function'){
+    const originalHourly = window.renderHourly;
+    window.renderHourly = function(data, idx){
+      // ricreazione simile come prima ma con icone
+      const rows=[];
+      for(let i=idx;i<idx+24&&i<data.hourly.time.length;i++){
+        const tempOffset = (window.LIVE && !isNaN(window.LIVE.t)) ? (window.LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+        const urOffset = (window.LIVE && !isNaN(window.LIVE.ur)) ? (window.LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+        const isNightTime = data.hourly.is_day && data.hourly.is_day[i]===0;
+        const timeLabel = data.hourly.time[i].slice(11,16);
+        rows.push(
+          `<tr>
+            <td>${timeLabel}</td>
+            <td>${weatherIconHTML(data.hourly.weathercode[i], isNightTime)}</td>
+            <td>${typeof wmoDesc==='function'?wmoDesc(data.hourly.weathercode[i]):''}</td>
+            <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"t",data.hourly.temperature_2m[i]+tempOffset),"°"):(Math.round(data.hourly.temperature_2m[i]+tempOffset)+"°")}</td>
+            <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"ur",data.hourly.relativehumidity_2m[i]+urOffset),"%"):(Math.round(data.hourly.relativehumidity_2m[i]+urOffset)+"%")}</td>
+            <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"mm",data.hourly.precipitation[i])," mm",1):(data.hourly.precipitation[i]+" mm")}</td>
+            <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"prob",data.hourly.precipitation_probability[i]),"%"):(data.hourly.precipitation_probability[i]+"%")}</td>
+            <td>${typeof fmt==='function'?fmt(data.hourly.wind_speed_10m[i]," km/h"):(data.hourly.wind_speed_10m[i]+" km/h")}</td>
+          </tr>`
+        );
+      }
+      return `
+        <div class="card">
+          <h3>Prossime 24 h</h3>
+          <div style="overflow-x:auto">
+            <table class="hourly">
+              <thead>
+                <tr><th>Ora</th><th></th><th>Cond.</th><th>T°</th><th>UR</th><th>Pioggia</th><th>Prob%</th><th>Vento</th></tr>
+              </thead>
+              <tbody>${rows.join("")}</tbody>
+            </table>
+          </div>
+        </div>`;
+    };
+  }
+  if(typeof window.renderDaily==='function'){
+    const originalDaily = window.renderDaily;
+    window.renderDaily = function(data){
+      let h = '<div class="card"><h3>7 Giorni</h3><div class="days">';
+      for(let i=0;i<data.daily.time.length;i++){
+        const dateSlice = data.daily.time[i].slice(5);
+        const iconHtml = weatherIconHTML(data.daily.weathercode[i], false);
+        h += `
+          <div class="day">
+            <div>${dateSlice}</div>
+            <div>${iconHtml}</div>
+            <div>${typeof fmt==='function'?fmt(data.daily.temperature_2m_max[i],"°"):Math.round(data.daily.temperature_2m_max[i])+"°"}</div>
+            <div class="min">${typeof fmt==='function'?fmt(data.daily.temperature_2m_min[i],"°"):Math.round(data.daily.temperature_2m_min[i])+"°"}</div>
+          </div>`;
+      }
+      h += '</div></div>';
+      return h;
+    };
+  }
+}
+
+// attiva observer per patchare quando appaiono nuovi marker
+const mo = new MutationObserver(()=>{
+  patchMarkers();
+});
+document.addEventListener('DOMContentLoaded', ()=>{
+  overrideTables();
+  patchMarkers();
+  const mapA = document.querySelector('#mapArea');
+  if(mapA) mo.observe(mapA, {childList:true, subtree:true});
+  // fallback: ripeti ogni secondo per qualche secondo
+  let attempts=0;
+  const iv = setInterval(()=>{
+    patchMarkers();
+    attempts++;
+    if(attempts>5) clearInterval(iv);
+  }, 1000);
+});
+</script>
+<!-- End improved icon mapping override -->
+
+
+
+<!-- Begin improved icon mapping override -->
+<script>
+// base raw GitHub URL
+const RAW_BASE = 'https://raw.githubusercontent.com/Meteologullo/mappamlg/main/';
+
+// mapping WMO -> file names (giorno/notte)
+const ICON_FILES = {
+  0: { day: "Sereno giorno.PNG", night: "Sereno notte.PNG" },
+  1: { day: "Parzialmente nuvoloso giorno.PNG", night: "Parz nuvoloso notte.PNG" },
+  2: { day: "Poco nuvoloso giorno.PNG", night: "Poco nuvoloso notte.PNG" },
+  3: { day: "Nuvoloso.PNG", night: "Nuvoloso.PNG" },
+  45: { day: "Nebbia nuvole basse.PNG", night: "Nebbia nuvole basse.PNG" },
+  48: { day: "Nebbia nuvole basse.PNG", night: "Nebbia nuvolose basse.PNG" },
+  51: { day: "Pioggia debole.PNG", night: "Pioggia debole.PNG" },
+  53: { day: "Pioggia moderata.PNG", night: "Pioggia moderata.PNG" },
+  55: { day: "Pioggia mista a neve.PNG", night: "Pioggia mista a neve.PNG" },
+  61: { day: "Pioggia .PNG", night: "Pioggia .PNG" },
+  63: { day: "Pioggia moderata.PNG", night: "Pioggia moderata.PNG" },
+  65: { day: "Pioggia moderata.PNG", night: "Pioggia moderata.PNG" },
+  80: { day: "Possibili piovaschi giorno.PNG", night: "Possibili piovaschi notte.PNG" },
+  81: { day: "Possibili temporali.PNG", night: "Possibili temporali.PNG" },
+  82: { day: "Possibili temporali.PNG", night: "Possibili temporali.PNG" },
+  71: { day: "Neve .PNG", night: "Neve .PNG" },
+  73: { day: "Neve .PNG", night: "Neve .PNG" },
+  75: { day: "Neve .PNG", night: "Neve .PNG" },
+  77: { day: "Neve .PNG", night: "Neve .PNG" },
+  85: { day: "Neve .PNG", night: "Neve .PNG" },
+  86: { day: "Neve .PNG", night: "Neve .PNG" },
+  95: { day: "Possibili temporali.PNG", night: "Possibili temporali.PNG" },
+  96: { day: "Possibili temporali.PNG", night: "Possibili temporali.PNG" },
+  99: { day: "Possibili temporali.PNG", night: "Possibili temporali.PNG" },
+};
+
+// add style
+(function(){
+  const s=document.createElement('style');
+  s.textContent=`
+    .weather-icon { width:1.3em; height:1.3em; vertical-align:middle; display:inline-block; object-fit:contain; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); margin-right:2px; }
+  `;
+  document.head.appendChild(s);
+})();
+
+function getEmojiFallback(code,isNight=false){
+  try{ return typeof wmo==='function' ? wmo(code,isNight) : '❓'; }catch(e){return '❓';}
+}
+function getDesc(code){
+  try{ return typeof wmoDesc==='function' ? wmoDesc(code) : ''; }catch(e){return '';}
+}
+function weatherIconHTML(code,isNight=false){
+  const emojiFallback=getEmojiFallback(code,isNight);
+  const entry=ICON_FILES[code];
+  if(!entry) return emojiFallback;
+  const filename = isNight ? (entry.night||entry.day) : entry.day;
+  if(!filename) return emojiFallback;
+  const encoded=encodeURIComponent(filename).replace(/%20/g,'%20');
+  const url=`${RAW_BASE}${encoded}`;
+  const alt=getDesc(code);
+  // create image element string
+  return `<img class="weather-icon" src="${url}" alt="${alt}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${emojiFallback}'))" aria-label="${alt}">`;
+}
+
+// Replace markers when they appear using MutationObserver
+const markerObserver = new MutationObserver(muts => {
+  muts.forEach(m => {
+    m.addedNodes.forEach(node => {
+      if(!(node instanceof HTMLElement)) return;
+      if(node.matches && node.matches('.marker')) updateMarker(node);
+      node.querySelectorAll && node.querySelectorAll('.marker').forEach(updateMarker);
+    });
+  });
+});
+function updateMarker(mk){
+  try{
+    // find index by data or fallback: assume order in current day data.points
+    if(!window.DAYS || window.curDay===undefined) return;
+    const data=window.DAYS[window.curDay];
+    const markers = Array.from(mk.parentElement?.querySelectorAll('.marker')||[]);
+    const idx = markers.indexOf(mk);
+    const p = data.points[idx];
+    if(!p) return;
+    const isNightFlag=!!window.night;
+    if(p.code!==undefined){
+      mk.innerHTML=weatherIconHTML(p.code,isNightFlag);
+    } else {
+      mk.textContent=p.icon||'';
+    }
+  }catch(e){
+    console.warn('updateMarker err',e);
+  }
+}
+markerObserver.observe(document.body,{childList:true, subtree:true});
+
+// Force patch existing markers now
+document.addEventListener('DOMContentLoaded', () => {
+  // small delay for original render to populate
+  setTimeout(()=> {
+    document.querySelectorAll('.marker').forEach(updateMarker);
+    // Replace hourly/daily after their original render if present
+    if(typeof window.renderHourly==='function' && window.DAYS){
+      // Try to re-render current if visible
+      try{
+        if(window.curDay!==undefined){
+          const dayData=window.DAYS[window.curDay];
+          const hourlyContainer = document.querySelector('.hourly')?.closest('.card');
+          if(hourlyContainer){
+            // re-inject using custom function
+            const parent = hourlyContainer.parentElement;
+            if(parent){
+              parent.innerHTML = window.renderHourly(dayData,0);
+            }
+          }
+          const dailyContainer = document.querySelector('.days')?.closest('.card');
+          if(dailyContainer){
+            const parent = dailyContainer.parentElement;
+            if(parent){
+              parent.innerHTML = window.renderDaily(dayData);
+            }
+          }
+        }
+      }catch(e){console.warn('rerender',e);}
+    }
+  }, 500);
+});
+
+// Override renderHourly and renderDaily to use custom icons (non-destructive)
+(function(){
+  const originalHourly = window.renderHourly;
+  window.renderHourly = function(data, idx){
+    // reuse logic from existing if present, but inject icons
+    if(!data) return originalHourly ? originalHourly(data, idx) : '';
+    const rows=[];
+    for(let i=idx;i<idx+24&&i<data.hourly.time.length;i++){
+      const tempOffset = (window.LIVE && !isNaN(window.LIVE.t)) ? (window.LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+      const urOffset = (window.LIVE && !isNaN(window.LIVE.ur)) ? (window.LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+      const isNightTime = data.hourly.is_day && data.hourly.is_day[i]===0;
+      const timeLabel = data.hourly.time[i].slice(11,16);
+      rows.push(
+        `<tr>
+          <td>${timeLabel}</td>
+          <td>${weatherIconHTML(data.hourly.weathercode[i], isNightTime)}</td>
+          <td>${getDesc(data.hourly.weathercode[i])}</td>
+          <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"t",data.hourly.temperature_2m[i]+tempOffset),"°"):(Math.round(data.hourly.temperature_2m[i]+tempOffset)+"°")}</td>
+          <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"ur",data.hourly.relativehumidity_2m[i]+urOffset),"%"):(Math.round(data.hourly.relativehumidity_2m[i]+urOffset)+"%")}</td>
+          <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"mm",data.hourly.precipitation[i])," mm",1):(data.hourly.precipitation[i]+" mm")}</td>
+          <td>${typeof fmt==='function'?fmt(applyOverride(timeLabel,"prob",data.hourly.precipitation_probability[i]),"%"):(data.hourly.precipitation_probability[i]+"%")}</td>
+          <td>${typeof fmt==='function'?fmt(data.hourly.wind_speed_10m[i]," km/h"):(data.hourly.wind_speed_10m[i]+" km/h")}</td>
+        </tr>`
+      );
+    }
+    return `
+      <div class="card">
+        <h3>Prossime 24 h</h3>
+        <div style="overflow-x:auto">
+          <table class="hourly">
+            <thead><tr><th>Ora</th><th></th><th>Cond.</th><th>T°</th><th>UR</th><th>Pioggia</th><th>Prob%</th><th>Vento</th></tr></thead>
+            <tbody>${rows.join('')}</tbody>
+          </table>
+        </div>
+      </div>`;
+  };
+  const originalDaily = window.renderDaily;
+  window.renderDaily = function(data){
+    if(!data) return originalDaily ? originalDaily(data) : '';
+    let h='<div class="card"><h3>7 Giorni</h3><div class="days">';
+    for(let i=0;i<data.daily.time.length;i++){
+      const dateSlice = data.daily.time[i].slice(5);
+      const iconHtml = weatherIconHTML(data.daily.weathercode[i], false);
+      h+=`
+        <div class="day">
+          <div>${dateSlice}</div>
+          <div>${iconHtml}</div>
+          <div>${typeof fmt==='function'?fmt(data.daily.temperature_2m_max[i],"°"):Math.round(data.daily.temperature_2m_max[i])+"°"}</div>
+          <div class="min">${typeof fmt==='function'?fmt(data.daily.temperature_2m_min[i],"°"):Math.round(data.daily.temperature_2m_min[i])+"°"}</div>
+        </div>`;
+    }
+    h+='</div></div>';
+    return h;
+  };
+})();
+</script>
+<!-- End improved override -->
+
+</body>
+</html>
