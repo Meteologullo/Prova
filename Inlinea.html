@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Meteo Calabria – Dashboard Unificata</title>
+<!-- Google Fonts & FontAwesome -->
+<link crossorigin="" href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&amp;family=Baloo+2:wght@600&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+<style>
+  /* —— Palette & Theme ——————————————— */
+  :root{
+    --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+    --glass:rgba(255,255,255,.14);
+    --blur:14px;
+    --radius:18px;
+    --accent:#00d2ff;
+    --accent2:#3a7bd5;
+    --text:#ecf1f8;
+    --marker-size:clamp(22px,5vw,48px);
+    --text-dim:#c5d0e6;
+
+    /* Widget */
+    --clr-sky:#4fd1ff;
+    --clr-sky-2:#0ea5e9;
+    --clr-night:#06214b;
+    --clr-night-2:#010c1e;
+    --clr-accent:#facc15;
+    --clr-accent-night:#ffe680;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    min-height:100vh;background:var(--bg);font-family:"Inter",sans-serif;color:var(--text);
+    display:flex;flex-direction:column;align-items:center;padding:20px 12px;
+  }
+  /* —— Search bar ——————————————— */
+  .search{display:flex;gap:.5rem;width:100%;max-width:820px;margin-bottom:20px}
+  .search input{flex:1;padding:.9rem 1.1rem;border:none;border-radius:var(--radius);background:var(--glass);backdrop-filter:blur(var(--blur));color:var(--text);font-size:1rem;outline:none;}
+  .search button{padding:.9rem 1.2rem;border:none;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:700;font-size:1rem;cursor:pointer;}
+  /* —— Main widget (map + tabelle) ——— */
+  #widget{width:100%;max-width:820px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto 1fr auto;grid-template-areas:"header header""map forecast""bottom bottom";background:radial-gradient(circle at 50% 15%,var(--clr-sky) 0%,var(--clr-sky-2) 100%);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden;position:relative;isolation:isolate;transition:background .4s;}
+  body.night #widget{background:radial-gradient(circle at 50% 15%,var(--clr-night) 0%,var(--clr-night-2) 100%);}  
+  @media(max-width:600px){#widget{grid-template-columns:1fr;grid-template-areas:"header""map""forecast""bottom";}}
+  header{grid-area:header;padding:18px 14px;text-shadow:0 2px 6px rgba(0,0,0,.5);font-family:'Baloo 2',cursive;}
+  header h1{font-size:clamp(26px,6vw,38px);font-weight:800;line-height:1.1;}
+  header p{font-size:clamp(14px,3vw,18px);margin-top:2px;font-weight:600;opacity:.9;}
+  body.night header *{filter:brightness(.88);}  
+  /* —— Map —— */
+  #mapArea{grid-area:map;position:relative;margin:0 14px 88px 14px;border-radius:6px;aspect-ratio:3/4;}
+  @media(max-width:600px){#mapArea{margin:0 14px 20px 14px;}}
+  #mapArea::before{content:"";position:absolute;inset:0;background:rgba(255,255,255,.08);border-radius:inherit;}
+  #map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:.3;filter:drop-shadow(0 0 2px rgba(0,0,0,.5));}
+  .marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-size:var(--marker-size);user-select:none;cursor:default;text-shadow:0 1px 3px rgba(0,0,0,.45);}  
+  /* —— Forecast table —— */
+  #forecast{grid-area:forecast;margin:20px 14px 0 0;border-collapse:collapse;border-radius:10px;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);font-size:13px;min-width:160px;max-width:100%;box-shadow:0 4px 12px rgba(0,0,0,.25);overflow:hidden;z-index:2;transition:background .35s;}
+  body.night #forecast{background:rgba(255,255,255,.10);}  
+  #forecast th,#forecast td{padding:4px 10px;}
+  #forecast th{background:rgba(255,255,255,.25);font-weight:700;font-family:'Baloo 2',cursive;transition:background .35s;}
+  body.night #forecast th{background:rgba(255,255,255,.18);}  
+  #forecast tr:nth-child(even) td{background:rgba(255,255,255,.05);}  
+  #forecast tr:hover td{background:rgba(255,255,255,.08);}  
+  #forecast th:first-child::before{content:"🌡️ ";}
+  #forecast td:nth-child(2),#forecast td:nth-child(3){font-weight:800;font-size:18px;}
+  /* —— Bottom nav —— */
+  #bottomBar{grid-area:bottom;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 14px;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);box-shadow:0 -4px 12px rgba(0,0,0,.25);border-top-left-radius:12px;border-top-right-radius:12px;z-index:3;transition:background .35s;}
+  body.night #bottomBar{background:rgba(255,255,255,.10);}  
+  #nav{flex:1;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;overflow-x:auto;padding:2px 0;}
+  #nav button{background:transparent;border:none;font-size:14px;font-weight:600;padding:6px 10px;border-radius:8px;transition:background .2s,color .2s;color:#fff;white-space:nowrap;}
+  #nav button:hover{background:rgba(255,255,255,.25);}body.night #nav button:hover{background:rgba(255,255,255,.18);}#nav button.active{background:var(--clr-accent);color:#000;}body.night #nav button.active{background:var(--clr-accent-night);color:#000;}
+  .fab-btn{width:52px;height:52px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.35);transition:transform .2s,background .35s;flex-shrink:0;font-size:26px;}
+  .fab-btn:hover{transform:scale(1.08);}#fab{background:var(--clr-accent);color:#000;}body.night #fab{background:var(--clr-accent-night);}#themeBtn{background:#ffffff26;color:#fff;}body.night #themeBtn{background:#ffffff33;}
+  /* —— Extra panels —— */
+  .panel,.card{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.1rem 1.4rem;margin-bottom:1.1rem;width:100%;max-width:820px;}
+  .station-header{display:flex;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem}
+  .metric-row{display:flex;flex-wrap:wrap;gap:1rem}
+  .metric{display:flex;align-items:center;gap:.4rem;font-size:.95rem}
+  .metric i{font-size:1.1rem}
+  .main-temp{font-size:2.4rem;font-weight:600;margin-right:.3rem}
+  table.hourly{width:100%;border-collapse:collapse;font-size:.85rem}
+  table.hourly th,table.hourly td{padding:.45rem .2rem;text-align:center}
+  table.hourly th{color:var(--text);font-weight:600}
+  table.hourly tr:nth-child(even){background:rgba(255,255,255,.05)}
+  .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:.6rem}
+  .day{background:rgba(255,255,255,.08);border-radius:var(--radius);padding:.55rem .25rem;text-align:center}
+  .day i{font-size:1.3rem;margin-bottom:.2rem}
+  .day .min{color:var(--text-dim);font-size:.8rem}
+  .radar{width:100%;border:none;border-radius:var(--radius);overflow:hidden;height:450px;max-width:820px;}
+  .advice{display:flex;align-items:center;gap:.7rem;font-size:1.05rem;font-weight:600}
+  .advice.ok{color:#1dd05d}.advice.no{color:#ff6565}
+  /* —— Admin modal —— */
+  #adminPanel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:999;visibility:hidden;opacity:0;transition:opacity .25s; }
+  #adminPanel.open{visibility:visible;opacity:1;}
+  #adminPanel .modal{background:rgba(0,0,0,.85);border-radius:var(--radius);padding:1.4rem;max-width:400px;width:90%;color:var(--text);}
+  #adminPanel button{background:var(--clr-accent);border:none;border-radius:8px;font-weight:600;padding:.6rem 1rem;cursor:pointer;margin-top:1rem;}
+  footer{font-size:.8rem;color:var(--text-dim);text-align:center;margin-top:1.4rem;max-width:820px}
+  a{color:var(--accent)}
+  @media(max-width:380px){.main-temp{font-size:2rem}table.hourly{font-size:.75rem}}
+  
+
+body.modal-open{overflow:hidden}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;backdrop-filter:blur(4px);z-index:99;}
+.modal.hidden{display:none}
+.modal .box{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.4rem;max-width:500px;width:90%;color:var(--text);}
+.modal textarea{width:100%;height:250px;background:rgba(255,255,255,.1);border:none;color:var(--text);border-radius:var(--radius);padding:.6rem;font-family:monospace;}
+.modal button{border:none;cursor:pointer;border-radius:var(--radius);padding:.5rem 1rem;font-weight:700;}
+
+
+/* === Map Control Panel (imported) === */
+#panel{
+  position:absolute;left:0;right:0;bottom:0;z-index:20;
+  background:rgba(255,255,255,.95);color:#004070;
+  padding:22px 22px 30px;border-top-left-radius:18px;border-top-right-radius:18px;
+  transform:translateY(110%);transition:transform .35s ease;
+  box-shadow:0 -6px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);
+  overflow-y:auto;max-height:85vh;font-family:'Inter',sans-serif;
+}
+#panel.open{transform:translateY(0);}
+#handle{width:50px;height:6px;background:#bbb;border-radius:3px;margin:0 auto 12px;}
+#panel h3{margin:12px 0 6px;font-size:18px;font-weight:800;font-family:'Baloo 2',cursive;}
+#panel label{display:block;margin-top:12px;font-size:14px;}
+#panel input,#panel select{
+  width:100%;padding:8px 10px;font-size:15px;border:1px solid #c0c0c0;border-radius:6px;
+}
+#panel .row{display:flex;gap:10px;flex-wrap:wrap;}
+#panel button{
+  width:100%;padding:11px;font-size:16px;border:none;border-radius:8px;font-weight:700;
+  cursor:pointer;transition:filter .15s;
+}
+#panel button:hover{filter:brightness(1.08);}
+#btnSaveMarker{background:#facc15;}
+#btnDeleteMarker{background:#ff6666;color:#fff;}
+#btnSaveLayout{background:#10b981;color:#fff;}
+#btnReset{background:#ef4444;color:#fff;}
+#btnSaveForecast{background:#facc15;}
+#toast{
+  position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:8px;font-size:15px;
+  box-shadow:0 4px 10px rgba(0,0,0,.45);display:none;z-index:25;
+}
+
+.icon-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.icon-list button{border:none;background:#e5e5e5;border-radius:6px;padding:4px 8px;font-size:22px;cursor:pointer;line-height:1}
+.icon-list button.active{outline:2px solid var(--accent);background:#fff}
+
+
+  /* —— Icon picker ——— */
+  .icon-picker{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+  .icon-picker button{font-size:24px;padding:4px 6px;background:none;border:1px solid #555;border-radius:6px;cursor:pointer;}
+  .icon-picker button.active{outline:2px solid var(--accent);}
+
+
+  /* ——— Panel tidy overrides ——— */
+  #panel{display:flex;flex-direction:column;gap:14px;}
+  #panel .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  #panel h3{flex:0 0 auto;}
+
+  
+/* === Enhanced Weather Icon Styles === */
+@keyframes floatIcon {
+  0%   { transform: translate(-50%, -50%) translateY(0); }
+  50%  { transform: translate(-50%, -50%) translateY(-6px); }
+  100% { transform: translate(-50%, -50%) translateY(0); }
+}
+@keyframes pulseIcon {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.2); }
+}
+
+/* Map markers */
+.marker i{
+  font-size:46px;
+  animation:floatIcon 4s ease-in-out infinite;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.45));
+}
+/* Forecast panels */
+.day i,
+.hourly i{
+  font-size:30px;
+  animation:pulseIcon 6s ease-in-out infinite;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
+  transition:transform .25s;
+}
+.day:hover i,
+.hourly:hover i{
+  transform:scale(1.15) rotate(4deg);
+}
+
+/* Color palette per icon */
+.fa-sun{color:#facc15;}
+.fa-cloud-sun{color:#ffbe6f;}
+.fa-cloud{color:#a3bffa;}
+.fa-cloud-rain,
+.fa-cloud-showers-heavy{color:#4DB7FF;}
+.fa-cloud-meatball{color:#39c9e8;}
+.fa-smog{color:#9ca3af;}
+.fa-snowflake{color:#8ecae6;}
+.fa-bolt{color:#ffd43b;}
+
+
+  /* —— Forecast table refreshed ———————————— */
+  #forecast{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+  }
+  #forecast th,#forecast td{
+    padding:.55rem .4rem;
+    text-align:center;
+  }
+  #forecast th{
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    font-weight:600;
+  }
+  #forecast tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+
+  /* Bottom navigation bar polished */
+  #bottomBar{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-bottom-left-radius:var(--radius);
+    border-bottom-right-radius:var(--radius);
+  }
+
+  /* Hourly & Daily cards harmonised */
+  table.hourly th{
+    background:rgba(255,255,255,.09);
+  }
+  table.hourly tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+  .day{
+    background:rgba(255,255,255,.08);
+  }
+
+  @media(max-width:600px){
+    #forecast{margin:14px 0;}
+  }
+
+
+@media(max-width:600px){
+  #forecast{display:none;}
+  #bottomBar{
+    background:transparent;
+    backdrop-filter:none;
+    padding:4px 4px 0;
+  }
+  #nav{
+    gap:6px;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    justify-content:flex-start;
+  }
+  #nav button{
+    padding:4px 8px;
+    font-size:.8rem;
+  }
+  #bottomBar::-webkit-scrollbar,
+  #nav::-webkit-scrollbar{display:none;}
+  #nearestStation{margin-top:14px;}
+}
+
+
+table.hourly td:nth-child(3), table.hourly th:nth-child(3){
+  text-align:left;
+  padding-left:4px;
+}
+
+
+@media(max-width:600px){
+  #mapArea{
+    height:55vh;
+  }
+  #map{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+  }
+}
+
+</style>
+<style>
+/* === Mobile & Map Visual Tweaks (added) === */
+#widget{
+  background:var(--glass);
+  backdrop-filter:blur(var(--blur));
+}
+body.night #widget{
+  background:rgba(255,255,255,.08);
+}
+#mapArea::before{
+  background:rgba(255,255,255,.06);
+}
+/* Remove blue tint under map image */
+#map{
+  opacity:0.9 !important;
+  filter:none !important;
+}
+/* Reduce bottom margin on small screens */
+@media(max-width:600px){
+  #mapArea{
+    margin:0 12px 20px 12px;
+    aspect-ratio:3/4;
+  }
+  #forecast{
+    margin:10px 14px 0 14px;
+  }
+}
+
+  /* —— Forecast table refreshed ———————————— */
+  #forecast{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-radius:var(--radius);
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+  }
+  #forecast th,#forecast td{
+    padding:.55rem .4rem;
+    text-align:center;
+  }
+  #forecast th{
+    background:rgba(255,255,255,.09);
+    color:var(--text);
+    font-weight:600;
+  }
+  #forecast tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+
+  /* Bottom navigation bar polished */
+  #bottomBar{
+    background:var(--glass);
+    backdrop-filter:blur(var(--blur));
+    border-bottom-left-radius:var(--radius);
+    border-bottom-right-radius:var(--radius);
+  }
+
+  /* Hourly & Daily cards harmonised */
+  table.hourly th{
+    background:rgba(255,255,255,.09);
+  }
+  table.hourly tr:nth-child(even){
+    background:rgba(255,255,255,.05);
+  }
+  .day{
+    background:rgba(255,255,255,.08);
+  }
+
+  @media(max-width:600px){
+    #forecast{margin:14px 0;}
+  }
+
+</style>
+<style>
+/* === Mobile layout refinements (2025‑07) === */
+
+/* 1. Hourly forecast: horizontal scroll + column pruning */
+@media(max-width:600px){
+  /* keep table readable while allowing swipe */
+  #hourlyPanel table.hourly{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    font-size:0.83rem;
+    min-width:550px;          /* keeps columns from squashing too much */
+  }
+}
+@media(max-width:480px){
+  /* hide less‑critical columns on very small screens */
+  /*#hourlyPanel table.hourly th:nth-child(n+4),
+  #hourlyPanel table.hourly td:nth-child(n+4){*/
+    display:none;
+  }
+  #hourlyPanel table.hourly{
+    min-width:320px;
+  }
+}
+
+/* 2. Daily/extra cards tighter padding on phones */
+@media(max-width:600px){
+  .card,
+  .panel{
+    padding:0.9rem 1.1rem;
+  }
+  .day{
+    padding:0.45rem 0.2rem;
+  }
+}
+
+/* 3. Sticky search bar for quick access */
+@media(max-width:600px){
+  .search{
+    position:sticky;
+    top:8px;
+    z-index:120;
+    margin-bottom:14px;
+  }
+}
+
+/* 4. Ensure nav pills scroll nicely edge‑to‑edge */
+#nav{
+  scroll-padding-left:12px;
+}
+</style>
+<style>
+/* === Extra breakpoint up to 900px (table condenses sooner) === */
+@media(max-width:900px){
+  /* shrink font & allow horizontal scroll earlier */
+  #hourlyPanel table.hourly{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    font-size:0.9rem;
+  }
+  /* tighten cards and map container */
+  .card,
+  .panel{
+    max-width:100%;
+  }
+}
+</style>
+<style>
+/* Orario icon cells */
+table.hourly td:nth-child(2), table.hourly th:nth-child(2){
+  text-align:center;
+  width:38px;
+}
+</style>
+<style>
+.weather-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.4));
+  animation: icon-pop 1s ease-in-out infinite alternate;
+}
+@keyframes icon-pop {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
+}
+</style></head>
+<body>
+<!-- —— Search —— -->
+<form class="search" id="searchForm">
+<input autocomplete="off" id="cityInput" placeholder="Scrivi una città o usa 📍…" required=""/>
+<button type="submit"><i class="fa-solid fa-search"></i></button>
+</form>
+<!-- —— Widget map + forecast —— -->
+<div id="widget">
+<header>
+<h1 id="hDay">GIORNO 1</h1>
+<p id="hDate"></p>
+</header>
+<div id="mapArea">
+<img alt="Mappa Calabria" id="map" loading="lazy" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png"/>
+</div>
+<table aria-label="Previsioni meteo" id="forecast"></table>
+<div id="bottomBar">
+<button aria-label="Cambia tema" class="fab-btn" id="themeBtn" title="Cambia tema">🌙</button>
+<nav aria-label="Seleziona giorno previsioni" id="nav"></nav>
+<button aria-label="Pannello admin" class="fab-btn" id="fab" title="Pannello admin">⚙️</button>
+</div>
+<!-- === Map Control Panel === -->
+<div id="panel">
+<div id="handle"></div>
+<h3>Modifica Giorno</h3>
+<label>Giorno
+      <select id="selDay"></select>
+</label>
+<label>Nome visualizzato
+      <input id="inpDayName" type="text"/>
+</label>
+<label>Data visualizzata
+      <input id="inpDayDate" type="text"/>
+</label>
+<hr style="margin:16px 0; border:none; border-top:1px solid #ddd;"/>
+<h3>Modifica Marker</h3>
+<label>Icona (emoji)
+      <input id="inpIcon" placeholder="☀️" type="text"/>
+</label>
+<div class="icon-picker" id="iconPicker"></div>
+<label>Dimensione marker
+      <input id="inpMarkerSize" max="64" min="24" type="range"/>
+</label>
+<div class="row">
+<button id="btnSaveMarker">Salva marker</button>
+<button id="btnDeleteMarker">🗑️ Elimina marker</button>
+<button id="btnAddMarker">➕ Nuovo marker</button>
+<button id="btnSaveLayout">💾 Layout</button>
+</div>
+<div class="icon-list" id="iconList"></div>
+<hr style="margin:16px 0; border:none; border-top:1px solid #ddd;"/>
+<h3>Modifica Tabella</h3>
+<label>Città
+      <select id="selCity"></select>
+</label>
+<div class="row">
+<label style="flex:1;">T° max
+        <input id="inpTmax" type="number"/>
+</label>
+<label style="flex:1;">T° min
+        <input id="inpTmin" type="number"/>
+</label>
+</div>
+<button id="btnSaveForecast">Salva previsione</button>
+<button id="btnReset" style="margin-top:22px;">Reset layout</button>
+</div>
+<div id="toast"></div>
+</div>
+<!-- —— Extra dynamic panels —— -->
+<section id="nearestStation"></section>
+<section id="adviceBox"></section>
+<section id="hourlyPanel"></section>
+<section id="dailyPanel"></section>
+<iframe class="radar" id="radarFrame" loading="lazy"></iframe>
+<!-- —— Admin Panel —— -->
+<div id="adminPanel">
+<div class="modal">
+<h2>Pannello di controllo</h2>
+<p id="stationsCount"></p>
+<button id="closeAdmin">Chiudi</button>
+<button id="reloadBtn">Aggiorna previsioni</button>
+</div>
+</div>
+<footer>Previsioni automatiche – dati Open‑Meteo integrati con la rete MLG Map.</footer>
+<script>function wmo(code) {
+  const map = {
+  };
+  const src = map[code] || "";
+  return src ? `<img src="${src}" alt="meteo" class="weather-icon">` : "";
+}</script>
+<!-- Admin overlay -->
+<div class="modal hidden" id="adminOverlay">
+<div class="box">
+<h2>Modifica marker</h2>
+<textarea id="markerJson"></textarea>
+<div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem">
+<button id="saveMarkers">Salva</button>
+<button id="closeAdmin">Chiudi</button>
+</div>
+</div>
+</div>
+<script>
+/* === Map Control Panel integrato === */
+(function(){
+  const panel=document.getElementById('panel');
+  if(!panel) return;
+
+  /* ——— Elementi DOM ——— */
+  
+        const btnAddMarker=$('#btnAddMarker'), iconList=$('#iconList');
+
+        /* —— Icon picker ——— */
+        const iconSet=['☀️','🌙','🌤️','⛅️','🌦️','🌧️','🌨️','⛈️','❓','💨','🌊','⬇️','⬆️','➡️','⬅️','↗️','↘️','↙️','↖️','〰️'];
+        const iconPicker=document.getElementById('iconPicker');
+        function buildIconPicker(selected){
+          if(!iconPicker) return;
+          iconPicker.innerHTML='';
+          iconSet.forEach(ic=>{
+            const b=document.createElement('button');
+            b.type='button';
+            b.textContent=ic;
+            if(ic===selected) b.classList.add('active');
+            b.addEventListener('click',()=>{ inpIcon.value=ic; buildIconPicker(ic); });
+            iconPicker.appendChild(b);
+          });
+        }
+
+
+        /* ——— Add new marker ——— */
+        btnAddMarker && btnAddMarker.addEventListener('click', async ()=>{
+          const query = prompt('Inserisci la località (es: "Cosenza, Italia")','');
+          if(!query) return;
+          toast('Ricerca coordinate…');
+          let lat,lon,display;
+          try{
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`);
+            const arr = await res.json();
+            if(!arr.length){ toast('Località non trovata'); return; }
+            lat = parseFloat(arr[0].lat);
+            lon = parseFloat(arr[0].lon);
+            display = arr[0].display_name.split(',')[0];
+          }catch(e){
+            console.error(e); toast('Errore geocoding'); return;
+          }
+          const {x,y}=latLonToXY(lat,lon);
+          try{
+            const data = await forecast(lat,lon);
+            const dayCount=data.daily.time.length;
+            for(let d=0;d<dayCount;d++){
+              const pt={city:display||query,
+                        x,y,lat,lon,
+                        icon:wmo(data.daily.weathercode[d]),
+                        tmax:Math.round(data.daily.temperature_2m_max[d]),
+                        tmin:Math.round(data.daily.temperature_2m_min[d])};
+              DAYS[d].points.push(pt);
+            }
+            buildSelectors();
+            updateIconList();
+            render();
+            toast('Marker aggiunto e previsioni aggiornate');
+          }catch(e){
+            console.error(e);
+            toast('Errore nel recuperare dati meteo');
+          }
+        });
+
+        /* ——— Icon list ——— */
+        function updateIconList(){
+          if(!iconList) return;
+          iconList.innerHTML='';
+          DAYS[curDay].points.forEach((p,i)=>{
+            const btn=document.createElement('button');
+            btn.type='button';
+            btn.textContent=p.icon;
+            btn.title=p.city;
+            if(i===editIdx) btn.classList.add('active');
+            btn.addEventListener('click',()=>{
+              editIdx=i; panel.classList.add('open'); editMarker.call({dataset:{idx:i}}, new Event('click'));
+              updateIconList();
+            });
+            iconList.appendChild(btn);
+          });
+        }
+        /* aggiorna lista quando si cambia giorno o rende */
+        const oldRender=window.render;
+        window.render=function(){ oldRender(); updateIconList(); }
+const selDay=$('#selDay'), inpDayName=$('#inpDayName'), inpIcon=$('#inpIcon'),
+        selCity=$('#selCity'), inpTmax=$('#inpTmax'), inpTmin=$('#inpTmin'),
+        inpMarkerSize=$('#inpMarkerSize'), toastEl=$('#toast'),
+        btnSaveMarker=$('#btnSaveMarker'), btnDeleteMarker=$('#btnDeleteMarker'),
+        btnSaveLayout=$('#btnSaveLayout'), btnReset=$('#btnReset'),
+        btnSaveForecast=$('#btnSaveForecast');
+
+  /* Clono il FAB per eliminare vecchi listener */
+  const oldFab=$('#fab');
+  const fab=oldFab.cloneNode(true);
+  oldFab.parentNode.replaceChild(fab,oldFab);
+
+  let adminMode=false, editIdx=null;
+
+  /* ——— Helper toast ——— */
+  function toast(msg){
+    toastEl.textContent=msg;
+    toastEl.style.display='block';
+    clearTimeout(toastEl._t);
+    toastEl._t=setTimeout(()=>toastEl.style.display='none',2100);
+  }
+
+  /* ——— Toggle adminMode con click sul FAB ——— */
+  fab.addEventListener('click',e=>{
+    e.preventDefault(); e.stopImmediatePropagation();
+    adminMode=!adminMode;
+    fab.textContent=adminMode?'🔒':'⚙️';
+    toast(adminMode?'Modalità admin attiva':'Admin disattivata');
+    render();            // ricollega drag/click ai marker
+  });
+
+  /* ——— Costruisci combo giorno/città ——— */
+  function buildSelectors(){
+    selDay.innerHTML=''; DAYS.forEach((d,i)=>selDay.add(new Option(d.label,i)));
+    selCity.innerHTML=''; (window.CITIES||[]).forEach(c=>selCity.add(new Option(c.city||c,c.city||c)));
+  }
+  buildSelectors();
+
+  /* ——— Estendo render() per gesti admin ——— */
+  const _render=window.render;
+  window.render=function(){
+    _render && _render();
+    if(!adminMode) return;
+
+    const mapArea=$('#mapArea');
+    mapArea.querySelectorAll('.marker').forEach((mk,i)=>{
+      mk.dataset.idx=i;
+      mk.style.cursor='grab';
+      mk.removeEventListener('click',editMarker);
+      mk.addEventListener('click',editMarker);
+      mk.removeEventListener('pointerdown',dragStart);
+      mk.addEventListener('pointerdown',dragStart);
+    });
+  };
+
+  /* ——— Drag marker ——— */
+  function dragStart(ev){
+    const mk=this; const idx=+this.dataset.idx;
+    const rect=mk.parentElement.getBoundingClientRect();
+    mk.setPointerCapture(ev.pointerId);
+    const move=e=>{
+      const x=((e.clientX-rect.left)/rect.width)*100;
+      const y=((e.clientY-rect.top)/rect.height)*100;
+      mk.style.left=Math.min(Math.max(0,x),100)+'%';
+      mk.style.top=Math.min(Math.max(0,y),100)+'%';
+    };
+    const up=e=>{
+      mk.releasePointerCapture(e.pointerId);
+      DAYS[curDay].points[idx].x=parseFloat(mk.style.left);
+      DAYS[curDay].points[idx].y=parseFloat(mk.style.top);
+      mk.removeEventListener('pointermove',move);
+      mk.removeEventListener('pointerup',up);
+    };
+    mk.addEventListener('pointermove',move);
+    mk.addEventListener('pointerup',up);
+  }
+
+  /* ——— Click marker → apre pannello ——— */
+  function editMarker(e){
+    editIdx=+this.dataset.idx;
+    const pt=DAYS[curDay].points[editIdx];
+    selDay.value=curDay;
+    inpDayName.value=DAYS[curDay].label;
+    inpIcon.value=pt.icon;
+    buildIconPicker(pt.icon);
+    selCity.value=pt.city||'';
+    inpTmax.value=pt.tmax||'';
+    inpTmin.value=pt.tmin||'';
+    panel.classList.add('open');
+    e.stopPropagation();
+  }
+
+  /* —— Chiudi pannello cliccando fuori —— */
+  $('#widget').addEventListener('click',()=>panel.classList.remove('open'));
+  panel.addEventListener('click',e=>e.stopPropagation());
+
+  /* —— Salva marker —— */
+  btnSaveMarker.addEventListener('click',()=>{
+    if(editIdx===null) return toast('Nessun marker selezionato');
+    const pt=DAYS[curDay].points[editIdx];
+    pt.icon=inpIcon.value.trim()||pt.icon;
+    pt.code = undefined;
+    pt.city=selCity.value;
+    pt.tmax=parseFloat(inpTmax.value)||pt.tmax;
+    pt.tmin=parseFloat(inpTmin.value)||pt.tmin;
+    panel.classList.remove('open'); editIdx=null; render();
+  });
+
+  /* —— Elimina marker —— */
+  btnDeleteMarker.addEventListener('click',()=>{
+    if(editIdx===null) return toast('Nessun marker selezionato');
+    DAYS[curDay].points.splice(editIdx,1);
+    panel.classList.remove('open'); editIdx=null; render();
+  });
+
+  /* —— Slider dimensione marker —— */
+  inpMarkerSize.addEventListener('input',e=>{
+    document.documentElement.style.setProperty('--marker-size',e.target.value+'px');
+  });
+
+  /* —— Salva layout —— */
+  btnSaveLayout.addEventListener('click',()=>{
+    localStorage.setItem('CALABRIA_MAP_LAYOUT_V1',JSON.stringify(DAYS));
+    toast('Layout salvato');
+  });
+  btnReset.addEventListener('click',()=>{localStorage.removeItem('CALABRIA_MAP_LAYOUT_V1'); location.reload();});
+
+  /* —— Salva dati tabella —— */
+  btnSaveForecast.addEventListener('click',()=>{
+    const city=selCity.value;
+    DAYS[curDay].points.forEach(p=>{
+      if(p.city===city){
+        p.tmax=parseFloat(inpTmax.value)||p.tmax;
+        p.tmin=parseFloat(inpTmin.value)||p.tmin;
+      }
+    });
+    panel.classList.remove('open'); render();
+  });
+
+  /* —— Sincronizza nome giono —— */
+  inpDayName.addEventListener('change',()=>{
+    DAYS[curDay].label=inpDayName.value.trim()||DAYS[curDay].label;
+    if(typeof buildNav==='function') buildNav();
+  });
+
+  /* —— Carica layout salvato —— */
+  try{
+    const mem=localStorage.getItem('CALABRIA_MAP_LAYOUT_V1');
+    if(mem){
+      const saved=JSON.parse(mem);
+      if(Array.isArray(saved) && saved.length===DAYS.length){
+        DAYS.splice(0,DAYS.length,...saved);
+      }
+    }
+  }catch(e){}
+
+})();
+</script>
+<!-- Hidden override editor -->
+<div id="overridePanel" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+<div style="background:var(--bg);padding:18px;border-radius:var(--radius);max-width:90%;width:480px;max-height:90vh;overflow:auto;color:var(--text)">
+<h2>Modifica previsione 24 h</h2>
+<p>Inserisci un blocco JSON con <code>{ora:"HH:MM", t:°, ur:%, mm:precip, prob:%}</code>. Solo i campi presenti sovrascrivono il valore.</p>
+<textarea id="overrideJSON" style="width:100%;height:200px;"></textarea>
+<div style="display:flex;gap:12px;margin-top:14px;justify-content:flex-end">
+<button id="btnCancelOverride">Annulla</button>
+<button id="btnSaveOverride">Salva</button>
+</div>
+</div>
+</div>
+<script>
+/* ---- Patch v7.1 --- real-time bias + regional override --- */
+// === Real‑time bias function ===
+const originalRenderHourly = window.renderHourly;
+window.renderHourly = function(data, idx){
+    if(typeof LIVE === "object" && LIVE){
+        const tempBias = (!isNaN(LIVE.t) && !isNaN(data.hourly.temperature_2m[idx])) ? (LIVE.t - data.hourly.temperature_2m[idx]) : 0;
+        const rhBias   = (!isNaN(LIVE.ur) && !isNaN(data.hourly.relativehumidity_2m[idx])) ? (LIVE.ur - data.hourly.relativehumidity_2m[idx]) : 0;
+        for(let i=idx; i<Math.min(idx+24, data.hourly.time.length); i++){
+            data.hourly.temperature_2m[i] += tempBias;
+            data.hourly.relativehumidity_2m[i] += rhBias;
+            if(LIVE.rain > 0.1 && i-idx < 3) data.hourly.weathercode[i] = 61; // override first 3h as 'rain'
+        }
+    }
+    return originalRenderHourly.call(this, data, idx);
+};
+
+// === Daily regional override ===
+let DAILY_OVERRIDE = JSON.parse(localStorage.getItem("dailyOverride")||"{}");
+
+function saveDailyOverride(dateKey, city, obj){
+    if(!DAILY_OVERRIDE[dateKey]) DAILY_OVERRIDE[dateKey] = {};
+    DAILY_OVERRIDE[dateKey][city] = { ...(DAILY_OVERRIDE[dateKey][city]||{}), ...obj };
+    localStorage.setItem("dailyOverride", JSON.stringify(DAILY_OVERRIDE));
+}
+
+function applyDailyOverride(dateKey, city, field, original){
+    const o = DAILY_OVERRIDE?.[dateKey]?.[city];
+    return (o && o[field] !== undefined) ? o[field] : original;
+}
+
+// Patch loadCalabria to inject overrides
+const originalLoadCalabria = window.loadCalabria;
+window.loadCalabria = async function() {
+    await originalLoadCalabria();
+    DAYS.forEach(dayObj => {
+        const baseDate = new Date(); baseDate.setHours(0,0,0,0);
+        baseDate.setDate(baseDate.getDate() + dayObj.offset);
+        const keyStr = baseDate.toISOString().slice(0,10);
+        dayObj.points.forEach(pt => {
+            pt.tmax = applyDailyOverride(keyStr, pt.city, "tmax", pt.tmax);
+            pt.tmin = applyDailyOverride(keyStr, pt.city, "tmin", pt.tmin);
+            const newCode = applyDailyOverride(keyStr, pt.city, "code", pt.code);
+            if(newCode !== pt.code) {
+                pt.code = newCode;
+                pt.icon = wmo(newCode);
+            }
+            pt.icon = applyDailyOverride(keyStr, pt.city, "icon", pt.icon);
+        });
+    });
+    render();
+};
+
+// Extend existing 'Salva previsione' button to persist override
+if(typeof btnSaveForecast !== "undefined" && btnSaveForecast){
+    btnSaveForecast.addEventListener("click", () => {
+        const city = selCity.value;
+        const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + curDay);
+        const key = d.toISOString().slice(0,10);
+        const obj = {
+            tmax: inpTmax.value ? parseFloat(inpTmax.value) : undefined,
+            tmin: inpTmin.value ? parseFloat(inpTmin.value) : undefined
+        };
+        saveDailyOverride(key, city, obj);
+    });
+}
+</script>
+</body>
+</html>
