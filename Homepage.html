@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meteo Lo Gullo – Home</title>
+
+<!-- Fonts & Icons -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Baloo+2:wght@600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+
+<style>
+/* ——— Theme ——— */
+:root{
+  --bg:linear-gradient(135deg,#001219,#005f73 40%,#0a9396);
+  --glass:rgba(255,255,255,.14);
+  --blur:14px;
+  --radius:18px;
+  --accent:#00d2ff;
+  --accent2:#3a7bd5;
+  --text:#ecf1f8;
+  --text-dim:#c5d0e6;
+  --marker-size:clamp(22px,5vw,48px);
+  --panel-w: 980px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  min-height:100vh;background:var(--bg);font-family:"Inter",system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text);
+  display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 12px;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+/* ——— Search ——— */
+.search{display:flex;gap:.5rem;width:100%;max-width:820px;position:sticky;top:8px;z-index:20}
+.search .field{position:relative;flex:1}
+.search input{
+  width:100%;padding:0.9rem 3.2rem 0.9rem 1.1rem;border:none;border-radius:var(--radius);
+  background:var(--glass);backdrop-filter:blur(var(--blur));color:var(--text);font-size:1rem;outline:none;
+}
+.search .geo{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  border:none;background:#ffffff26;color:#fff;cursor:pointer;
+}
+.search .submit{
+  padding:.9rem 1.2rem;border:none;border-radius:var(--radius);
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-weight:800;font-size:1rem;cursor:pointer;
+}
+/* ——— Main widget (map + header + nav) ——— */
+#widget{width:100%;max-width:820px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto;grid-template-areas:"header""map""bottom";background:radial-gradient(circle at 50% 15%,#4fd1ff 0%,#0ea5e9 100%);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden;position:relative;isolation:isolate;transition:background .4s;}
+body.night #widget{background:radial-gradient(circle at 50% 15%,#06214b 0%,#010c1e 100%);}  
+header{grid-area:header;padding:18px 14px;text-shadow:0 2px 6px rgba(0,0,0,.5);font-family:'Baloo 2',cursive;}
+header h1{font-size:clamp(26px,6vw,38px);font-weight:800;line-height:1.1;}
+header p{font-size:clamp(14px,3vw,18px);margin-top:2px;font-weight:600;opacity:.9;}
+/* Map */
+#mapArea{grid-area:map;position:relative;margin:0 14px 10px 14px;border-radius:6px;aspect-ratio:3/4;}
+#mapArea::before{content:"";position:absolute;inset:0;background:rgba(255,255,255,.06);border-radius:inherit;}
+#map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:none;opacity:0.9;}
+.marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);user-select:none;cursor:default;text-shadow:0 1px 3px rgba(0,0,0,.45);}
+.marker img.weather-icon{width:calc(var(--marker-size) * 1.4);height:calc(var(--marker-size) * 1.4);}
+/* Bottom bar */
+#bottomBar{grid-area:bottom;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 14px;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);box-shadow:0 -4px 12px rgba(0,0,0,.25);z-index:3;}
+#nav{flex:1;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;overflow-x:auto;padding:2px 0;}
+#nav button{background:transparent;border:none;font-size:14px;font-weight:700;padding:6px 10px;border-radius:8px;transition:background .2s,color .2s;color:#fff;white-space:nowrap;}
+#nav button.active{background:#facc15;color:#000;}
+.fab-btn{width:52px;height:52px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.35);flex-shrink:0;font-size:26px;}
+#themeBtn{background:#ffffff26;color:#fff;}
+/* ——— Sections under the map ——— */
+.section{background:var(--glass);backdrop-filter:blur(var(--blur));border-radius:var(--radius);padding:1.1rem 1.2rem;width:100%;max-width:var(--panel-w);box-shadow:0 10px 30px rgba(0,0,0,.15);}
+.section h2{font-family:'Baloo 2',cursive;font-size:1.4rem;margin-bottom:.6rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.card{background:rgba(255,255,255,.12);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.card img{width:100%;aspect-ratio:16/9;object-fit:cover}
+.card .txt{padding:.8rem}
+.card .kicker{font-size:.78rem;color:var(--text-dim);font-weight:700;letter-spacing:.02em}
+.card h3{font-size:1rem;margin:.2rem 0 .35rem;font-weight:800;line-height:1.2}
+.card p{font-size:.9rem;color:var(--text);opacity:.95}
+/* Stations preview */
+#stationsFrame{width:100%;height:520px;border:none;border-radius:12px;overflow:hidden}
+/* Social strip */
+.social-strip{display:flex;gap:10px;flex-wrap:wrap}
+.social-strip a{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:.6rem .9rem;border-radius:999px;font-weight:800}
+/* Forecast-mode: hide home sections */
+body.forecast-mode .home-sections{display:none}
+/* Mobile */
+@media (max-width: 600px){
+  #mapArea{margin:0 12px 12px 12px;aspect-ratio:3/4}
+  #bottomBar{position:sticky;bottom:0}
+  #nav{flex-wrap:nowrap;justify-content:flex-start}
+  .fab-btn{width:42px;height:42px;font-size:20px}
+}
+footer{font-size:.8rem;color:var(--text-dim);text-align:center;margin:18px 0}
+</style>
+</head>
+<body>
+
+<!-- Search -->
+<form class="search" id="searchForm" autocomplete="off">
+  <div class="field">
+    <input id="cityInput" placeholder="Scrivi una località o usa la posizione 📍" required />
+    <button type="button" class="geo" id="geoBtn" title="Usa la tua posizione"><i class="fa-solid fa-location-crosshairs"></i></button>
+  </div>
+  <button class="submit" type="submit"><i class="fa-solid fa-search"></i></button>
+</form>
+
+<!-- Widget -->
+<div id="widget" aria-live="polite">
+  <header>
+    <h1 id="hDay">GIORNO 1</h1>
+    <p id="hDate"></p>
+  </header>
+
+  <div id="mapArea">
+    <img id="map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Map_of_region_of_Calabria%2C_Italy.svg/565px-Map_of_region_of_Calabria%2C_Italy.svg.png" alt="Mappa della Calabria" loading="lazy" />
+    <!-- markers injected here -->
+  </div>
+
+  <div id="bottomBar">
+    <button id="themeBtn" class="fab-btn" title="Cambia tema" aria-label="Cambia tema">🌙</button>
+    <nav id="nav" aria-label="Seleziona giorno previsioni"></nav>
+    <button id="exitBtn" class="fab-btn" title="Torna alla Home" aria-label="Torna alla Home">🏠</button>
+  </div>
+</div>
+
+<!-- —— HOME SECTIONS —— -->
+<div class="home-sections" style="display:contents">
+  <!-- Stations live preview -->
+  <section class="section" id="stations">
+    <h2>MLG Map — Stazioni in tempo reale</h2>
+    <iframe id="stationsFrame" src="https://meteologullo.github.io/mappamlg/" loading="lazy" title="Mappa stazioni Meteo Lo Gullo"></iframe>
+  </section>
+
+  <!-- Social Flash -->
+  <section class="section" id="flash">
+    <h2>Flash dai Social</h2>
+    <div class="social-strip">
+      <a href="https://www.facebook.com/METEOLOGULLO/" target="_blank" rel="noopener"><i class="fa-brands fa-facebook"></i> Ultimi post</a>
+      <a href="https://www.instagram.com/meteologullo/" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Reel & foto</a>
+      <a href="https://www.tiktok.com/@meteologullo_mlg" target="_blank" rel="noopener"><i class="fa-brands fa-tiktok"></i> TikTok</a>
+    </div>
+    <!-- Facebook Page Plugin (shows timeline) -->
+    <div id="fb-root"></div>
+    <div class="fb-page" data-href="https://www.facebook.com/METEOLOGULLO/" data-tabs="timeline" data-width="500" data-height="420" data-small-header="true" data-adapt-container-width="true" data-hide-cover="false" data-show-facepile="false">
+      <blockquote cite="https://www.facebook.com/METEOLOGULLO/" class="fb-xfbml-parse-ignore"><a href="https://www.facebook.com/METEOLOGULLO/">METEO LO GULLO</a></blockquote>
+    </div>
+  </section>
+
+  <!-- Ultime News -->
+  <section class="section" id="news">
+    <h2>Ultime news meteo</h2>
+    <div class="grid" id="newsGrid">
+      <!-- Filled by JS from inline JSON or falls back to links -->
+    </div>
+  </section>
+
+  <!-- Curiosità -->
+  <section class="section" id="curiosita">
+    <h2>Curiosità meteo</h2>
+    <div class="grid" id="curioGrid"></div>
+  </section>
+
+  <!-- Link rapidi -->
+  <section class="section" id="links">
+    <h2>Sezioni rapide</h2>
+    <div class="social-strip">
+      <a href="https://www.meteologullo.com/blog" target="_blank" rel="noopener"><i class="fa-solid fa-newspaper"></i> News</a>
+      <a href="https://www.meteologullo.com/curiosita" target="_blank" rel="noopener"><i class="fa-solid fa-lightbulb"></i> Curiosità</a>
+      <a href="https://www.meteologullo.com/stazioni-meteorologiche-mlg" target="_blank" rel="noopener"><i class="fa-solid fa-tower-observation"></i> Stazioni</a>
+      <a href="https://www.meteologullo.com/blank" target="_blank" rel="noopener"><i class="fa-solid fa-user"></i> Chi siamo</a>
+    </div>
+  </section>
+</div>
+
+<footer>
+  © Meteo Lo Gullo — previsioni automatiche con dati Open‑Meteo e rete MLG Map.
+</footer>
+
+<!-- FB SDK -->
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/it_IT/sdk.js#xfbml=1&version=v18.0" nonce="mlg"></script>
+
+<script>
+/* ============ Utility & State ============ */
+const $ = (q,root=document)=>root.querySelector(q);
+const $$ = (q,root=document)=>[...root.querySelectorAll(q)];
+const fmt = (v,u="") => isFinite(v) ? Math.round(v)+u : "--";
+const CAL_ABOX = { latMin: 37.90, latMax: 40.30, lonMin: 15.60, lonMax: 17.30 };
+const CITIES = [
+  {city:'Cosenza',lat:39.307,lon:16.251},
+  {city:'Catanzaro',lat:38.905,lon:16.594},
+  {city:'Reggio Calabria',lat:38.114,lon:15.651},
+  {city:'Crotone',lat:39.080,lon:17.126},
+  {city:'Vibo Valentia',lat:38.674,lon:16.10}
+];
+let DAYS=[], curDay=0;
+
+/* ============ Map helpers ============ */
+function latLonToXY(lat,lon){
+  const x = (lon - CAL_ABOX.lonMin)/(CAL_ABOX.lonMax - CAL_ABOX.lonMin)*100;
+  const y = (1- (lat - CAL_ABOX.latMin)/(CAL_ABOX.latMax - CAL_ABOX.latMin))*100;
+  return {x,y};
+}
+function filenameFromWMO(code,night=false){
+  code=Number(code);
+  if(code===0) return night?"Sereno notte.PNG":"Sereno giorno.PNG";
+  if(code===1||code===2) return night?"Parz nuvoloso notte.PNG":"Parzialmente nuvoloso giorno.PNG";
+  if(code===3) return "Nuvoloso.PNG";
+  if(code===45||code===48) return "Nebbia nuvole basse.PNG";
+  if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return night?"Possibili piovaschi notte.PNG":"Possibili piovaschi giorno.PNG";
+  if([71,73,75,85,86,77].includes(code)) return "Neve .PNG";
+  if([95,96,99].includes(code)) return "Possibili temporali.PNG";
+  if([62,64,65].includes(code)) return "Pioggia moderata.PNG";
+  if([60,61].includes(code)) return "Pioggia debole.PNG";
+  return night?"Parz nuvoloso notte.PNG":"Parzialmente nuvoloso giorno.PNG";
+}
+function iconImg(file, alt=""){
+  const base1="https://meteologullo.github.io/mappamlg/";
+  const first = encodeURI(file);
+  const onerr = "if(!this.dataset.step){this.dataset.step='1';this.src=this.src.replace('.PNG','.png');}"
+              + "else if(this.dataset.step=='1'){this.dataset.step='2';this.src=this.src.replace('%20.','.');}"
+              + "else if(this.dataset.step=='2'){this.dataset.step='3';this.src=this.src.replace(/%20/g,'_');}"
+              + "else if(this.dataset.step=='3'){this.dataset.step='4';this.src=this.src.replace('/mappamlg/','/mappamlg/icons/');}"
+              + "else {this.src='data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%23e5e7eb%22/%3E%3Ccircle cx=%2220%22 cy=%2222%22 r=%228%22 fill=%22%23f59e0b%22/%3E%3Cellipse cx=%2236%22 cy=%2238%22 rx=%2218%22 ry=%2212%22 fill=%22%23d1d5db%22/%3E%3C/svg%3E';}";
+  return `<img class="weather-icon" alt="${alt}" src="${base1}${first}" data-step="0" onerror="${onerr}" style="width:calc(var(--marker-size) * 1.4);height:calc(var(--marker-size) * 1.4);object-fit:contain;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35));">`;
+}
+
+/* ============ Build days for Calabria map ============ */
+async function loadCalabria(){
+  const promises = CITIES.map(c => fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&timezone=auto&daily=temperature_2m_max,temperature_2m_min,weathercode`).then(r=>r.json()));
+  const results = await Promise.all(promises);
+  DAYS=[];
+  const n = results[0].daily.time.length;
+  for(let d=0; d<n; d++){
+    const day = {label:`GIORNO ${d+1}`,offset:d,points:[]};
+    CITIES.forEach((c,idx)=>{
+      const fc = results[idx];
+      const {x,y} = latLonToXY(c.lat,c.lon);
+      day.points.push({
+        city:c.city,x,y,
+        code: fc.daily.weathercode[d],
+        tmax: Math.round(fc.daily.temperature_2m_max[d]),
+        tmin: Math.round(fc.daily.temperature_2m_min[d])
+      });
+    });
+    DAYS.push(day);
+  }
+  buildNav(); render();
+}
+
+/* ============ Render ============ */
+function buildNav(){
+  const nav = $("#nav"); nav.innerHTML="";
+  DAYS.forEach((d,i)=>{
+    const b=document.createElement('button'); b.type="button"; b.textContent=d.label;
+    if(i===curDay) b.classList.add('active');
+    b.addEventListener('click',()=>{curDay=i; updateNav(); render();});
+    nav.appendChild(b);
+  });
+}
+function updateNav(){ $$("#nav button").forEach((b,i)=>b.classList.toggle('active',i===curDay)); }
+
+function render(){
+  if(!DAYS.length) return;
+  const data = DAYS[curDay];
+  $("#hDay").textContent = data.label;
+  const dt = new Date(); dt.setDate(dt.getDate()+data.offset);
+  $("#hDate").textContent = dt.toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+  const area = $("#mapArea");
+  area.querySelectorAll(".marker").forEach(m=>m.remove());
+  data.points.forEach(p=>{
+    const m=document.createElement('div');
+    m.className="marker";
+    m.style.left=p.x+"%"; m.style.top=p.y+"%";
+    m.innerHTML = iconImg(filenameFromWMO(p.code,false));
+    m.title = `${p.city}: ${p.tmax}° / ${p.tmin}°`;
+    area.appendChild(m);
+  });
+}
+
+/* ============ Forecast Search (geocoding + show mode) ============ */
+async function geocode(name){
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&language=it&count=1`;
+  const r = await fetch(url); if(!r.ok) throw new Error("Geo fallita");
+  const j = await r.json(); if(!j.results || !j.results.length) throw new Error("Località non trovata");
+  const g = j.results[0];
+  return {name: g.name, lat: g.latitude, lon: g.longitude, country: g.country, admin1: g.admin1 || ""};
+}
+async function forecastFull(lat,lon){
+  const u = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&hourly=temperature_2m,precipitation,windspeed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max`;
+  const r = await fetch(u); if(!r.ok) throw new Error("Meteo fallita"); return r.json();
+}
+function enterForecastMode(){ document.body.classList.add("forecast-mode"); }
+function exitForecastMode(){ document.body.classList.remove("forecast-mode"); $("#cityInput").value=""; }
+
+/* Simple inline forecast rendering under the widget */
+function ensureForecastPanel(){
+  let panel = $("#forecastPanel");
+  if(panel) return panel;
+  panel = document.createElement("section");
+  panel.className="section"; panel.id="forecastPanel";
+  panel.innerHTML = `
+    <h2 id="fcTitle">Previsioni</h2>
+    <div id="fcContent">
+      <div class="grid" id="dailyGrid"></div>
+      <div style="margin-top:10px">
+        <canvas id="hourlyTemp" height="200"></canvas>
+      </div>
+    </div>`;
+  // insert right after widget
+  $("#widget").after(panel);
+  return panel;
+}
+function wmoDesc(code){
+  const t={0:"Sereno",1:"Quasi sereno",2:"Poco nuvoloso",3:"Nuvoloso",45:"Nebbia",48:"Nebbia",
+  51:"Pioviggine",53:"Pioviggine",55:"Pioviggine",61:"Pioggia",63:"Pioggia",65:"Pioggia",
+  66:"Ghiaccio",67:"Ghiaccio",71:"Neve",73:"Neve",75:"Neve",77:"Nevischio",80:"Rovesci",81:"Rovesci",82:"Rovesci",85:"Rovescio di neve",86:"Rovescio di neve",95:"Temporale",96:"Temporale forte",99:"Temporale forte"};
+  return t[code]||"";
+}
+
+async function runSearch(query){
+  const geo = await geocode(query);
+  const fc  = await forecastFull(geo.lat, geo.lon);
+  enterForecastMode();
+  const p = ensureForecastPanel();
+  $("#fcTitle").textContent = `Previsioni per ${geo.name} ${geo.admin1?("("+geo.admin1+")"):""}`;
+  // daily cards
+  const g = $("#dailyGrid"); g.innerHTML="";
+  const days = fc.daily.time.length;
+  for(let i=0;i<Math.min(days,7);i++){
+    const date = new Date(fc.daily.time[i]);
+    const file = filenameFromWMO(fc.daily.weathercode[i],false);
+    const card = document.createElement("a");
+    card.className="card"; card.href="#forecastPanel"; card.style.textDecoration="none";
+    card.innerHTML = `
+      <div class="txt">
+        <div class="kicker">${date.toLocaleDateString('it-IT',{weekday:'short', day:'2-digit', month:'2-digit'})}</div>
+        <h3>${wmoDesc(fc.daily.weathercode[i])}</h3>
+      </div>`;
+    const img = document.createElement("img"); img.loading="lazy";
+    img.src = "https://meteologullo.github.io/mappamlg/"+encodeURI(file);
+    img.alt = wmoDesc(fc.daily.weathercode[i]);
+    card.prepend(img);
+    g.appendChild(card);
+  }
+  // hourly simple line using canvas (vanilla)
+  drawHourlyTemp(fc.hourly.time, fc.hourly.temperature_2m);
+  // scroll
+  p.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+/* Minimal vanilla line chart (no external deps) */
+function drawHourlyTemp(times, temps){
+  const c = $("#hourlyTemp");
+  const ctx = c.getContext('2d');
+  const W = c.clientWidth || 680; const H = c.height;
+  c.width = W; c.height = H;
+  ctx.clearRect(0,0,W,H);
+  if(!temps || !temps.length) return;
+  const n = Math.min(48, temps.length);
+  const data = temps.slice(0,n);
+  const tmin = Math.min(...data), tmax = Math.max(...data);
+  const pad = 24;
+  ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.globalAlpha=0.9;
+  ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x = pad + (W-2*pad) * (i/(n-1));
+    const y = H - pad - (H-2*pad) * ((v - tmin)/Math.max(1,(tmax - tmin)));
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // axes
+  ctx.globalAlpha=0.5; ctx.fillStyle="#fff"; ctx.font="12px Inter, system-ui";
+  ctx.fillText(Math.round(tmax)+"°", 4, pad+6);
+  ctx.fillText(Math.round(tmin)+"°", 4, H-pad);
+}
+
+/* ============ Home content (News & Curiosità) ============ */
+/* Owner-editable JSON: replace with your latest items if desired */
+const HOME_DATA = {
+  news: [
+    { title: "Primo Weekend di Agosto: tempo stabile e caldo nella norma", img: "", url: "https://www.meteologullo.com/blog" },
+    { title: "Prossimi giorni: si torna a respirare! Venti freschi e piogge sparse", img: "", url: "https://www.meteologullo.com/blog" }
+  ],
+  curiosita: [
+    { title: "Nasce MLG Map: la mappa che insegna a leggere il meteo in tempo reale", img: "", url: "https://www.meteologullo.com/curiosita" }
+  ]
+};
+function fillCards(list, rootId){
+  const root = $(rootId); if(!root) return;
+  root.innerHTML="";
+  list.forEach(item=>{
+    const a = document.createElement('a'); a.href=item.url; a.className="card"; a.target="_blank"; a.rel="noopener";
+    const img = document.createElement('img'); img.loading="lazy"; img.src=item.img||"https://images.unsplash.com/photo-1504608524841-42fe6f032b4b?q=80&w=1200&auto=format&fit=crop"; img.alt=item.title;
+    const box = document.createElement('div'); box.className="txt";
+    const k = document.createElement('div'); k.className="kicker"; k.textContent="Anteprima";
+    const h = document.createElement('h3'); h.textContent=item.title;
+    box.appendChild(k); box.appendChild(h);
+    a.appendChild(img); a.appendChild(box);
+    root.appendChild(a);
+  });
+}
+function initHome(){
+  fillCards(HOME_DATA.news, "#newsGrid");
+  fillCards(HOME_DATA.curiosita, "#curioGrid");
+}
+
+/* ============ Events ============ */
+$("#themeBtn").addEventListener("click", ()=>document.body.classList.toggle("night"));
+$("#exitBtn").addEventListener("click", ()=>{ exitForecastMode(); window.scrollTo({top:0,behavior:"smooth"}); });
+$("#searchForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const q = $("#cityInput").value.trim();
+  if(!q) return;
+  try{
+    await runSearch(q);
+  }catch(err){
+    alert("Impossibile trovare la località. Riprova con un altro nome.");
+  }
+});
+$("#geoBtn").addEventListener("click", ()=>{
+  if(!navigator.geolocation){ alert("Geolocalizzazione non supportata."); return; }
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    try{
+      const {latitude, longitude} = pos.coords;
+      const fc = await forecastFull(latitude, longitude);
+      enterForecastMode();
+      const p = ensureForecastPanel();
+      $("#fcTitle").textContent = "Previsioni per la tua posizione";
+      const names = ["Oggi","Domani","Tra 2 giorni","Tra 3 giorni","Tra 4 giorni","Tra 5 giorni","Tra 6 giorni"];
+      const g = $("#dailyGrid"); g.innerHTML="";
+      for(let i=0;i<7;i++){
+        const file = filenameFromWMO(fc.daily.weathercode[i],false);
+        const card = document.createElement("a");
+        card.className="card"; card.href="#forecastPanel";
+        card.innerHTML = `<div class="txt"><div class="kicker">${names[i]||""}</div><h3>${wmoDesc(fc.daily.weathercode[i])}</h3></div>`;
+        const img = document.createElement("img"); img.loading="lazy";
+        img.src = "https://meteologullo.github.io/mappamlg/"+encodeURI(file);
+        img.alt = wmoDesc(fc.daily.weathercode[i]); card.prepend(img);
+        g.appendChild(card);
+      }
+      drawHourlyTemp(fc.hourly.time, fc.hourly.temperature_2m);
+      p.scrollIntoView({behavior:"smooth", block:"start"});
+    }catch(e){ alert("Non sono riuscito a caricare le previsioni per la tua posizione."); }
+  }, ()=>alert("Posizione negata."), {enableHighAccuracy:true, timeout:10000});
+});
+
+/* ============ Boot ============ */
+initHome();
+loadCalabria();
+</script>
+</body>
+</html>
