@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteo Lo Gullo — MeteoHub (query esatta, vento fix V4)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+  :root{--brand:#1e5bff;}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#f6f7fb;color:#222}
+  header{background:var(--brand);color:#fff;padding:12px 18px;font-weight:700;letter-spacing:.2px}
+  #map{height:calc(100vh - 88px);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;margin:12px}
+  .leaflet-popup-content{font-size:14px;line-height:1.35}
+  .popup-title{font-weight:700;margin-bottom:4px}
+  .popup-data{margin:2px 0}
+  #note{margin:0 12px 12px 12px;color:#555}
+  #note b{color:#000}
+</style>
+</head>
+<body>
+<header>- Meteo Lo Gullo · MeteoHub (query esatta)</header>
+<div id="map"></div>
+<div id="note"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(async function(){
+  const CENTER = {lat:39.25, lon:16.43583}; // come nella tua URL
+  const map = L.map('map').setView([CENTER.lat, CENTER.lon], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap', maxZoom:18}).addTo(map);
+
+  // Query identica alla tua, con un po' di margine temporale per min/max
+  function pad(n){return String(n).padStart(2,'0');}
+  function fmt(dt){return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth()+1)}-${pad(dt.getUTCDate())} ${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`;}
+  const now = new Date();
+  const from = new Date(now.getTime() - 48*3600*1000);
+  const q =
+    `reftime: >=${fmt(from)},<=${fmt(now)};` +
+    `timerange:254,0,0 or 1,0,3600;` +
+    `level:103,2000,0,0 or 1,0,0,0 or 103,10000,0,0;` +
+    `license:CCBY_COMPLIANT;` +
+    `product:B12101 or B13011 or B11002 or B11001 or B11041 or B11042 or B13003 or B10004`; // **B11002 = speed, B11001 = direction
+
+  const base = new URL("https://meteohub.agenziaitaliameteo.it/api/observations");
+  base.searchParams.set("q", q);
+  base.searchParams.set("lat", CENTER.lat);
+  base.searchParams.set("lon", CENTER.lon);
+  base.searchParams.set("networks", "dpcn-calabria");
+  base.searchParams.set("stationDetails", "true");
+  base.searchParams.set("allStationProducts", "false");
+  const url = base.toString();
+
+  async function fetchJSON(u){
+    const r = await fetch(u, {cache:"no-store"});
+    if (!r.ok){ throw new Error(`HTTP ${r.status}`); }
+    return await r.json();
+  }
+
+  function toNum(v){const n = Number(v); return isFinite(n)? n : null;}
+  const pool = st => st?.prod || st?.products || st?.var || st?.variables || st;
+  function getProd(st, code){
+    const P = pool(st); if(!P) return null;
+    if (Array.isArray(P)) return P.find(p => String(p.var||p.code||"").toUpperCase()===String(code).toUpperCase()) || null;
+    if (typeof P === "object") return P[code] || P[String(code)] || null;
+    return null;
+  }
+  function series(prod){
+    const raw = prod?.val ?? prod?.values ?? prod?.series ?? prod;
+    const out=[];
+    if (Array.isArray(raw)){
+      for (const r of raw){
+        if (r && typeof r==="object" && "val" in r){
+          out.push({val: toNum(r.val), time: r.ref || r.reftime || r.time || r.ts});
+        }
+      }
+    }
+    return out.filter(x=>x.val!=null);
+  }
+  function todayOnly(s){
+    const d = new Date(); const y=d.getUTCFullYear(), m=d.getUTCMonth()+1, dd=d.getUTCDate();
+    const dayStr = `${y}-${String(m).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+    return (s||[]).filter(p => p.time && String(p.time).slice(0,10) === dayStr).sort((a,b)=> new Date(a.time)-new Date(b.time));
+  }
+  function rainTodayCalc(seriesAll){
+    const s = todayOnly(seriesAll);
+    if (!s.length) return 0;
+    let nonDec = true; for (let i=1;i<s.length;i++){ if (s[i].val < s[i-1].val - 1e-6){ nonDec=false; break; } }
+    if (nonDec) return Math.max(0, s[s.length-1].val - s[0].val);
+    let sum = 0; for (const p of s){ if (p.val >= 0) sum += p.val; }
+    return sum;
+  }
+
+  // Helpers per ultimo valore + unità e conversione
+  function lastVal(prod){
+    const s = series(prod);
+    if (s.length) return s[s.length-1].val;
+    return toNum(prod?.val);
+  }
+  function toKmH(value, unit){
+    if (value==null) return null;
+    const u = (unit||"").toUpperCase();
+    if (u.includes("M/S")) return value*3.6;
+    if (u.includes("KM/H") || u.includes("KMH")) return value;
+    if (u.includes("KT") || u.includes("KNOT")) return value*1.852;
+    // se non c'è unità: se è ragionevole come m/s (<60), converto, altrimenti assumo km/h
+    return value<60 ? value*3.6 : value;
+  }
+
+  function normalize(st){
+    const lat = toNum(st.lat ?? st.latitude ?? st.stat?.lat);
+    const lon = toNum(st.lon ?? st.longitude ?? st.stat?.lon);
+    const name = st.name || st.station_name || st.stat?.name || st.stat?.details?.val || "Stazione";
+    const T   = getProd(st,"B12101");
+    const RH  = getProd(st,"B13003");
+    const WS  = getProd(st,"B11002");  // **SPEED**
+    const WG  = getProd(st,"B11041") || getProd(st,"B11042");  // **GUST**
+    const WD  = getProd(st,"B11001");  // **DIRECTION** (opzionale, non lo mostro se non serve)
+    const RR  = getProd(st,"B13011");
+
+    const tS = series(T).map(p=>({val:(p.val>120? p.val-273.15:p.val), time:p.time}));
+    const tToday = todayOnly(tS);
+    const tMin = tToday.length ? Math.min(...tToday.map(x=>x.val)) : (tS.length? tS[tS.length-1].val : null);
+    const tMax = tToday.length ? Math.max(...tToday.map(x=>x.val)) : (tS.length? tS[tS.length-1].val : null);
+    const tLast = tS.length? tS[tS.length-1].val : null;
+
+    const rhLast = lastVal(RH);
+
+    const wsVal = lastVal(WS); const wsKmH = toKmH(wsVal, WS?.unit);
+    const wgVal = lastVal(WG); const wgKmH = toKmH(wgVal, WG?.unit);
+    const wdDeg = lastVal(WD); // (0..360) opzionale
+
+    const rainToday = rainTodayCalc(series(RR));
+
+    return {lat,lon,name,t:tLast,rh:rhLast,ws:wsKmH,wg:wgKmH,wd:wdDeg,rain:rainToday,tMin,tMax};
+  }
+
+  let data, note = document.getElementById('note');
+  try{
+    data = await fetchJSON(url);
+    note.innerHTML = `Richiesta OK · <b>URL corrispondente</b>`;
+  }catch(e){
+    note.innerHTML = `Errore richiesta: ${e.message}<br><small>URL usato: ${url}</small>`;
+    return;
+  }
+  const list = Array.isArray(data)? data : (data.stations || data.data || data.results || []);
+  list.map(normalize).filter(s => isFinite(s.lat) && isFinite(s.lon)).forEach(s => {
+    const m=L.circleMarker([s.lat,s.lon],{radius:9,color:'#333',weight:1,fillOpacity:.9,fillColor:'#f6ad55'}).addTo(map);
+    m.bindPopup(`
+      <div class="popup-title">${s.name}</div>
+      <div class="popup-data"><span class="bold">Temp:</span> ${s.t!=null? s.t.toFixed(1)+'°C':'--'}</div>
+      <div class="popup-data"><span class="bold">Umidità:</span> ${s.rh!=null? s.rh.toFixed(0)+'%':'--'}</div>
+      <div class="popup-data"><span class="bold">Min:</span> ${s.tMin!=null? s.tMin.toFixed(1)+'°C':'--'} / <span class="bold">Max:</span> ${s.tMax!=null? s.tMax.toFixed(1)+'°C':'--'}</div>
+      <div class="popup-data"><span class="bold">Vento:</span> ${s.ws!=null? s.ws.toFixed(0)+' km/h':'--'}${s.wd!=null? ' ('+s.wd.toFixed(0)+'°)':''} / <span class="bold">Raffica:</span> ${s.wg!=null? s.wg.toFixed(0)+' km/h':'--'}</div>
+      <div class="popup-data"><span class="bold">Pioggia odierna:</span> ${s.rain!=null? s.rain.toFixed(1)+' mm':'--'}</div>
+    `);
+  });
+})();
+</script>
+</body>
+</html>
