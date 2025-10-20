@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteo Lo Gullo — Pill piccole stile “screenshot” (V17)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<style>
+  :root{--brand:#1e5bff;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#f6f7fb;color:#111}
+  header{background:var(--brand);color:#fff;padding:10px 14px;font-weight:700;letter-spacing:.2px;font-size:16px}
+  #map{height:calc(100vh - 200px);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;margin:12px}
+  .controls{display:flex;gap:8px;align-items:center;margin:8px 12px 6px 12px;flex-wrap:wrap}
+  label{font-size:12px;color:#555}
+  input[type=number]{padding:6px 8px;border:1px solid #d1d5db;border-radius:10px;min-width:120px;background:#fff}
+  button{padding:7px 10px;border-radius:11px;border:0;background:#111;color:#fff;cursor:pointer}
+  button.secondary{background:#e5e7eb;color:#111}
+  .muted{opacity:.75}
+
+  /* === CHIP MOLTO PICCOLE, come nello screenshot === */
+  .leaflet-marker-icon.t-label{ background:transparent; border:none; transform: translate(-50%, -50%); }
+  .leaflet-div-icon.t-label{ background:transparent; border:none; }
+
+  .t-chip{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:2px 7px;           /* meno imbottitura */
+    border-radius:999px;       /* pill */
+    font-weight:900;
+    font-size:12px;
+    line-height:1;
+    min-width:28px;
+    height:22px;               /* decisamente più piccole */
+    border:1px solid rgba(0,0,0,.35);
+    box-shadow: 0 1px 3px rgba(0,0,0,.18);
+    user-select:none;
+    -webkit-font-smoothing:antialiased;
+    color:#000;                /* testo sempre nero, come nello screen */
+    text-shadow:none;
+  }
+
+  /* I puntini dei “centri” li rimpicciolisco per non sporcare la vista */
+  .leaflet-interactive.center-dot{ stroke-width:1px !important; }
+
+  .legend{margin:0 12px 10px 12px;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#eef0f3}
+  .dot{width:9px;height:9px;border-radius:999px;display:inline-block}
+
+  .temp-scale{ display:flex; align-items:center; gap:10px; margin: 6px 12px 2px 12px; }
+  .temp-bar{
+    height: 12px; width: 300px; border-radius: 10px; border: 1px solid #ccc;
+    /* scala “verde-centrica” simile allo screenshot */
+    background: linear-gradient(90deg,
+      hsl(190,60%,60%),
+      hsl(165,65%,52%),
+      hsl(128,70%,48%),
+      hsl(100,85%,52%),
+      hsl(60,90%,54%),
+      hsl(35,90%,52%),
+      hsl(10,90%,48%)
+    );
+  }
+  .temp-labels{display:flex;justify-content:space-between;font-size:11px;color:#555;margin:2px 12px 0 12px;width:300px}
+</style>
+</head>
+<body>
+<header>- Meteo Lo Gullo · MeteoHub (V17 — pill **piccole** e scala colore verde)</header>
+<div class="controls">
+  <label>Finestra (ore): <input id="hours" type="number" value="24" min="1" max="168"></label>
+  <button id="reload">Ricarica</button>
+  <button id="fit" class="secondary">Centra mappa</button>
+  <span id="status" class="muted"></span>
+</div>
+
+<div class="temp-scale">
+  <div class="temp-bar" title="Scala colore centrata sul verde (leggibile come nello screenshot)"></div>
+  <div style="font-size:11px;color:#555">Scala sensibile (°C)</div>
+</div>
+<div class="temp-labels"><span>-10</span><span>0</span><span>10</span><span>20</span><span>30</span><span>40+</span></div>
+
+<div id="map"></div>
+<div id="note" class="legend"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function(){
+  function pad(n){ return String(n).padStart(2, '0'); }
+  function fmtSpace(dt){ return dt.getUTCFullYear() + "-" + pad(dt.getUTCMonth()+1) + "-" + pad(dt.getUTCDate()) + " " + pad(dt.getUTCHours()) + ":" + pad(dt.getUTCMinutes()); }
+
+  // Map init
+  var map = L.map('map');
+  var canvasRenderer = L.canvas({padding:0.5});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap', maxZoom:18}).addTo(map);
+
+  // Mini-centri: rimpiccioliti
+  var CENTERS = [
+    {"name":"Cosenza Crati","lat":39.28731,"lon":16.26483,"color":"#16a34a"},
+    {"name":"Botte Donato","lat":39.25,"lon":16.43583,"color":"#2563eb"},
+    {"name":"Reggio Calabria","lat":38.10278,"lon":15.63889,"color":"#f59e0b"}
+  ];
+  var bounds = L.latLngBounds(CENTERS.map(c=>[c.lat,c.lon]));
+  map.fitBounds(bounds.pad(0.55));
+  document.getElementById('fit').onclick = function(){ map.fitBounds(bounds.pad(0.55)); };
+  CENTERS.forEach(c=>{
+    L.circleMarker([c.lat,c.lon], {renderer:canvasRenderer, radius:4, color:"#111", weight:1, fillOpacity:1, fillColor:c.color, className:'center-dot'}).addTo(map);
+  });
+
+  // === Nuova SCALA COLORE “verde-centrica” ===
+  function chipColor(t){
+    if (t==null || !isFinite(t)) return {bg:"#e5e7eb"}; // grigino per N/A
+    // segmenti: freddo → turchese, 0-10 menta, 10-20 verde, 20-28 lime, 28-35 giallo/arancio, >35 arancio/rosso
+    var H,S,L;
+    var x = t;
+    if (x <= 0){
+      H = 190; S = 60; L = 60;
+    } else if (x <= 10){
+      var k = (x-0)/10;
+      H = 190 + (165-190)*k; S = 60 + (65-60)*k; L = 60 + (52-60)*k;
+    } else if (x <= 20){
+      var k2 = (x-10)/10;
+      H = 165 + (128-165)*k2; S = 65 + (70-65)*k2; L = 52 + (48-52)*k2;
+    } else if (x <= 28){
+      var k3 = (x-20)/8;
+      H = 128 + (100-128)*k3; S = 70 + (85-70)*k3; L = 48 + (52-48)*k3;
+    } else if (x <= 35){
+      var k4 = (x-28)/7;
+      H = 100 + (60-100)*k4; S = 85 + (90-85)*k4; L = 52 + (54-52)*k4;
+    } else if (x <= 42){
+      var k5 = (x-35)/7;
+      H = 60 + (35-60)*k5; S = 90 + (90-90)*k5; L = 54 + (52-54)*k5;
+    } else {
+      H = 10; S = 90; L = 48;
+    }
+    return {bg: "hsl("+H.toFixed(1)+","+S+"%,"+L+"%)"};
+  }
+  function bubbleIcon(temp){
+    var col = chipColor(temp);
+    var txt = (temp==null || !isFinite(temp)) ? "&ndash;" : temp.toFixed(1);
+    var html = '<div class="t-chip" style="background:'+col.bg+'">'+txt+'</div>';
+    return L.divIcon({className:'t-label', html:html, popupAnchor:[0,-14]});
+  }
+
+  // ---- Dati (riuso identico alla V16; ho ridotto solo i marker) ----
+  function safeGet(obj, path){
+    try{ var cur=obj; path.split('.').forEach(p=>{cur = cur ? cur[p] : undefined}); return cur;
+    }catch(e){ return undefined; }
+  }
+  function toNum(v){ var n = Number(v); return isFinite(n)? n : null; }
+  function notNull(x){ return x!==undefined && x!==null; }
+
+  function productPool(st){ return st && (st.prod || st.products || st["var"] || st.variables || st); }
+  function getProd(st, code){
+    var P = productPool(st); if (!P) return null;
+    if (Array.isArray(P)){
+      for (var i=0;i<P.length;i++){ var p=P[i]; var v=(p.var||p.code||"")+""; if (v.toUpperCase()===(code+"").toUpperCase()) return p; }
+      return null;
+    }
+    if (typeof P === "object") return P[code] || P[String(code)] || null;
+    return null;
+  }
+  function series(prod){
+    var raw = prod && (prod.val || prod.values || prod.series || prod.data || prod);
+    var out=[];
+    if (Array.isArray(raw)){
+      for (var i=0;i<raw.length;i++){
+        var r=raw[i], val=r&&(notNull(r.val)? r.val : r.value), time=r&&(r.ref||r.reftime||r.time||r.ts);
+        if (notNull(val)) out.push({val: Number(val), time: time});
+      }
+    }
+    return out.filter(x=>x.val!=null);
+  }
+  function todayOnly(arr){
+    var d=new Date(); var y=d.getUTCFullYear(), m=d.getUTCMonth()+1, dd=d.getUTCDate();
+    var dayStr = y+"-"+String(m).padStart(2,'0')+"-"+String(dd).padStart(2,'0');
+    var s=(arr||[]).filter(p=>p.time && String(p.time).slice(0,10)===dayStr);
+    s.sort((a,b)=> new Date(a.time)-new Date(b.time)); return s;
+  }
+  function rainTodayCalc(seriesAll){
+    var s=todayOnly(seriesAll); if (!s.length) return 0;
+    var nonDec=true; for(var i=1;i<s.length;i++){ if (s[i].val < s[i-1].val - 1e-6){ nonDec=false; break; } }
+    if (nonDec) return Math.max(0, s[s.length-1].val - s[0].val);
+    var sum=0; for (var j=0;j<s.length;j++){ if (s[j].val >= 0) sum += s[j].val; } return sum;
+  }
+  function lastVal(prod){
+    var s = series(prod); if (s.length) return s[s.length-1].val;
+    return toNum(prod && (prod.val!=null? prod.val : prod.value));
+  }
+  function pickName(st){
+    var S = st.station || st.stat || st.stationDetails || st.details || {};
+    return st.assignedName || st.assigned_name || st.stationAssignedName ||
+           S.assignedName || S.assigned_name ||
+           st.name || S.name || st.station_name ||
+           safeGet(st,'stat.details.name') || safeGet(st,'stat.details.val') || "Stazione";
+  }
+  function normalize(st){
+    var S = st.station || st.stat || st.stationDetails || st.details || {};
+    var id  = st.id || st.station_id || st.code || S.id || S.code || null;
+    var lat = toNum(st.lat || st.latitude || S.lat || S.latitude || safeGet(st,'stat.lat') || safeGet(st,'stat.latitude'));
+    var lon = toNum(st.lon || st.longitude || S.lon || S.longitude || safeGet(st,'stat.lon') || safeGet(st,'stat.longitude'));
+    var name = pickName(st);
+
+    var T   = getProd(st,"B12101");
+    var RH  = getProd(st,"B13003");
+    var WS  = getProd(st,"B11002");
+    var WG  = getProd(st,"B11041") || getProd(st,"B11042");
+    var WD  = getProd(st,"B11001");
+    var RR  = getProd(st,"B13011");
+
+    var tS = series(T).map(p=>({val:(p.val>120? p.val-273.15:p.val), time:p.time}));
+    var tToday = todayOnly(tS);
+    var tMin = tToday.length ? Math.min.apply(null, tToday.map(x=>x.val)) : (tS.length? tS[tS.length-1].val : null);
+    var tMax = tToday.length ? Math.max.apply(null, tToday.map(x=>x.val)) : (tS.length? tS[tS.length-1].val : null);
+    var tLast = tS.length? tS[tS.length-1].val : null;
+
+    function asKmH(val, unit){
+      if (val==null) return null;
+      var u = (unit||"").toUpperCase();
+      if (u.indexOf("M/S")>=0) return val*3.6;
+      if (u.indexOf("KM/H")>=0 || u.indexOf("KMH")>=0) return val;
+      if (u.indexOf("KT")>=0 || u.indexOf("KNOT")>=0) return val*1.852;
+      return val<60? val*3.6 : val;
+    }
+    var rhLast = lastVal(RH);
+    var wsKmH = asKmH(lastVal(WS), WS && WS.unit);
+    var wgKmH = asKmH(lastVal(WG), WG && WG.unit);
+    var wdDeg = lastVal(WD);
+    var rainToday = rainTodayCalc(series(RR));
+
+    return {id:id,lat:lat,lon:lon,name:name,t:tLast,rh:rhLast,ws:wsKmH,wg:wgKmH,wd:wdDeg,rain:rainToday,tMin:tMin,tMax:tMax};
+  }
+
+  function bubbleMarker(st){
+    var m = L.marker([st.lat, st.lon], {icon: bubbleIcon(st.t)});
+    var ventoPart = (st.ws!=null? (st.ws.toFixed(0) + " km/h") : "--");
+    if (st.wd!=null) ventoPart += " ("+st.wd.toFixed(0)+"&deg;)";
+    var rafficaPart = (st.wg!=null? (st.wg.toFixed(0)+" km/h") : "--");
+    var popup = ""
+      + '<div style="font-weight:700;margin-bottom:4px">'+(st.name||"Stazione")+(st.id? ' <small style="color:#666">('+st.id+')</small>' : '')+'</div>'
+      + '<div><b>Temp:</b> '+(st.t!=null? st.t.toFixed(1)+'&nbsp;&deg;C' : '--')+'</div>'
+      + '<div><b>Umidit&agrave;:</b> '+(st.rh!=null? st.rh.toFixed(0)+'%' : '--')+'</div>'
+      + '<div><b>Min:</b> '+(st.tMin!=null? st.tMin.toFixed(1)+'&nbsp;&deg;C' : '--')+' / <b>Max:</b> '+(st.tMax!=null? st.tMax.toFixed(1)+'&nbsp;&deg;C' : '--')+'</div>'
+      + '<div><b>Vento:</b> '+ventoPart+' / <b>Raffica:</b> '+rafficaPart+'</div>'
+      + '<div><b>Pioggia odierna:</b> '+((st.rain!=null? st.rain:0).toFixed(1))+' mm</div>';
+    m.bindPopup(popup);
+    return m;
+  }
+
+  // Networking
+  function buildURL(center, q){
+    var base = new URL("https://meteohub.agenziaitaliameteo.it/api/observations");
+    base.searchParams.set("q", q);
+    base.searchParams.set("lat", center.lat);
+    base.searchParams.set("lon", center.lon);
+    base.searchParams.set("networks", "dpcn-calabria");
+    base.searchParams.set("stationDetails", "true");
+    base.searchParams.set("allStationProducts", "true");
+    base.searchParams.set("limit", "200");
+    return base.toString();
+  }
+  function fetchJSON(u, timeoutMs){
+    if (timeoutMs==null) timeoutMs = 15000;
+    return new Promise(function(resolve, reject){
+      var ctrl = new AbortController();
+      var t = setTimeout(function(){ try{ctrl.abort();}catch(e){} reject(new Error("timeout")); }, timeoutMs);
+      fetch(u, {cache:"no-store", signal: ctrl.signal}).then(function(r){
+        if (!r.ok){ r.text().then(function(body){ clearTimeout(t); reject(new Error("HTTP "+r.status+(body? " | body: "+body : ""))); }); return; }
+        r.json().then(function(j){ clearTimeout(t); resolve(j); }).catch(function(e){ clearTimeout(t); reject(e); });
+      }).catch(function(e){ clearTimeout(t); reject(e); });
+    });
+  }
+  var PRODUCTS = "B12101 or B13011 or B11002 or B11001 or B11041 or B11042 or B13003 or B10004";
+  function buildStableQ(from, to){
+    return "reftime:>="+from+",<="+to+";timerange:254,0,0 or 1,0,3600;level:103,2000,0,0 or 1,0,0,0 or 103,10000,0,0;license:CCBY_COMPLIANT;product:"+PRODUCTS;
+  }
+  function buildMinimalQ(from, to){
+    return "reftime:>="+from+",<="+to+";timerange:1,0,3600;license:CCBY_COMPLIANT;product:B12101,B13011,B11002,B11001,B11041,B11042,B13003,B10004";
+  }
+  function fetchForCenter(center, fromStr, toStr){
+    return new Promise(function(resolve, reject){
+      var qStable = buildStableQ(fromStr, toStr);
+      var qMinimal = buildMinimalQ(fromStr, toStr);
+      var url = buildURL(center, qStable);
+      fetchJSON(url).then(function(res){
+        var list = Array.isArray(res)? res : (res.stations || res.data || res.results || []);
+        resolve({center:center, list:list, variant:"stable"});
+      }).catch(function(e){
+        if (String(e && e.message).indexOf("HTTP 400")>=0){
+          var url2 = buildURL(center, qMinimal);
+          fetchJSON(url2).then(function(res2){
+            var list2 = Array.isArray(res2)? res2 : (res2.stations || res2.data || res2.results || []);
+            resolve({center:center, list:list2, variant:"minimal"});
+          }).catch(function(e2){ reject(e2); });
+        }else{
+          reject(e);
+        }
+      });
+    });
+  }
+
+  function updateLegend(progress){
+    var html = "";
+    for (var i=0;i<progress.length;i++){
+      var cs = progress[i];
+      html += '<span class="pill"><span class="dot" style="background:'+cs.color+'"></span><b>'+cs.name+'</b>: '+cs.count+' stazioni ('+cs.variant+')</span>';
+    }
+    document.getElementById('note').innerHTML = html;
+  }
+  function renderStations(stations){
+    for (var i=0;i<stations.length;i++){
+      var s=stations[i]; if (!isFinite(s.lat)||!isFinite(s.lon)) continue;
+      bubbleMarker(s).addTo(map);
+    }
+  }
+
+  function pMap(items, mapper, opts){
+    opts = opts||{};
+    var concurrency = Math.min(opts.concurrency||8, items.length||0);
+    return new Promise(function(resolve){
+      var ret = new Array(items.length);
+      var index=0, finished=0;
+      function runNext(){
+        if (index >= items.length){ if (++finished === concurrency) resolve(ret); return; }
+        var myIndex = index++;
+        mapper(items[myIndex], myIndex).then(function(val){
+          ret[myIndex] = val;
+          if (opts.onEach) try{ opts.onEach(val, myIndex); }catch(e){}
+          runNext();
+        }).catch(function(err){
+          ret[myIndex] = {error:String(err), center:items[myIndex]};
+          if (opts.onEach) try{ opts.onEach(ret[myIndex], myIndex); }catch(e){}
+          runNext();
+        });
+      }
+      for (var k=0;k<concurrency;k++) runNext();
+    });
+  }
+
+  function run(){
+    var statusEl = document.getElementById('status');
+    statusEl.textContent = "caricamento...";
+    var hours = Number(document.getElementById('hours').value)||24;
+    var now = new Date();
+    var from = new Date(now.getTime() - hours*3600*1000);
+    var fromStr = fmtSpace(from), toStr = fmtSpace(now);
+
+    // ho ridotto i “centri” mostrati nella legenda progress
+    var progress = CENTERS.map(function(c){ return {name:c.name, color:c.color, count:0, variant:"--"}; });
+    updateLegend(progress);
+
+    pMap(CENTERS, function(c){
+      return fetchForCenter(c, fromStr, toStr).then(function(r){
+        var norm = (r.list||[]).map(normalize);
+        return {center:c, norm:norm, variant:r.variant};
+      });
+    }, {
+      concurrency: 8,
+      onEach: function(item, idx){
+        var isErr = item && item.error;
+        if (!isErr){
+          renderStations(item.norm);
+          progress[idx] = {name:item.center.name, color:item.center.color, count:item.norm.length, variant:item.variant};
+        }else{
+          progress[idx] = {name:item.center.name, color:item.center.color, count:0, variant:"errore"};
+        }
+        updateLegend(progress);
+      }
+    }).then(function(){ statusEl.textContent=""; });
+  }
+
+  document.getElementById('reload').onclick = function(){ document.getElementById('note').textContent = ""; run(); };
+  run();
+})();</script>
+</body>
+</html>
