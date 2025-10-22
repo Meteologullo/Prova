@@ -1,0 +1,2222 @@
+<!doctype html>
+<html lang="it">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meteo Lo Gullo — Pill piccole ottimizzate (V19)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<style>
+  :root{--brand:#1e5bff;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#f6f7fb;color:#111}
+  header{background:var(--brand);color:#fff;padding:10px 14px;font-weight:700;letter-spacing:.2px;font-size:16px}
+  #map{height:calc(100vh - 200px);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;margin:12px}
+  .controls{display:flex;gap:8px;align-items:center;margin:8px 12px 6px 12px;flex-wrap:wrap}
+  label{font-size:12px;color:#555}
+  input[type=number]{padding:6px 8px;border:1px solid #d1d5db;border-radius:10px;min-width:120px;background:#fff}
+  button{padding:7px 10px;border-radius:11px;border:0;background:#111;color:#fff;cursor:pointer}
+  button.secondary{background:#e5e7eb;color:#111}
+  .muted{opacity:.75}
+
+  /* === CHIP PIÙ PICCOLE (~14% in meno) === */
+  .leaflet-marker-icon.t-label{ background:transparent; border:none; transform: translate(-50%, -50%); }
+  .leaflet-div-icon.t-label{ background:transparent; border:none; }
+
+  .t-chip{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:1px 6px;
+    border-radius:999px;
+    font-weight:900;
+    font-size:11px;            /* -1px rispetto a V18 */
+    line-height:1;
+    min-width:28px;            /* più strette */
+    height:19px;               /* 22px -> 19px */
+    border:1px solid rgba(0,0,0,.35);
+    box-shadow: 0 1px 2px rgba(0,0,0,.18);
+    user-select:none;
+    -webkit-font-smoothing:antialiased;
+    color:#000;
+    text-shadow:none;
+    font-variant-numeric: tabular-nums; /* cifre a larghezza fissa */
+  }
+
+  .legend{margin:0 12px 10px 12px;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#eef0f3}
+  .dot{width:9px;height:9px;border-radius:999px;display:inline-block}
+
+  .temp-scale{ display:flex; align-items:center; gap:10px; margin: 6px 12px 2px 12px; }
+  .temp-bar{
+    height: 12px; width: 300px; border-radius: 10px; border: 1px solid #ccc;
+    background: linear-gradient(90deg,
+      hsl(240,85%,28%), /* -15 */
+      hsl(215,80%,38%), /* -5  */
+      hsl(205,80%,45%), /* 0   */
+      hsl(195,75%,50%), /* 5   */
+      hsl(150,70%,42%), /* 12  */
+      hsl(130,75%,44%), /* 16  */
+      hsl(105,80%,50%), /* 19  */
+      hsl(65,92%,54%),  /* 22  */
+      hsl(50,95%,54%),  /* 25  */
+      hsl(38,95%,52%),  /* 27  */
+      hsl(28,95%,50%),  /* 29  */
+      hsl(15,95%,48%),  /* 32  */
+      hsl(0,95%,46%),   /* 35  */
+      hsl(350,92%,50%), /* 37  */
+      hsl(335,88%,55%), /* 40  */
+      hsl(300,80%,62%), /* 46  */
+      hsl(285,75%,66)   /* 50  */
+    );
+  }
+  .temp-labels{display:flex;justify-content:space-between;font-size:11px;color:#555;margin:2px 12px 0 12px;width:300px}
+
+
+/* === Barra laterale compatta + allineamento ai pulsanti Zoom === */
+:root{ --ctl-size: 34px; }
+
+/* Rendiamo i pulsanti + / - della stessa dimensione della toolbar */
+.leaflet-control-zoom a{
+  width: var(--ctl-size);
+  height: var(--ctl-size);
+  line-height: var(--ctl-size);
+  border-radius: 12px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.10);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  font-weight: 900;
+}
+
+.leaflet-control.meteo-toolbar{
+  padding: 6px 6px;
+  background: rgba(30,41,59,.60);    /* leggermente trasparente */
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.15);
+  display: flex; flex-direction: column; gap: 6px; align-items: center;
+  margin-top: 4px; /* si posiziona subito sotto lo zoom */
+}
+
+.meteo-toolbar .sep{width:22px;height:1px;background:rgba(255,255,255,.18);margin:2px 0}
+
+/* Bottoni della toolbar, esattamente come i + / - */
+.meteo-toolbar .sb-btn{
+  width: var(--ctl-size);
+  height: var(--ctl-size);
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.95);
+  color:#0f172a;
+  display: grid; place-items: center;
+  cursor: pointer; user-select: none;
+  font-weight: 900;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.35);
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  transition: transform .08s ease, filter .15s ease, background .15s ease;
+}
+.meteo-toolbar .sb-btn:hover{ transform: translateY(-1px); filter: brightness(1.02); }
+.meteo-toolbar .sb-btn:active{ transform: translateY(0); }
+.meteo-toolbar .sb-btn:focus-visible{ outline: 2px solid #60a5fa; outline-offset: 2px; }
+.meteo-toolbar .sb-btn.active{ background:#60a5fa; color:#03102b; border-color:#60a5fa; text-shadow:none; }
+.meteo-toolbar .sb-btn.small{ font-size:11px; }
+
+</style>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+:root{
+  --mlg-blue:#1e43a5; --mlg-blue-2:#163a93; --mlg-header-h-base:60px;
+}
+/* === TOP BANNER (MLG) === */
+.mlg-banner{ 
+  width:100vw;
+  margin-left:calc(50% - 50vw);
+  margin-right:calc(50% - 50vw);
+  background:linear-gradient(180deg,var(--mlg-blue),var(--mlg-blue-2));
+  color:#fff;
+  box-shadow:0 6px 16px rgba(0,0,0,.28);
+}
+.mlg-banner.mlg-sticky{ position:sticky; top:0; z-index:1000; }
+.mlg-banner .mlg-inner{ max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:12px; padding:10px 12px; }
+.mlg-title{ font-weight:800; letter-spacing:.2px; font-size:clamp(18px,2.4vw,22px); }
+.mlg-search{ position:relative; flex:1 1 auto; min-width:140px; }
+.mlg-search input{
+  width:100%; padding:.56rem 2.2rem .56rem .9rem; border-radius:999px;
+  background:#ffffff24; border:1px solid #ffffff35; color:#fff; outline:none; backdrop-filter:blur(6px);
+}
+.mlg-search input::placeholder{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mlg-search button{
+  position:absolute; top:50%; right:4px; transform:translateY(-50%);
+  height:34px; display:inline-flex; align-items:center; justify-content:center; padding:0 12px; font-weight:800; font-size:12px;
+  border:none; border-radius:999px; background:linear-gradient(135deg,#ffd54a,#ffb300); color:#002;
+  box-shadow:0 6px 12px rgba(0,0,0,.28); cursor:pointer;
+}
+#mlgMenuBtn{
+  -webkit-tap-highlight-color:transparent; appearance:none;
+  border:1px solid #ffffff33; background:#ffffff20; color:#fff;
+  border-radius:12px; padding:8px 10px; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
+  box-shadow:0 6px 14px rgba(0,0,0,.28);
+}
+#mlgMenuBtn .mlg-hb{ display:inline-block; width:18px; height:12px; position:relative; }
+#mlgMenuBtn .mlg-hb b{ position:absolute; left:0; right:0; height:2px; background:currentColor; border-radius:2px; }
+#mlgMenuBtn .mlg-hb b:nth-child(1){ top:0; } .mlg-hb b:nth-child(2){ top:50%; transform:translateY(-50%); } .mlg-hb b:nth-child(3){ bottom:0; }
+
+/* Dropdown */
+#mlgMenuPanel{
+  position:fixed; top:calc(env(safe-area-inset-top) + var(--mlg-header-h-base) + 6px);
+  left:max(8px, env(safe-area-inset-left)); width:min(92vw,360px); z-index:4000; display:none;
+  background:linear-gradient(180deg,var(--mlg-blue-2),#102b78); border:1px solid #ffffff2b; border-radius:14px;
+  box-shadow:0 14px 40px rgba(0,0,0,.45); padding:8px; overflow:hidden;
+}
+#mlgMenuPanel.open{ display:block; }
+#mlgMenuPanel a{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 14px; border-radius:12px; color:#fff; text-decoration:none; font-weight:800;
+  background:#ffffff18; border:1px solid #ffffff24; margin:6px 4px;
+}
+#mlgMenuPanel a:hover{ background:#ffffff2a; }
+@media (max-width: 540px){
+  .mlg-banner .mlg-inner{ padding:8px 10px; gap:8px; }
+}
+</style>
+
+
+<style>
+/* === Compact header overrides === */
+:root{ --mlg-header-h-base:46px; }
+.mlg-banner .mlg-inner{ padding:6px 10px; }
+.mlg-banner{ box-shadow:0 4px 10px rgba(0,0,0,.20); }
+.mlg-title{ font-size:clamp(16px,2vw,20px); }
+#mlgMenuBtn{ padding:6px 8px; border-radius:10px; }
+.mlg-search input{ padding:.44rem 2.4rem .44rem .78rem; }
+.mlg-search button{ height:30px; padding:0 10px; font-size:12px; }
+header.mlg-banner{ margin-bottom:6px; } /* reduce gap to content */
+@media (max-width:540px){
+  .mlg-banner .mlg-inner{ padding:5px 8px; }
+  .mlg-search input{ padding:.42rem 2.2rem .42rem .72rem; }
+  .mlg-search button{ height:28px; padding:0 10px; font-size:12px; }
+}
+</style>
+
+
+<style>
+/* Hide the controls and temp scale to have the map start immediately under the header */
+header.mlg-banner{ margin-bottom:2px; }
+.controls, .temp-scale{ display:none !important; }
+</style>
+
+
+<style>
+/* Rimuove i numeri residui della scala (-10..40+) */
+.temp-labels{ display:none !important; }
+</style>
+
+
+<style>
+/* Nasconde la diagnostica originale */
+#note.legend{ display:none !important; }
+
+/* === pannello classifiche === */
+#rankingWrap{
+  position:static; bottom:auto; z-index:auto;
+  margin:8px 12px 16px 12px;
+}
+#rankingCard{#rankingHead{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.viewToggle{display:flex;gap:6px;align-items:center;margin-left:auto}
+.chip{border:1px solid rgba(0,0,0,.12);padding:6px 10px;border-radius:999px;font-size:13px;background:#fff;cursor:pointer}
+.chip.on{background:#eef3ff;border-color:rgba(0,0,0,.18);box-shadow:0 1px 2px rgba(0,0,0,.06) inset}
+#rankingText{display:none;margin:8px 0 0 0;padding:10px;border-radius:10px;background:#f8f9fb;border:1px solid rgba(0,0,0,.06);font-size:14px;line-height:1.4;white-space:pre-wrap}
+#copyBtn{margin-left:6px}
+  background:linear-gradient(180deg,#ffffffcc,#ffffffee);
+  backdrop-filter:blur(6px);
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  box-shadow:0 12px 34px rgba(0,0,0,.22);
+  padding:8px;
+}
+#rankingHead{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between;
+  padding:4px 4px 8px 4px;
+}
+#rankingHead h3{ margin:0; font-size:14px; font-weight:800; color:#0b265f; letter-spacing:.2px; }
+#rankingSelect{
+  appearance:none; -webkit-appearance:none;
+  padding:8px 12px; border-radius:12px; border:1px solid #d1d5db; background:#fff;
+  font-weight:700; font-size:13px;
+}
+#rankingList{ max-height:28vh; overflow:auto; margin:4px 0 0 0; padding:2px; display:grid; gap:6px; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); }
+.r-item{
+  background:#f4f6ff; border:1px solid #dee3ff;
+  padding:8px 10px; border-radius:12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.r-left{ display:flex; align-items:center; gap:8px; min-width:0; }
+.r-dot{ width:8px; height:8px; border-radius:50%; background:#3b82f6; flex:0 0 8px; }
+.r-name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.r-val{ font-variant-numeric:tabular-nums; font-weight:800; color:#0b265f; }
+@media (max-width:600px){
+  #rankingList{ grid-template-columns:1fr; max-height:34vh; }
+  #rankingCard{#rankingHead{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.viewToggle{display:flex;gap:6px;align-items:center;margin-left:auto}
+.chip{border:1px solid rgba(0,0,0,.12);padding:6px 10px;border-radius:999px;font-size:13px;background:#fff;cursor:pointer}
+.chip.on{background:#eef3ff;border-color:rgba(0,0,0,.18);box-shadow:0 1px 2px rgba(0,0,0,.06) inset}
+#rankingText{display:none;margin:8px 0 0 0;padding:10px;border-radius:10px;background:#f8f9fb;border:1px solid rgba(0,0,0,.06);font-size:14px;line-height:1.4;white-space:pre-wrap}
+#copyBtn{margin-left:6px} border-radius:14px; }
+}
+</style>
+
+
+<!-- === Webcam Amantea + mobile popup styles === -->
+<style id="webcam_amantea_fix">
+.leaflet-popup-content{overflow:hidden;}
+.webcam-preview{
+  width:100%;
+  max-height:100px;
+  object-fit:cover;
+  margin-top:5px;
+  border-radius:5px;
+}
+img.webcam-preview[src*="webcam_spiaggia_pulita"],
+iframe.webcam-preview[src*="webcam_spiaggia_pulita"]{
+  height:100px !important;
+  width:100%  !important;
+  transform:translateX(-10%) scaleX(3) !important;
+  transform-origin:center center !important;
+  object-fit:contain !important;
+  display:block;
+}
+</style>
+<style id="mobile-popup-shrink">
+@media (max-width: 520px){
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip{
+    max-width: 240px;
+    padding: 4px;
+  }
+  .leaflet-popup-content{
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    margin: 4px 6px !important;
+  }
+}
+</style>
+
+<style>
+
+/* === Toolbar allineata sotto ai pulsanti Zoom === */
+:root{ --ctl-size: 34px; }
+
+/* Zoom: dimensioni e stile base */
+.leaflet-control-zoom a{
+  width: var(--ctl-size);
+  height: var(--ctl-size);
+  line-height: var(--ctl-size);
+  border-radius: 12px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.10);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  font-weight: 900;
+}
+
+/* La toolbar è un "continuo" dello zoom: stessa colonna, stesso offset */
+.leaflet-left .leaflet-control.meteo-toolbar{
+  margin-left: 0;            /* allinea alla colonna di sinistra */
+}
+.leaflet-control.meteo-toolbar{
+  padding: 6px;
+  background: rgba(30,41,59,.42);    /* più trasparente */
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  display: flex; flex-direction: column; gap: 6px; align-items: center;
+  margin-top: 6px; /* subito sotto lo zoom */
+  width: calc(var(--ctl-size) + 12px); /* stessa "colonna" visiva */
+}
+
+/* Bottoni interni: stessi ingombri dei + / - e contenuto centrato */
+.meteo-toolbar .sb-btn{
+  width: var(--ctl-size);
+  height: var(--ctl-size);
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.88);
+  color:#0f172a;
+  display: grid; place-items: center;
+  cursor: pointer; user-select: none;
+  font-weight: 900;
+  font-size: 13px;
+  padding: 0;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.35);
+  text-shadow: 0 1px 0 rgba(255,255,255,.55);
+  transition: transform .08s ease, filter .15s ease, background .15s ease;
+  overflow: hidden;
+}
+.meteo-toolbar .sb-btn > *{ pointer-events:none; }  /* evita click sui figli (icone/testo) */
+.meteo-toolbar .sb-btn:hover{ transform: translateY(-1px); filter: brightness(1.03); }
+.meteo-toolbar .sb-btn:active{ transform: translateY(0); }
+.meteo-toolbar .sb-btn:focus-visible{ outline: 2px solid #60a5fa; outline-offset: 2px; }
+.meteo-toolbar .sb-btn.active{ background:#60a5fa; color:#03102b; border-color:#60a5fa; text-shadow:none; }
+
+/* Testi brevi come "min" "max" centrati perfettamente */
+.meteo-toolbar .sb-btn .label,
+.meteo-toolbar .sb-btn span{
+  display:block;
+  width:100%;
+  text-align:center;
+  line-height: 1;
+}
+
+</style>
+<style>
+
+/* === Toolbar in continuità con Zoom, stessa LARGHEZZA === */
+:root{ --ctl-size: 34px; --ctl-pad: 4px; --ctl-gap: 6px; }
+
+/* Pulsanti Zoom (+/-) */
+.leaflet-control-zoom a{
+  width: var(--ctl-size);
+  height: var(--ctl-size);
+  line-height: var(--ctl-size);
+  border-radius: 12px;
+  background: rgba(255,255,255,.94);
+  border: 1px solid rgba(0,0,0,.10);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  font-weight: 900;
+}
+
+/* La colonna della toolbar ha esattamente la stessa larghezza visiva dei pulsanti */
+.leaflet-left .leaflet-control.meteo-toolbar{ margin-left: 0; }
+.leaflet-control.meteo-toolbar{
+  width: var(--ctl-size);                 /* <<< stessa larghezza dei +/− */
+  padding: var(--ctl-pad);
+  background: rgba(30,41,59,.38);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  backdrop-filter: blur(6px);
+  display: flex; flex-direction: column; align-items: center; gap: var(--ctl-gap);
+  margin-top: 6px;
+  box-sizing: content-box;                /* padding non altera la larghezza visiva */
+}
+
+/* Bottoni interni identici ai +/− e larghi quanto la colonna */
+.meteo-toolbar .sb-btn{
+  width: 100%;                            /* <<< identico alla colonna */
+  height: var(--ctl-size);
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.9);
+  color:#0f172a;
+  display: grid; place-items: center;
+  cursor: pointer; user-select: none;
+  font-weight: 900; font-size: 13px; padding: 0; overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.35);
+  text-shadow: 0 1px 0 rgba(255,255,255,.55);
+  transition: transform .08s ease, filter .15s ease, background .15s ease;
+}
+.meteo-toolbar .sb-btn:hover{ transform: translateY(-1px); filter: brightness(1.03); }
+.meteo-toolbar .sb-btn:active{ transform: translateY(0); }
+.meteo-toolbar .sb-btn:focus-visible{ outline: 2px solid #60a5fa; outline-offset: 2px; }
+.meteo-toolbar .sb-btn.active{ background:#60a5fa; color:#03102b; border-color:#60a5fa; text-shadow:none; }
+
+/* Testi centrati (min/max) */
+.meteo-toolbar .sb-btn .label,
+.meteo-toolbar .sb-btn span{ display:block; width:100%; text-align:center; line-height:1; }
+
+</style>
+
+<style id="toolbar-final-fix">
+/* === FIX: Toolbar stessa colonna e stessa larghezza dei pulsanti +/− === */
+:root{ --ctl-size: 34px; } /* cambia questo valore se vuoi tutto più grande/piccolo */
+
+/* Pulsanti Zoom (+/−) – dimensionati per coerenza */
+.leaflet-control-zoom a{
+  width: var(--ctl-size);
+  height: var(--ctl-size);
+  line-height: var(--ctl-size);
+  border-radius: 12px;
+}
+
+/* La toolbar è allineata e ha esattamente la stessa larghezza visiva dei +/− */
+.leaflet-left .leaflet-control.meteo-toolbar{ margin-left: 0; }
+.leaflet-control.meteo-toolbar{
+  width: var(--ctl-size);          /* <<< uguale ai +/− */
+  box-sizing: border-box;          /* padding NON allarga visivamente */
+  padding: 4px;                    /* bordo morbido senza “pancia” più larga */
+  background: rgba(30,41,59,.45);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;                 /* subito sotto lo zoom */
+}
+
+/* Bottoni interni: larghi come la colonna e identici ai +/− */
+.meteo-toolbar .sb-btn{
+  width: 100%;                     /* <<< combacia con la colonna */
+  height: var(--ctl-size);
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.95);
+  color: #0f172a;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 13px;
+  padding: 0;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.35);
+}
+
+/* Testi brevi (min/max/%) centrati perfettamente */
+.meteo-toolbar .sb-btn .label,
+.meteo-toolbar .sb-btn span{
+  display:block;
+  width:100%;
+  text-align:center;
+  line-height:1;
+}
+</style>
+
+<style id="toolbar-final-fix-2">
+/* === Allineamento e forma identica allo zoom === */
+:root{ --ctl-size: 40px; --ctl-radius: 12px; --ctl-gap: 6px; }
+
+/* Zoom (+/−): usiamo le stesse dimensioni e raggio */
+.leaflet-control-zoom a{
+  width: var(--ctl-size) !important;
+  height: var(--ctl-size) !important;
+  line-height: var(--ctl-size) !important;
+  border-radius: var(--ctl-radius) !important;
+}
+
+/* Colonna toolbar – stessa larghezza visiva e stessa "forma" arrotondata */
+.leaflet-left .leaflet-control.meteo-toolbar{
+  margin-left: 10px !important;   /* identico ai controlli Leaflet */
+}
+.leaflet-control.meteo-toolbar{
+  width: var(--ctl-size) !important;    /* uguale ai +/− */
+  padding: 4px !important;              /* bordo interno */
+  box-sizing: border-box !important;
+  border-radius: var(--ctl-radius) !important;
+  background: rgba(30,41,59,.45) !important;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ctl-gap);
+  margin-top: 8px !important;           /* attaccata sotto lo zoom */
+  overflow: hidden;                      /* arrotondamento visivo “taglia” il contenuto come lo zoom */
+}
+
+/* Bottoni interni: centrati e larghi come il contenitore */
+.meteo-toolbar .sb-btn{
+  width: 100% !important;
+  height: var(--ctl-size) !important;
+  border-radius: var(--ctl-radius) !important;
+  border: 1px solid rgba(0,0,0,.1);
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 13px;
+  padding: 0;
+  box-shadow: 0 6px 18px rgba(0,0,0,.10), inset 0 0 0 1px rgba(255,255,255,.35);
+}
+
+/* Testo centrato */
+.meteo-toolbar .sb-btn .label,
+.meteo-toolbar .sb-btn span{ width:100%; text-align:center; line-height:1; display:block; }
+</style>
+
+
+
+
+
+<style id="arpacal-tag-style">
+/* 'Dati Arpacal' posizionato in alto a destra, sotto la X (zona sempre libera) */
+.leaflet-popup-content{ position:relative; }
+.leaflet-popup-content .arpacal-tag{
+  position:absolute;
+  top:22px;           /* sotto la X e il titolo */
+  right:12px;         /* ben distanziato dal bordo */
+  font-size:9.6px;
+  font-weight:800;
+  letter-spacing:.15px;
+  color:#0b265f;
+  opacity:.24;
+  pointer-events:none;
+  white-space:nowrap;
+  line-height:1;
+  mix-blend-mode:multiply;
+  user-select:none;
+}
+@media (max-width:520px){
+  .leaflet-popup-content .arpacal-tag{ font-size:9.2px; top:22px; right:10px; }
+}
+</style>
+
+
+
+
+
+
+<!-- *** PATCH: keep toolbar under sticky header and above map *** -->
+<style id="mlg-sticky-over-controls">
+/* Il banner resta sempre sopra ai controlli Leaflet */
+header.mlg-banner.mlg-sticky{ z-index: 5000 !important; }
+/* I controlli Leaflet (zoom + toolbar) stanno sotto al banner */
+.leaflet-top, .leaflet-bottom{ z-index: 1200 !important; }
+</style>
+
+
+<!-- *** PATCH: stile valori nei popup (più grandi + grassetto; min blu, max rosso) *** -->
+<style id="mlg-popup-values">
+.leaflet-popup-content .mlg-val{
+  font-weight: 700;
+  font-size: 1.08em;          /* poco più grande del testo */
+}
+/* Colori leggibili su fondo bianco */
+.leaflet-popup-content .mlg-val-min{ color: #2563eb; } /* blu moderato */
+.leaflet-popup-content .mlg-val-max{ color: #dc2626; } /* rosso moderato */
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style id="mlg-logo-watermark">
+#map{ position: relative; }
+/* === Watermark mappa === */
+#map .mlg-watermark{
+  position:absolute; inset:0; z-index:550; pointer-events:none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='480' height='320' viewBox='0 0 480 320' fill='none'><defs><pattern id='p' width='240' height='160' patternUnits='userSpaceOnUse' patternTransform='rotate(-25)'><g fill='%230b2f86' fill-opacity='0.14' font-family='system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif' font-weight='900'><text x='0' y='60' font-size='52'>MLG</text><text x='130' y='130' font-size='30'>MLG</text></g></pattern></defs><rect width='100%' height='100%' fill='url(%23p)'/></svg>");
+  background-size: 420px 280px;
+}
+/* === Logo Mappa (spostato un pelo in basso e a destra) === */
+#map .mlg-corner-logo{
+  position:absolute;
+  right: 36px;  /* v7: 42px */
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px)); /* v7: 76px */
+  z-index:650;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:0; background: transparent; border:0; box-shadow:none;
+  text-decoration:none;
+}
+#map .mlg-corner-logo img{
+  height:128px; width:auto; display:block;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,.95)) drop-shadow(0 1.2px 2px rgba(0,0,0,.45));
+}
+@media (max-width: 540px){
+  #map .mlg-corner-logo{ right: 30px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  #map .mlg-corner-logo img{ height:116px; }
+}
+
+/* === CLASSIFICA === */
+#rankingWrap{ 
+  position: relative; 
+  z-index: 900;                /* sopra la mappa/logo */
+  margin-top: -26px;           /* piccola sovrapposizione */
+}
+@media (min-width: 768px){
+  #rankingWrap{ margin-top: -30px; }
+}
+
+#rankingCard{
+  position: relative;
+  overflow: hidden;
+}
+/* Watermark sopra la tabella (ma con bassa opacità e nessun click) */
+#rankingCard::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='480' height='320' viewBox='0 0 480 320' fill='none'><defs><pattern id='pr' width='240' height='160' patternUnits='userSpaceOnUse' patternTransform='rotate(-25)'><g fill='%230b2f86' fill-opacity='0.06' font-family='system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif' font-weight='900'><text x='0' y='60' font-size='52'>MLG</text><text x='130' y='130' font-size='30'>MLG</text></g></pattern></defs><rect width='100%' height='100%' fill='url(%23pr)'/></svg>");
+  background-size: 420px 280px;
+}
+</style>
+
+</head>
+<body>
+
+<header class="mlg-banner mlg-sticky" role="banner">
+  <div class="mlg-inner">
+    <button id="mlgMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false" title="Apri menu">
+      <span class="mlg-hb" aria-hidden="true"><b></b><b></b><b></b></span>
+    </button>
+    <div class="mlg-title" aria-label="Meteo Lo Gullo">MLG</div>
+    <form id="searchForm" class="mlg-search" role="search" aria-label="Cerca località">
+      <input id="cityInput" autocomplete="off" inputmode="search" placeholder="Inserisci qui la tua località…">
+      <button type="submit" aria-label="Cerca">Vai</button>
+    </form>
+  </div>
+</header>
+<div id="mlgMenuPanel">
+  <a href="https://www.meteologullo.com/" target="_blank" rel="noopener">Home</a>
+  <a href="https://www.meteologullo.com/stazioni-meteorologiche-mlg" target="_blank" rel="noopener">MLG Map</a>
+  <a href="https://www.meteologullo.com/blog" target="_blank" rel="noopener">News</a>
+  <a href="https://www.meteologullo.com/blank" target="_blank" rel="noopener">Chi Siamo</a>
+  <a href="https://www.meteologullo.com/blog/categories/meteo-curiosit%C3%A0" target="_blank" rel="noopener">Curiosità</a>
+  <a href="https://www.meteologullo.com/webcam" target="_blank" rel="noopener">Webcam</a>
+</div>
+
+
+
+<div class="controls">
+  <label>Finestra (ore): <input id="hours" type="number" value="24" min="1" max="168"></label>
+  <button id="reload">Ricarica</button>
+  <button id="fit" class="secondary">Centra mappa</button>
+  <span id="status" class="muted"></span>
+</div>
+
+<div class="temp-scale">
+  <div class="temp-bar" title="Scala colore centrata sul verde (leggibile come nello screenshot)"></div>
+  <div style="font-size:11px;color:#555">Scala sensibile (°C)</div>
+</div>
+<div class="temp-labels"><span>-10</span><span>0</span><span>10</span><span>20</span><span>30</span><span>40+</span></div>
+
+<div id="map"><div class="mlg-watermark" aria-hidden="true"></div><a class="mlg-corner-logo" href="https://www.meteologullo.com/" target="_blank" rel="noopener" aria-label="MLG logo"><img src="https://meteologullo.github.io/mappamlg/logo.png" alt="MLG"></a></div>
+
+<div id="rankingWrap">
+  <div id="rankingCard">
+    <div id="rankingHead">
+      <h3>Classifiche stazioni</h3>
+      <div class="viewToggle" role="tablist" aria-label="Vista classifica">
+        <button id="modeList" class="chip on" role="tab" aria-selected="true">Lista</button>
+        <button id="modeText" class="chip" role="tab" aria-selected="false">Testo</button>
+        <button id="copyBtn" class="secondary small" title="Copia il testo" aria-label="Copia il testo">Copia</button>
+      </div>
+      <select id="rankingSelect" aria-label="Seleziona classifica">
+        <option value="t_desc">Più calde (t live)</option>
+        <option value="t_asc">Più fredde (t live)</option>
+        <option value="tmax_desc">T max più alta</option>
+        <option value="tmin_asc">T min più bassa</option>
+        <option value="rh_desc">Più umide</option>
+        <option value="wg_desc">Vento (raffica)</option>
+        <option value="rain_desc">Più piovose (oggi)</option>
+      </select>
+    </div>
+    <div id="rankingList" role="list"></div>
+    <div id="rankingText" aria-live="polite"></div>
+  </div>
+</div>
+
+<div id="note" class="legend"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function(){
+  // Helpers
+  function safeGet(obj, path){
+    try{ var cur=obj; path.split('.').forEach(function(p){ cur = cur ? cur[p] : undefined; }); return cur;
+    }catch(e){ return undefined; }
+  }
+  function toNum(v){ var n = Number(v); return isFinite(n)? n : null; }
+  function notNull(x){ return x!==undefined && x!==null; }
+  function pad(n){ return String(n).padStart(2, '0'); }
+  function fmtSpace(dt){ return dt.getUTCFullYear() + "-" + pad(dt.getUTCMonth()+1) + "-" + pad(dt.getUTCDate()) + " " + pad(dt.getUTCHours()) + ":" + pad(dt.getUTCMinutes()); }
+  function fmtLocal(dt){ try{ var d=(dt instanceof Date)? dt : new Date(dt); if(!isFinite(d)) return null; return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear()+" "+pad(d.getHours())+":"+pad(d.getMinutes()); }catch(_){ return null; } }
+
+  // Decimali: sempre 1 come nei pop-up (es.: 14,5°C)
+  var DECIMALS = 1;
+  function fmtTemp(v){ return (v==null || !isFinite(v))? "&ndash;" : Number(v).toFixed(DECIMALS).replace('.', ','); }
+
+  // Map
+  var map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap', maxZoom:18}).addTo(map);
+
+  // === TUTTI i centri ===
+  var CENTERS = [
+    {"key":"A","name":"Centro A","lat":39.25,"lon":16.43583,"color":"#4f46e5"},
+    {"key":"B","name":"Centro B","lat":39.28731,"lon":16.26483,"color":"#16a34a"},
+    {"key":"C","name":"Nocelle-Arvo","lat":39.24722,"lon":16.54444,"color":"#ef4444"},
+    {"key":"D","name":"Cecita","lat":39.4,"lon":16.5375,"color":"#22c55e"},
+    {"key":"E","name":"Monte Curcio-Camigl.","lat":39.32139,"lon":16.42889,"color":"#3b82f6"},
+    {"key":"F","name":"Gambarie","lat":38.19278,"lon":15.84417,"color":"#eab308"},
+    {"key":"G","name":"Albidona","lat":39.92611,"lon":16.46639,"color":"#a855f7"},
+    {"key":"H","name":"Antonimina","lat":38.275,"lon":16.14722,"color":"#f97316"},
+    {"key":"I","name":"Limina","lat":38.37139,"lon":16.18917,"color":"#06b6d4"},
+    {"key":"J","name":"Plati'","lat":38.22222,"lon":16.04444,"color":"#84cc16"},
+    {"key":"K","name":"Roccaforte del Greco","lat":38.04444,"lon":15.90278,"color":"#ec4899"},
+    {"key":"L","name":"Rogliano","lat":39.18361,"lon":16.32583,"color":"#10b981"},
+    {"key":"M","name":"S.Agata del Bianco","lat":38.09167,"lon":16.08194,"color":"#8b5cf6"},
+    {"key":"N","name":"Villapiana","lat":39.79694,"lon":16.48139,"color":"#f59e0b"},
+    {"key":"O","name":"Campo Tenese","lat":39.855,"lon":16.08778,"color":"#ef4444"},
+    {"key":"P","name":"Belvedere Marittimo","lat":39.62972,"lon":15.85167,"color":"#22c55e"},
+    {"key":"Q","name":"Oriolo","lat":40.05,"lon":16.44694,"color":"#3b82f6"},
+    {"key":"R","name":"Serrarossa","lat":39.06889,"lon":16.89056,"color":"#eab308"},
+    {"key":"S","name":"Rosarno","lat":38.49972,"lon":15.98361,"color":"#a855f7"},
+    {"key":"T","name":"Montebello Ionico","lat":37.9875,"lon":15.72861,"color":"#f97316"},
+    {"key":"U","name":"Joppolo","lat":38.58278,"lon":15.8925,"color":"#06b6d4"},
+    {"key":"V","name":"Roseto Capo Spulico","lat":39.99111,"lon":16.60667,"color":"#84cc16"},
+    {"key":"W","name":"Botricello","lat":38.93778,"lon":16.85639,"color":"#ec4899"},
+    {"key":"X","name":"Corigliano Calabro","lat":39.58694,"lon":16.52111,"color":"#10b981"},
+    {"key":"Y","name":"Amantea","lat":39.15,"lon":16.07806,"color":"#8b5cf6"},
+    {"key":"Z","name":"Spineto","lat":39.16333,"lon":16.54,"color":"#f59e0b"},
+    {"key":"AA","name":"Arena","lat":38.55806,"lon":16.21278,"color":"#ef4444"},
+    {"key":"AB","name":"Capo Vaticano","lat":38.61917,"lon":15.8325,"color":"#22c55e"},
+    {"key":"AC","name":"Parenti","lat":39.16361,"lon":16.40556,"color":"#3b82f6"},
+    {"key":"AD","name":"Cenadi - Serralta","lat":38.73361,"lon":16.34389,"color":"#eab308"},
+    {"key":"AE","name":"Serra S.Bruno","lat":38.56611,"lon":16.3125,"color":"#a855f7"},
+    {"key":"AF","name":"S.Cristina d'Aspr.","lat":38.25278,"lon":15.97361,"color":"#f97316"},
+    {"key":"AG","name":"Cardeto","lat":38.11111,"lon":15.81444,"color":"#06b6d4"},
+    {"key":"AH","name":"Gioiosa Ionica","lat":38.30139,"lon":16.32556,"color":"#84cc16"},
+    {"key":"AI","name":"Cropalati","lat":39.51389,"lon":16.73056,"color":"#ec4899"},
+    {"key":"AJ","name":"Fitterizzi Meteo","lat":39.52401,"lon":16.16225,"color":"#10b981"},
+    {"key":"AK","name":"Torano Scalo","lat":39.47444,"lon":16.20083,"color":"#8b5cf6"},
+    {"key":"AL","name":"Cosenza Crati","lat":39.28731,"lon":16.26483,"color":"#f59e0b"},
+    {"key":"AM","name":"Satriano","lat":38.67528,"lon":16.53278,"color":"#ef4444"},
+    {"key":"AN","name":"Chiaravalle","lat":38.67222,"lon":16.40167,"color":"#22c55e"},
+    {"key":"AO","name":"Spadola","lat":38.60278,"lon":16.33722,"color":"#3b82f6"},
+    {"key":"AP","name":"Catanzaro","lat":38.9125,"lon":16.58194,"color":"#eab308"},
+    {"key":"AQ","name":"Vibo Valentia","lat":38.67361,"lon":16.10278,"color":"#a855f7"},
+    {"key":"AR","name":"Botte Donato","lat":39.25,"lon":16.43583,"color":"#f97316"},
+    {"key":"AS","name":"Fabrizia","lat":38.49167,"lon":16.30278,"color":"#06b6d4"},
+    {"key":"AT","name":"Mongiana P.","lat":38.51667,"lon":16.31944,"color":"#84cc16"},
+    {"key":"AU","name":"Cassari","lat":38.44444,"lon":16.29167,"color":"#ec4899"},
+    {"key":"AV","name":"Canolo Nuovo","lat":38.33222,"lon":16.15333,"color":"#10b981"},
+    {"key":"AW","name":"Castrovillari","lat":39.78611,"lon":16.25556,"color":"#8b5cf6"},
+    {"key":"AX","name":"Reggio Calabria","lat":38.10278,"lon":15.63889,"color":"#f59e0b"},
+    {"key":"AY","name":"Lamezia","lat":38.86528,"lon":16.24417,"color":"#ef4444"},
+    {"key":"AZ","name":"Papanice","lat":39.07222,"lon":17.02778,"color":"#22c55e"},
+    {"key":"BA","name":"Cutro","lat":39.03667,"lon":17.01528,"color":"#3b82f6"},
+    {"key":"BB","name":"Salica","lat":39.01389,"lon":17.12778,"color":"#eab308"},
+    {"key":"BC","name":"Crotone Molo Giunti","lat":39.08221,"lon":17.13555,"color":"#a855f7"},
+    {"key":"BD","name":"Ciro' Marina","lat":39.40722,"lon":17.11083,"color":"#f97316"},
+    {"key":"BE","name":"Tarsia","lat":39.6225,"lon":16.27806,"color":"#06b6d4"},
+    {"key":"BF","name":"S.Sosti","lat":39.66111,"lon":16.02778,"color":"#84cc16"},
+    {"key":"BG","name":"S.Pietro in Guarano","lat":39.34056,"lon":16.30417,"color":"#ec4899"},
+    {"key":"BH","name":"Domanico","lat":39.21667,"lon":16.20278,"color":"#10b981"},
+    {"key":"BI","name":"Tiriolo","lat":38.94639,"lon":16.51972,"color":"#8b5cf6"},
+    {"key":"BJ","name":"Montalto Uffugo","lat":39.39806,"lon":16.12083,"color":"#f59e0b"},
+    {"key":"BK","name":"Isola Capo Rizzuto","lat":38.93722,"lon":17.02333,"color":"#ef4444"},
+    {"key":"BL","name":"Mileto","lat":38.60556,"lon":16.06056,"color":"#22c55e"},
+    {"key":"BM","name":"Nicastro","lat":38.9775,"lon":16.30361,"color":"#3b82f6"},
+    {"key":"BN","name":"Feroleto","lat":38.46583,"lon":16.06028,"color":"#eab308"},
+    {"key":"BO","name":"Palermiti","lat":38.75333,"lon":16.44778,"color":"#a855f7"},
+    {"key":"BP","name":"Cittanova","lat":38.35361,"lon":16.07861,"color":"#f97316"},
+    {"key":"BQ","name":"Scilla","lat":38.25083,"lon":15.71389,"color":"#06b6d4"},
+    {"key":"BR","name":"Paola","lat":39.36111,"lon":16.04167,"color":"#84cc16"},
+    {"key":"BS","name":"S.Mauro Marchesato","lat":39.10278,"lon":16.92778,"color":"#ec4899"},
+    {"key":"BT","name":"Soverato Marina","lat":38.69,"lon":16.54444,"color":"#10b981"},
+    {"key":"BU","name":"Bovalino Marina","lat":38.15031,"lon":16.18149,"color":"#8b5cf6"},
+    {"key":"BV","name":"Reggio Calabria - Catona","lat":38.185,"lon":15.63806,"color":"#f59e0b"},
+    {"key":"BW","name":"Cortale","lat":38.83361,"lon":16.40222,"color":"#ef4444"},
+    {"key":"BX","name":"Castrovillari - Camerata","lat":39.73316,"lon":16.27101,"color":"#22c55e"},
+    {"key":"BY","name":"Martirano","lat":39.08306,"lon":16.23667,"color":"#3b82f6"},
+    {"key":"BZ","name":"Rizziconi","lat":38.40778,"lon":15.97167,"color":"#eab308"},
+    {"key":"CA","name":"Sant'Alessio in Aspromonte","lat":38.175,"lon":15.75611,"color":"#a855f7"},
+    {"key":"CB","name":"Zungri","lat":38.65056,"lon":15.98222,"color":"#f97316"},
+    {"key":"CC","name":"Crucoli","lat":39.42444,"lon":17.00361,"color":"#06b6d4"},
+    {"key":"CD","name":"Acri","lat":39.5,"lon":16.40278,"color":"#84cc16"},
+    {"key":"CE","name":"Cetraro Superiore","lat":39.5175,"lon":15.94056,"color":"#ec4899"},
+    {"key":"CF","name":"Scilla - Tagli","lat":38.24917,"lon":15.76472,"color":"#10b981"},
+    {"key":"CG","name":"Arasi'","lat":38.12056,"lon":15.73667,"color":"#8b5cf6"},
+    {"key":"CH","name":"Punta Stilo","lat":38.43556,"lon":16.57,"color":"#f59e0b"},
+    {"key":"CI","name":"Staiti","lat":38.00167,"lon":16.03417,"color":"#ef4444"},
+    {"key":"CJ","name":"Bova Superiore","lat":37.99667,"lon":15.93,"color":"#22c55e"},
+    {"key":"CK","name":"Stignano","lat":38.41889,"lon":16.46833,"color":"#3b82f6"},
+    {"key":"CL","name":"Roccelletta","lat":38.81444,"lon":16.55972,"color":"#eab308"},
+    {"key":"CM","name":"San Nicola da Crissa","lat":38.65917,"lon":16.29917,"color":"#a855f7"},
+    {"key":"CN","name":"Monte Scrisi","lat":38.235,"lon":15.71583,"color":"#f97316"},
+    {"key":"CO","name":"Altilia","lat":39.12944,"lon":16.25528,"color":"#06b6d4"},
+    {"key":"CP","name":"Pietrastorta","lat":38.11972,"lon":15.68972,"color":"#84cc16"},
+    {"key":"CQ","name":"Sellia Superiore","lat":38.98528,"lon":16.62083,"color":"#ec4899"},
+    {"key":"CR","name":"Petilia Policastro","lat":39.11444,"lon":16.76639,"color":"#10b981"},
+    {"key":"CS","name":"Allai","lat":38.02639,"lon":15.74861,"color":"#8b5cf6"},
+    {"key":"CT","name":"Cosenza 118","lat":39.30583,"lon":16.23556,"color":"#f59e0b"},
+    {"key":"CU","name":"Corbino","lat":38.95139,"lon":16.565,"color":"#ef4444"},
+    {"key":"CV","name":"Belsito","lat":39.17528,"lon":16.28083,"color":"#22c55e"},
+    {"key":"CW","name":"Mormanno","lat":39.885,"lon":15.99222,"color":"#3b82f6"},
+    {"key":"CX","name":"Decollatura","lat":39.04917,"lon":16.335,"color":"#eab308"},
+      {"key":"CY","name":"Albi","lat":39.0303,"lon":16.5964,"color":"#4f46e5"},
+    {"key":"CZ","name":"Ardore","lat":38.2044,"lon":16.1536,"color":"#16a34a"},
+    {"key":"DA","name":"Bagnara Calabra","lat":38.2906,"lon":15.8119,"color":"#ef4444"},
+    {"key":"DB","name":"Cariati","lat":39.5044,"lon":16.9403,"color":"#22c55e"},
+    {"key":"DC","name":"Cassano Jonico","lat":39.7897,"lon":16.3139,"color":"#3b82f6"},
+    {"key":"DD","name":"Cerchiara di Calabria","lat":39.8656,"lon":16.3814,"color":"#eab308"},
+    {"key":"DE","name":"Cotronei","lat":39.1597,"lon":16.7831,"color":"#a855f7"},
+    {"key":"DF","name":"Cropani","lat":38.9689,"lon":16.7797,"color":"#f97316"},
+    {"key":"DG","name":"Filadelfia","lat":38.7842,"lon":16.2861,"color":"#4f46e5"},
+    {"key":"DH","name":"Giffone","lat":38.4378,"lon":16.1431,"color":"#16a34a"},
+    {"key":"DI","name":"Gimigliano","lat":38.9744,"lon":16.5403,"color":"#ef4444"},
+    {"key":"DJ","name":"Gioia Tauro SS18","lat":38.4308,"lon":15.9072,"color":"#22c55e"},
+    {"key":"DK","name":"Laino Borgo","lat":39.9536,"lon":15.9731,"color":"#3b82f6"},
+    {"key":"DL","name":"Licciardi","lat":38.8983,"lon":16.3322,"color":"#eab308"},
+    {"key":"DM","name":"Locri","lat":38.2422,"lon":16.2578,"color":"#a855f7"},
+    {"key":"DN","name":"Longobucco","lat":39.4497,"lon":16.6142,"color":"#f97316"},
+    {"key":"DO","name":"Lungro","lat":39.745,"lon":16.1175,"color":"#4f46e5"},
+    {"key":"DP","name":"Maierato","lat":38.7083,"lon":16.1919,"color":"#16a34a"},
+    {"key":"DQ","name":"Molochio","lat":38.3081,"lon":16.0308,"color":"#ef4444"},
+    {"key":"DR","name":"Pagliarelle","lat":39.1419,"lon":16.7489,"color":"#22c55e"},
+    {"key":"DS","name":"Palmi","lat":38.3575,"lon":15.8506,"color":"#3b82f6"},
+    {"key":"DT","name":"Papasidero","lat":39.8711,"lon":15.9058,"color":"#eab308"},
+    {"key":"DU","name":"Petrona'","lat":39.0433,"lon":16.7589,"color":"#a855f7"},
+    {"key":"DV","name":"Pizzoni","lat":38.6247,"lon":16.2444,"color":"#f97316"},
+    {"key":"DW","name":"Polistena","lat":38.4083,"lon":16.0775,"color":"#4f46e5"},
+    {"key":"DX","name":"Ponte Vecchio","lat":38.3775,"lon":15.9128,"color":"#16a34a"},
+    {"key":"DY","name":"Roccella Jonica","lat":38.3272,"lon":16.3953,"color":"#ef4444"},
+    {"key":"DZ","name":"Rosario","lat":38.0422,"lon":15.7242,"color":"#22c55e"},
+    {"key":"EA","name":"S.Caterina dello Ionio","lat":38.5361,"lon":16.5194,"color":"#3b82f6"},
+    {"key":"EB","name":"S.Nicola dell'Alto","lat":39.2906,"lon":16.9781,"color":"#eab308"},
+    {"key":"EC","name":"S.Pietro di Carida'","lat":38.5494,"lon":16.1244,"color":"#a855f7"},
+    {"key":"ED","name":"San Luca","lat":38.1511,"lon":16.0728,"color":"#f97316"},
+    {"key":"EE","name":"Sant'Elia-Jano","lat":38.9522,"lon":16.5828,"color":"#4f46e5"},
+    {"key":"EF","name":"Savelli","lat":39.3147,"lon":16.7822,"color":"#16a34a"},
+    {"key":"EG","name":"Scilla - Piano delle Aquile","lat":38.2469,"lon":15.7514,"color":"#ef4444"},
+    {"key":"EH","name":"Scilla - Solano","lat":38.25,"lon":15.7808,"color":"#22c55e"},
+    {"key":"EI","name":"Scilla - Villaggio del Pino","lat":38.2419,"lon":15.7381,"color":"#3b82f6"},
+    {"key":"EJ","name":"Sibari","lat":39.7106,"lon":16.4966,"color":"#eab308"},
+    {"key":"EK","name":"Sinopoli","lat":38.2586,"lon":15.8714,"color":"#a855f7"},
+    {"key":"EL","name":"Soveria Simeri","lat":38.9517,"lon":16.6775,"color":"#f97316"},
+    {"key":"EM","name":"Taurianova","lat":38.3539,"lon":16.0106,"color":"#4f46e5"},
+    {"key":"EN","name":"Tortora","lat":39.9375,"lon":15.7686,"color":"#16a34a"},
+    {"key":"EO","name":"Vibo Valentia - Longobardi","lat":38.7028,"lon":16.1197,"color":"#ef4444"},
+];
+  var bounds = L.latLngBounds(CENTERS.map(function(c){return [c.lat, c.lon];}));
+  map.fitBounds(bounds.pad(0.25));
+  document.getElementById('fit').onclick = function(){ map.fitBounds(bounds.pad(0.25)); };
+
+
+  // === Scala colore ipersensibile per grado (-15°C .. 50°C) ===
+  // Stop principali: viola (-15) -> blu -> azzurro -> verde -> giallo -> arancione -> rosso -> fucsia -> violetto (50)
+  
+  // === SCALA COLORI "LINEAMETEO-LIKE" (–15°C .. 50°C) ===
+  // Freddo: blu/azzurro —> Verde —> Giallo —> Arancio —> Rosso —> Cremisi —> Magenta/Violetto
+  const TEMP_STOPS = [
+    {t:-15, h:240, s:85,  l:28}, // blu notte
+    {t:-10, h:225, s:80,  l:32}, // blu scuro
+    {t: -5, h:215, s:80,  l:38}, // blu
+    {t:  0, h:205, s:80,  l:45}, // azzurro freddo
+    {t:  5, h:195, s:75,  l:50}, // azzurro
+    {t:  8, h:175, s:70,  l:46}, // verde acqua
+    {t: 12, h:150, s:70,  l:42}, // verde
+    {t: 16, h:130, s:75,  l:44}, // verde brillante
+    {t: 19, h:105, s:80,  l:50}, // giallo‑verde
+    {t: 22, h: 65, s:92,  l:54}, // giallo chiaro
+    {t: 25, h: 50, s:95,  l:54}, // giallo pieno
+    {t: 27, h: 38, s:95,  l:52}, // giallo‑arancio
+    {t: 29, h: 28, s:95,  l:50}, // arancio
+    {t: 32, h: 15, s:95,  l:48}, // rosso‑arancio
+    {t: 35, h:  0, s:95,  l:46}, // rosso
+    {t: 37, h:350, s:92,  l:50}, // rosso intenso / cremisi
+    {t: 40, h:335, s:88,  l:55}, // carminio
+    {t: 43, h:320, s:85,  l:58}, // fucsia
+    {t: 46, h:300, s:80,  l:62}, // magenta
+    {t: 50, h:285, s:75,  l:66}  // violetto chiaro
+  ];
+
+  function interpHSL(a,b,k){
+    // Interpola angolo hue tenendo conto della circolarità (usa via più breve)
+    let dh = ((b.h - a.h + 540) % 360) - 180;
+    const h = (a.h + k*dh + 360) % 360;
+    const s = a.s + k*(b.s - a.s);
+    const l = a.l + k*(b.l - a.l);
+    return {h,s,l};
+  }
+  function chipColor(t){
+    if (t==null || !isFinite(t)) return {bg:'#e5e7eb'};
+    // Clamp
+    const minT = TEMP_STOPS[0].t, maxT = TEMP_STOPS[TEMP_STOPS.length-1].t;
+    let x = Math.max(minT, Math.min(maxT, t));
+    // Trova lo stop inferiore/superiore
+    let i = 0;
+    while (i < TEMP_STOPS.length-1 && x > TEMP_STOPS[i+1].t) i++;
+    const A = TEMP_STOPS[i], B = TEMP_STOPS[Math.min(i+1, TEMP_STOPS.length-1)];
+    const span = (B.t - A.t) || 1;
+    const k = (x - A.t) / span;
+    const {h,s,l} = interpHSL(A,B,k);
+    return {bg: `hsl(${h.toFixed(1)},${s.toFixed(1)}%,${l.toFixed(1)}%)`};
+  }
+
+  function bubbleIcon(temp){
+    var col = chipColor(temp);
+    var txt = fmtTemp(temp);
+    var style = 'background:'+col.bg+';'+ _textStyleFor(col.bg);
+    var html = '<div class="t-chip" style="'+style+'">'+txt+'</div>';
+    return L.divIcon({className:'t-label', html:html, popupAnchor:[0,-12]});
+  }
+
+  // --- Normalizzazione dati ---
+  function productPool(st){ return st && (st.prod || st.products || st["var"] || st.variables || st); }
+  function getProd(st, code){
+    var P = productPool(st); if (!P) return null;
+    if (Array.isArray(P)){
+      for (var i=0;i<P.length;i++){ var p=P[i]; var v=(p.var||p.code||"")+""; if (v.toUpperCase()===(code+"").toUpperCase()) return p; }
+      return null;
+    }
+    if (typeof P === "object") return P[code] || P[String(code)] || null;
+    return null;
+  }
+  function series(prod){
+    var raw = prod && (prod.val || prod.values || prod.series || prod.data || prod);
+    var out=[];
+    if (Array.isArray(raw)){
+      for (var i=0;i<raw.length;i++){
+        var r=raw[i], val=r&&(notNull(r.val)? r.val : r.value), time=r&&(r.ref||r.reftime||r.time||r.ts);
+        if (notNull(val)) out.push({val: Number(val), time: time});
+      }
+    }
+    return out.filter(function(x){return x.val!=null;});
+  }
+  function todayOnly(arr){
+    var d=new Date(); var y=d.getUTCFullYear(), m=d.getUTCMonth()+1, dd=d.getUTCDate();
+    var dayStr = y+"-"+String(m).padStart(2,'0')+"-"+String(dd).padStart(2,'0');
+    var s=(arr||[]).filter(function(p){ return p.time && String(p.time).slice(0,10)===dayStr; });
+    s.sort(function(a,b){ return new Date(a.time)-new Date(b.time); }); return s;
+  }
+  function rainTodayCalc(seriesAll){
+    var s=todayOnly(seriesAll); if (!s.length) return 0;
+    var nonDec=true; for(var i=1;i<s.length;i++){ if (s[i].val < s[i-1].val - 1e-6){ nonDec=false; break; } }
+    if (nonDec) return Math.max(0, s[s.length-1].val - s[0].val);
+    var sum=0; for (var j=0;j<s.length;j++){ if (s[j].val >= 0) sum += s[j].val; } return sum;
+  }
+  function lastVal(prod){
+    var s = series(prod); if (s.length) return s[s.length-1].val;
+    return toNum(prod && (prod.val!=null? prod.val : prod.value));
+  }
+  function latestObsTime(){
+    var best=null; var args=Array.prototype.slice.call(arguments);
+    for (var i=0;i<args.length;i++){
+      var p=args[i]; if(!p) continue; var s=series(p); if(s && s.length){ var tt=new Date(s[s.length-1].time); if(isFinite(tt)) best = (best && best>tt)? best : tt; }
+    }
+    return best;
+  }
+  function pickName(st){
+    var S = st.station || st.stat || st.stationDetails || st.details || {};
+    var cand = [
+      st.assignedName, st.assigned_name, st.stationAssignedName,
+      S.assignedName, S.assigned_name,
+      st.name, S.name, st.station_name, st.stationName, S.stationName,
+      st.label, S.label, S.description, S.desc,
+      st.siteName, S.siteName, S.site,
+      st.locationName, S.locationName, st.localita, st['località'], S.localita, S['località'],
+      st.city, S.city, st.municipality, S.municipality, st.comune, S.comune,
+      safeGet(st,'stat.details.name'), safeGet(st,'stat.details.val')
+    ];
+    for (var i=0;i<cand.length;i++){ if (cand[i] && String(cand[i]).trim()) return String(cand[i]).trim(); }
+    return "Stazione";
+  }
+  function normalize(st){
+    var S = st.station || st.stat || st.stationDetails || st.details || {};
+    var id  = st.id || st.station_id || st.code || S.id || S.code || null;
+    var lat = toNum(st.lat || st.latitude || S.lat || S.latitude || safeGet(st,'stat.lat') || safeGet(st,'stat.latitude'));
+    var lon = toNum(st.lon || st.longitude || S.lon || S.longitude || safeGet(st,'stat.lon') || safeGet(st,'stat.longitude'));
+    var name = pickName(st);
+
+    var T   = getProd(st,"B12101");
+    var RH  = getProd(st,"B13003");
+    var WS  = getProd(st,"B11002");
+    var WG  = getProd(st,"B11041") || getProd(st,"B11042");
+    var WD  = getProd(st,"B11001");
+    var RR  = getProd(st,"B13011");
+
+    var tS = series(T).map(function(p){ return {val:(p.val>120? p.val-273.15:p.val), time:p.time}; });
+    var tToday = todayOnly(tS);
+    var tMin = tToday.length ? Math.min.apply(null, tToday.map(function(x){return x.val;})) : (tS.length? tS[tS.length-1].val : null);
+    var tMax = tToday.length ? Math.max.apply(null, tToday.map(function(x){return x.val;})) : (tS.length? tS[tS.length-1].val : null);
+    var tLast = tS.length? tS[tS.length-1].val : null;
+
+    function asKmH(val, unit){
+      if (val==null) return null;
+      var u = (unit||"").toUpperCase();
+      if (u.indexOf("M/S")>=0) return val*3.6;
+      if (u.indexOf("KM/H")>=0 || u.indexOf("KMH")>=0) return val;
+      if (u.indexOf("KT")>=0 || u.indexOf("KNOT")>=0) return val*1.852;
+      return val<60? val*3.6 : val;
+    }
+    var rhLast = lastVal(RH);
+    var wsKmH = asKmH(lastVal(WS), WS && WS.unit);
+    var wgKmH = asKmH(lastVal(WG), WG && WG.unit);
+    var wdDeg = lastVal(WD);
+    var rainToday = rainTodayCalc(series(RR));
+    var updatedAt = latestObsTime(T,RH,WS,WG,WD,RR);
+
+    return {id:id,lat:lat,lon:lon,name:name,t:tLast,rh:rhLast,ws:wsKmH,wg:wgKmH,wd:wdDeg,rain:rainToday,tMin:tMin,tMax:tMax,updatedAt: updatedAt, source:'meteohub'};
+  }
+
+  
+  function buildPopupHTML(st){
+    var ventoPart = (st.ws!=null? ("<span class=\"mlg-val\" style=\"white-space:nowrap\">"+st.ws.toFixed(0)+"&nbsp;km/h</span>") : "--");
+    if (st.wd!=null) ventoPart += " ("+st.wd.toFixed(0)+"&deg;)";
+    var rafficaPart = (st.wg!=null? ("<span class=\"mlg-val\" style=\"white-space:nowrap\">"+st.wg.toFixed(0)+"&nbsp;km/h</span>") : "--");
+    var updated = st.updatedAt ? ('<div style="font-size:11px;color:#6b6b6b;margin-top:4px">Aggiornato: '+fmtLocal(st.updatedAt)+'</div>') : '';
+
+    // Conditional lines: hide humidity if 0; hide wind/raffica if both 0 (or null)
+    var humidLine = ((st.rh==null) || Number(st.rh)===0)
+      ? ''
+      : ('<div><b>Umidit&agrave;:</b> <span class=\"mlg-val\">'+st.rh.toFixed(0)+'</span>%</div>');
+    var windLine = (((st.ws==null || Number(st.ws)===0) && (st.wg==null || Number(st.wg)===0))
+      ? ''
+      : ('<div style="white-space:nowrap"><b>Vento:</b> ' + ventoPart + ' / <b>Raffica:</b> ' + rafficaPart + '</div>'));
+
+    var base = ""
+      + '<div style="font-weight:700;margin-bottom:4px">'+(st.name? st.name : '')+'</div>'
+      + '<div><b>Temp:</b> <span class=\"mlg-val\">'+(st.t!=null? fmtTemp(st.t)+'&nbsp;&deg;C' : '--')+'</span></div>'
+      + humidLine
+      + '<div><b>Min:</b> <span class=\"mlg-val mlg-val-min\">'+(st.tMin!=null? fmtTemp(st.tMin)+'&nbsp;&deg;C' : '--')+'</span> / <b>Max:</b> <span class=\"mlg-val mlg-val-max\">'+(st.tMax!=null? fmtTemp(st.tMax)+'&nbsp;&deg;C' : '--')+'</span></div>'
+      + windLine
+      + '<div><b>Pioggia odierna:</b> <span class=\"mlg-val\">'+((st.rain!=null? st.rain:0).toFixed(1))+'</span> mm</div>'
+      + updated;
+
+    // Webcam slot only for Amantea Spiaggia (IAMANT7)
+    var needWebcam = (st && (st.id==='IAMANT7' || /Amantea\s*Spiaggia/i.test(st.name||'')));
+    if (needWebcam){
+      base += ''
+        + '<div class="webcam-slot" data-stid="'+(st.id||'')+'" style="margin-top:6px">'
+        +   '<div class="webcam-loading" style="font-size:11px;color:#666">Caricamento webcam…</div>'
+        + '</div>'
+        + '<a href="https://meteologullo.github.io/webcam_timelapse/amantea/webcam_spiaggia_pulita/index.html" target="_blank" class="webcam-big-link" style="display:block;font-size:11px;text-align:center;margin-top:3px;text-decoration:underline;color:#007bff;">Clicca qui per immagine più grande</a>';
+    }
+    if (st && st.source === 'meteohub') { base += '<span class="arpacal-tag">Dati Arpacal</span>'; }
+    return base;
+  }
+function bubbleMarker(st){
+    var m = L.marker([st.lat, st.lon], {icon: bubbleIcon(st.t)});
+    m.bindPopup(buildPopupHTML(st));
+    return m;
+  }
+
+  // --- Networking + query ---
+  function buildURL(center, q){
+    var base = new URL("https://meteohub.agenziaitaliameteo.it/api/observations");
+    base.searchParams.set("q", q);
+    base.searchParams.set("lat", center.lat);
+    base.searchParams.set("lon", center.lon);
+    base.searchParams.set("networks", "dpcn-calabria");
+    base.searchParams.set("stationDetails", "true");
+    base.searchParams.set("allStationProducts", "true");
+    base.searchParams.set("limit", "200");
+    return base.toString();
+  }
+  function fetchJSON(u, timeoutMs){
+    if (timeoutMs==null) timeoutMs = 15000;
+    return new Promise(function(resolve, reject){
+      var ctrl = new AbortController();
+      var t = setTimeout(function(){ try{ctrl.abort();}catch(e){} reject(new Error("timeout")); }, timeoutMs);
+      fetch(u, {cache:"no-store", signal: ctrl.signal}).then(function(r){
+        if (!r.ok){ r.text().then(function(body){ clearTimeout(t); reject(new Error("HTTP "+r.status+(body? " | body: "+body : ""))); }); return; }
+        r.json().then(function(j){ clearTimeout(t); resolve(j); }).catch(function(e){ clearTimeout(t); reject(e); });
+      }).catch(function(e){ clearTimeout(t); reject(e); });
+    });
+  }
+  var PRODUCTS = "B12101 or B13011 or B11002 or B11001 or B11041 or B11042 or B13003 or B10004";
+  function buildStableQ(from, to){
+    return "reftime:>="+from+",<="+to+";timerange:254,0,0 or 1,0,3600;level:103,2000,0,0 or 1,0,0,0 or 103,10000,0,0;license:CCBY_COMPLIANT;product:"+PRODUCTS;
+  }
+  function buildMinimalQ(from, to){
+    return "reftime:>="+from+",<="+to+";timerange:1,0,3600;license:CCBY_COMPLIANT;product:B12101,B13011,B11002,B11001,B11041,B11042,B13003,B10004";
+  }
+  function fetchForCenter(center, fromStr, toStr){
+    return new Promise(function(resolve, reject){
+      var qStable = buildStableQ(fromStr, toStr);
+      var qMinimal = buildMinimalQ(fromStr, toStr);
+      var url = buildURL(center, qStable);
+      fetchJSON(url).then(function(res){
+        var list = Array.isArray(res)? res : (res.stations || res.data || res.results || []);
+        resolve({center:center, list:list, variant:"stable"});
+      }).catch(function(e){
+        if (String(e && e.message).indexOf("HTTP 400")>=0){
+          var url2 = buildURL(center, qMinimal);
+          fetchJSON(url2).then(function(res2){
+            var list2 = Array.isArray(res2)? res2 : (res2.stations || res2.data || res2.results || []);
+            resolve({center:center, list:list2, variant:"minimal"});
+          }).catch(function(e2){ reject(e2); });
+        }else{
+          reject(e);
+        }
+      });
+    });
+  }
+
+  function updateLegend(progress){
+    var html = "";
+    for (var i=0;i<progress.length;i++){
+      var cs = progress[i];
+      html += '<span class="pill"><span class="dot" style="background:'+cs.color+'"></span><b>'+cs.name+'</b>: '+cs.count+' stazioni ('+cs.variant+')</span>';
+    }
+    document.getElementById('note').innerHTML = html;
+  }
+  function renderStations(stations){
+    for (var i=0;i<stations.length;i++){
+      var s=stations[i]; if (!isFinite(s.lat)||!isFinite(s.lon)) continue;
+      bubbleMarker(s).addTo(map);
+    }
+  }
+
+  function pMap(items, mapper, opts){
+    opts = opts||{};
+    var concurrency = Math.min(opts.concurrency||10, items.length||0);
+    return new Promise(function(resolve){
+      var ret = new Array(items.length);
+      var index=0, finished=0;
+      function runNext(){
+        if (index >= items.length){ if (++finished === concurrency) resolve(ret); return; }
+        var myIndex = index++;
+        mapper(items[myIndex], myIndex).then(function(val){
+          ret[myIndex] = val;
+          if (opts.onEach) try{ opts.onEach(val, myIndex); }catch(e){}
+          runNext();
+        }).catch(function(err){
+          ret[myIndex] = {error:String(err), center:items[myIndex]};
+          if (opts.onEach) try{ opts.onEach(ret[myIndex], myIndex); }catch(e){}
+          runNext();
+        });
+      }
+      for (var k=0;k<concurrency;k++) runNext();
+    });
+  }
+
+  // ==== WUnderground PWS ====
+  const WU_API_KEY = "e1f10a1e78da46f5b10a1e78da96f525";
+  const WU_STATIONS = [
+    { id: "IAMANT7",  label: "Amantea Spiaggia", lat: 39.13, lon: 16.07 },
+    { id: "IAPRIG9",  label: "Aprigliano Guarno", lat: 39.24, lon: 16.34 },
+    { id: "IBIANC4",  label: "Bianchi - Palinudo Staglio", lat: 39.11, lon: 16.42 },
+    { id: "ICALABRI4",  label: "Brancaleone Marina", lat: 37.96, lon: 16.1 },
+    { id: "IAMANT5",  label: "Campora San Giovanni", lat: 39.07, lon: 16.09 },
+    { id: "IISOLA24",  label: "Capo Bianco", lat: 38.91, lon: 17.11 },
+    { id: "IBONIF3",  label: "Capo Bonifati", lat: 39.55, lon: 15.87 },
+    { id: "IRICADI98",  label: "Capo Vaticano - Frizza", lat: 38.63, lon: 15.83 },
+    { id: "ICASAL59",  label: "Casali del Manco - Verticelli", lat: 39.28, lon: 16.33 },
+    { id: "ICATAN92",  label: "Catanzaro - Viale Crotone", lat: 38.84, lon: 16.65 },
+    { id: "ICATAN57",  label: "Catanzaro centrale", lat: 38.92, lon: 16.59 },
+    { id: "ICATAN48",  label: "Catanzaro Santa Maria", lat: 38.87, lon: 16.6 },
+    { id: "ICATAN51",  label: "Catanzaro sud", lat: 38.9, lon: 16.59 },
+    { id: "ICORIG10",  label: "Corigliano - Villaggio Frasso", lat: 39.64, lon: 16.48 },
+    { id: "ICALABRI46",  label: "Cosenza Sud", lat: 39.29, lon: 16.23 },
+    { id: "ICROTO21",  label: "Crotone centro", lat: 39.08, lon: 17.13 },
+    { id: "IDOMAN19",  label: "Domanico - Potame", lat: 39.19, lon: 16.2 },
+    { id: "IFEROL1",  label: "Feroleto Antico", lat: 38.96, lon: 16.37 },
+    { id: "IFRASC28",  label: "Frascineto", lat: 39.83, lon: 16.26 },
+    { id: "ICASAL40",  label: "Casali del Manco - Morelli Soprana", lat: 39.28, lon: 16.29 },
+    { id: "ICASAL",  label: "ICASAL63", lat: null, lon: null },
+    { id: "ICASAL",  label: "ICASAL84", lat: null, lon: null },
+    { id: "ICELIC2",  label: "ICELIC2", lat: null, lon: null },
+    { id: "ICELIC3",  label: "Celico - Monte Scuro", lat: 39.33, lon: 16.4 },
+    { id: "ICOSEN11",  label: "Cosenza - Vaglio Lise", lat: 39.31, lon: 16.27 },
+    { id: "ICOSEN12",  label: "Cosenza Diodato", lat: 38.82, lon: 16.43 },
+    { id: "ICOSEN19",  label: "Cosenza - Viale Parco", lat: 39.323429, lon: 16.250803 },
+    { id: "ICOSEN20",  label: "Cosenza - Campagnano", lat: 39.31, lon: 16.23 },
+    { id: "IMENDI13",  label: "Mendicino - Tivolille", lat: 39.28, lon: 16.2 },
+    { id: "IRENDE25",  label: "Rende - Santa Chiara", lat: 39.336992, lon: 16.264061 },
+    { id: "IRENDE",  label: "IRENDE5", lat: null, lon: null },
+    { id: "ILONGO4",  label: "Longobardi Marina", lat: 39.196082, lon: 16.064474 },
+    { id: "ILUZZI4",  label: "Luzzi - Cavoni", lat: 39.45, lon: 16.26 },
+    { id: "IFRANC35",  label: "Marina di Curinga", lat: 38.83, lon: 16.22 },
+    { id: "IMOLOC3",  label: "Molochio", lat: 38.31, lon: 16.03 },
+    { id: "INUST1",  label: "Nuova Stazione 1", lat: 39.4, lon: 16.5 },
+    { id: "IREGGI58",  label: "Reggio Calabria - Stadio", lat: 38.1, lon: 15.65 },
+    { id: "IRENDE15",  label: "Rende", lat: 39.328697, lon: 16.211838 },
+    { id: "IRENDE23",  label: "Rende Nord", lat: 39.36, lon: 16.23 },
+    { id: "IMELIT15",  label: "San Lorenzo - Marina", lat: 37.92, lon: 15.8 },
+    { id: "ISANPI41",  label: "San Pietro in Guarano Est", lat: 39.34, lon: 16.32 },
+    { id: "ISANTI149",  label: "Sant'Ilario dello Ionio", lat: 38.21, lon: 16.19 },
+    { id: "ISARAC8",  label: "Saracena", lat: 39.78, lon: 16.16 },
+    { id: "ISIDERNO2",  label: "Siderno - Corso Garibaldi", lat: 38.26, lon: 16.29 },
+    { id: "ISOVER27",  label: "Soveria Mannelli", lat: 39.08, lon: 16.37 },
+    { id: "ISPEZZ1",  label: "Spez. Sila - Moccone", lat: 39.34, lon: 16.44 },
+    { id: "ITAVER2",  label: "Taverna", lat: 39.02, lon: 16.58 },
+    { id: "IMONTA161",  label: "Torano Castello - Scalo", lat: 39.46, lon: 16.24 },
+    { id: "IVIBOV3",  label: "Vibo V. - Olivarella", lat: 38.67, lon: 16.08 }
+  ];
+  const WU_COLOR = "#111827";
+  function numOrNull(v){ if (v === null || v === undefined) return null; var n = parseFloat(v); return isNaN(n)? null : n; }
+  function fetchWUStation(stId, apiKey, customLabel, overrideLat, overrideLon){
+    const base = new URL("https://api.weather.com/v2/pws/observations/current");
+    base.searchParams.set("stationId", stId);
+    base.searchParams.set("format", "json");
+    base.searchParams.set("units", "m");
+    base.searchParams.set("numericPrecision", "decimal");
+    base.searchParams.set("apiKey", apiKey);
+    return fetchJSON(base.toString()).then(function(j){
+      const o = (j && j.observations && j.observations[0]) || null;
+      if (!o) return null;
+      const met = o.metric || {};
+      return {
+        id: o.stationID || stId,
+        lat: (numOrNull(overrideLat) != null ? numOrNull(overrideLat) : Number(o.lat)),
+        lon: (numOrNull(overrideLon) != null ? numOrNull(overrideLon) : Number(o.lon)),
+        name: (customLabel && customLabel.trim()) ? customLabel : ((o.neighborhood || stId) + " (WU)"),
+        t: met.temp!=null? Number(met.temp) : null,
+        rh: o.humidity!=null? Number(o.humidity) : null,
+        ws: met.windSpeed!=null? Number(met.windSpeed) : null,
+        wg: met.windGust!=null? Number(met.windGust) : null,
+        wd: o.winddir!=null? Number(o.winddir) : null,
+        rain: met.precipTotal!=null? Number(met.precipTotal) : 0,
+        tMin: null,
+        tMax: null,
+        updatedAt: (function(){
+          try{
+            if (o.obsTimeUtc) return new Date(o.obsTimeUtc);
+            if (o.obsTimeLocal) return new Date(o.obsTimeLocal);
+            if (o.epoch) return new Date(Number(o.epoch)*1000);
+          }catch(_){ }
+          return null;
+        })()
+      };
+    }).catch(function(){ return null; });
+  }
+  function fetchWUAll(){
+    if (!WU_API_KEY || !WU_STATIONS.length) return Promise.resolve({list:[], count:0});
+    const proms = WU_STATIONS.map(function(s){ return fetchWUStation(s.id, WU_API_KEY, s.label || "", s.lat, s.lon); });
+    return Promise.all(proms).then(function(items){
+      const list = items.filter(function(x){ return x && isFinite(x.lat) && isFinite(x.lon); });
+      return {list:list, count:list.length};
+    });
+  }
+
+  // ---- RUN ----
+  function run(){
+    var statusEl = document.getElementById('status');
+    statusEl.textContent = "caricamento...";
+    var hours = Number(document.getElementById('hours').value)||24;
+    var now = new Date();
+    var from = new Date(now.getTime() - hours*3600*1000);
+    var fromStr = fmtSpace(from), toStr = fmtSpace(now);
+
+    var progress = CENTERS.map(function(c){ return {name:c.name, color:c.color, count:0, variant:"--"}; });
+    updateLegend(progress);
+
+    pMap(CENTERS, function(c){
+      return fetchForCenter(c, fromStr, toStr).then(function(r){
+        var norm = (r.list||[]).map(function(x){ var n = normalize(x); if(!n.name || String(n.name).trim()==='' || String(n.name).trim().toLowerCase()==='stazione'){ n.name = r.center && r.center.name ? r.center.name : n.name; } return n; });
+        return {center:c, norm:norm, variant:r.variant};
+      });
+    }, {
+      concurrency: 10,
+      onEach: function(item, idx){
+        var isErr = item && item.error;
+        if (!isErr){
+          renderStations(item.norm);
+          progress[idx] = {name:item.center.name, color:item.center.color, count:item.norm.length, variant:item.variant};
+        }else{
+          progress[idx] = {name:item.center.name, color:item.center.color, count:0, variant:"errore"};
+        }
+        updateLegend(progress);
+      }
+    }).then(function(){
+      fetchWUAll().then(async function(wu){
+        if (wu.list && wu.list.length){
+          for (const st of wu.list){
+            const m = bubbleMarker(st).addTo(map);
+            try{
+              if (window.fetchDailyExtremes && st.id){
+                const ex = await window.fetchDailyExtremes(st.id);
+                if (ex && (ex.min!=null || ex.max!=null)){
+                  st.tMin = (ex.min!=null ? ex.min : st.tMin);
+                  st.tMax = (ex.max!=null ? ex.max : st.tMax);
+                  m.setPopupContent(buildPopupHTML(st));
+                }
+              }
+            }catch(e){ console.warn("WU extremes update", st.id, e); }
+          }
+        }
+        try{
+          var pill = '<span class="pill"><span class="dot" style="background:'+WU_COLOR+'"></span><b>WUnderground PWS</b>: '+(wu.count||0)+' stazioni</span>';
+          var el = document.getElementById('note');
+          el.innerHTML = el.innerHTML + pill;
+        }catch(e){}
+        statusEl.textContent = "";
+        try{ if(window.renderRanking) window.renderRanking(); }catch(_){ }
+      }).catch(function(){ statusEl.textContent = "";
+        try{ if(window.renderRanking) window.renderRanking(); }catch(_){ } });
+    });
+  }
+
+  
+  /* ======== SIDEBAR & MODI DI VISUALIZZAZIONE ======== */
+  // Registry dei marker/stazioni senza toccare la logica originale
+  window.__ALL_MARKERS = window.__ALL_MARKERS || [];
+  var __origBubbleMarker = bubbleMarker;
+  bubbleMarker = function(st){
+  var m = __origBubbleMarker(st);
+  try{
+    // Mark "rain-only" stations (no T/RH/Wind but has rain)
+    var hasRain = (st && st.rain != null && !isNaN(Number(st.rain)));
+    var noTemp  = !(st && st.t != null && isFinite(Number(st.t)));
+    var noRH    = !(st && st.rh != null && isFinite(Number(st.rh)));
+    var noWS    = !(st && st.ws != null && isFinite(Number(st.ws)));
+    var noWG    = !(st && st.wg != null && isFinite(Number(st.wg)));
+    st.__rainOnly = !!(hasRain && noTemp && noRH && noWS && noWG);
+
+    m.__station = st; window.__ALL_MARKERS.push(m);
+  }catch(_){}
+  try{ if(window.__scheduleRanking) window.__scheduleRanking(); }catch(_){}
+  return m;
+};
+
+  function _hslInterp(A,B,k){
+    var hA=A.h,sA=A.s,lA=A.l, hB=B.h,sB=B.s,lB=B.l;
+    var dh=hB-hA; if(dh>180)dh-=360; if(dh<-180)dh+=360;
+    return {h:hA+dh*k, s:sA+(sB-sA)*k, l:lA+(lB-lA)*k};
+  }
+  function _colorFromStops(x, stops, key){
+    if (x==null || !isFinite(x)) return {bg:'#e5e7eb'};
+    var lo=stops[0][key], hi=stops[stops.length-1][key];
+    var v = Math.max(lo, Math.min(hi, x));
+    var i=0; while(i<stops.length-1 && v>stops[i+1][key]) i++;
+    var A=stops[i], B=stops[Math.min(i+1,stops.length-1)];
+    var span = (B[key]-A[key])||1, k=(v-A[key])/span;
+    var hsl=_hslInterp(A,B,k);
+    return {bg:`hsl(${hsl.h.toFixed(1)},${hsl.s.toFixed(1)}%,${hsl.l.toFixed(1)}%)`};
+  }
+
+  function _textStyleFor(bgHsl){
+    try{
+      var m = /hsl\(\s*[\d.]+,\s*[\d.]+%\s*,\s*([\d.]+)%\s*\)/.exec(String(bgHsl)||'');
+      var l = m ? parseFloat(m[1]) : 60;
+      if (!isFinite(l)) l = 60;
+      // Darker chips => white text + slight dark glow; light chips => black text + subtle light emboss
+      if (l < 58) return 'color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.60),0 0 2px rgba(0,0,0,.35)';
+      return 'color:#000;text-shadow:0 1px 0 rgba(255,255,255,.60)';
+    }catch(_){ return 'color:#000;text-shadow:0 1px 0 rgba(255,255,255,.60)'; }
+  }
+
+  // Scale delicate dedicate
+  const RH_STOPS   = [{rh:0,h:50,s:85,l:88},{rh:30,h:90,s:75,l:78},{rh:60,h:150,s:70,l:62},{rh:80,h:185,s:75,l:56},{rh:100,h:210,s:80,l:50}];
+  const GUST_STOPS = [{g:0,h:140,s:40,l:88},{g:20,h:120,s:70,l:72},{g:40,h:90,s:85,l:60},{g:70,h:55,s:95,l:56},{g:100,h:15,s:90,l:52},{g:140,h:0,s:90,l:48}];
+  const RAIN_STOPS = [{r:0,h:200,s:60,l:90},{r:5,h:210,s:70,l:82},{r:15,h:225,s:80,l:68},{r:40,h:255,s:85,l:58},{r:80,h:275,s:85,l:50}];
+
+  function iconGeneric(val, dec, stops, key){
+    var col = _colorFromStops(val, stops, key);
+    var txt = (val==null || !isFinite(val))? '&ndash;' : Number(val).toFixed(dec).replace('.', ',');
+    var style = 'background:'+col.bg+';'+ _textStyleFor(col.bg);
+    var html = '<div class="t-chip" style="'+style+'">'+txt+'</div>';
+    return L.divIcon({className:'t-label', html:html, popupAnchor:[0,-12]});
+  }
+
+  var _currentMode = 'live';
+  function _applyMode(mode){
+    _currentMode = mode || _currentMode;
+    // attiva bottone
+    var cont = document.querySelector('.leaflet-control.meteo-toolbar');
+    if (cont){
+      cont.querySelectorAll('.sb-btn').forEach(btn=>{
+        if(btn.dataset.mode) btn.classList.toggle('active', btn.dataset.mode===_currentMode);
+      });
+    }
+    // aggiorna marker
+// === FILTRI RICHIESTI ===
+// - Umidità: nascondi RH=0
+// - Raffiche: nascondi se Vento medio=0 e Raffica=0
+// - Pioggia: se una stazione ha 0.0 mm ma ENTRO 3 km ce ne sono >1.0 mm, nascondila
+var RAIN_NEAR_KM = 3;
+function haversineKm(lat1, lon1, lat2, lon2){
+  var R = 6371;
+  function toRad(d){ return d*Math.PI/180; }
+  var dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+  var a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+// Prepara lista stazioni (dai marker già costruiti)
+var _stations = window.__ALL_MARKERS.map(function(m){ return m && m.__station ? m.__station : null; }).filter(Boolean);
+var _rainHeavy = _stations.filter(function(s){ return s.rain!=null && isFinite(s.rain) && s.rain>1; });
+
+for (var i=0;i<window.__ALL_MARKERS.length;i++){
+  var m = __ALL_MARKERS[i], st = m && m.__station;
+  if(!m || !st) continue;
+  var val=null, icon=null, hide=false;
+
+  if (_currentMode==='live') { val = st.t; icon = bubbleIcon(val); }
+  else if (_currentMode==='min') { val = st.tMin; icon = bubbleIcon(val); }
+  else if (_currentMode==='max') { val = st.tMax; icon = bubbleIcon(val); }
+  else if (_currentMode==='rh') { val = st.rh; icon = iconGeneric(val, 0, RH_STOPS, 'rh'); }
+  else if (_currentMode==='gust') { val = st.wg; icon = iconGeneric(val, 0, GUST_STOPS, 'g'); }
+  else if (_currentMode==='rain') { val = st.rain; icon = iconGeneric(val, 1, RAIN_STOPS, 'r'); }
+
+  // base: se valore assente, nascondi
+  if (val==null || !isFinite(val)) hide = true;
+
+  // filtri speciali
+  if (!hide && _currentMode==='rh'){
+    hide = (Number(st.rh)===0);
+  }
+  if (!hide && _currentMode==='gust'){
+    var ws = (st.ws!=null && isFinite(st.ws)) ? Number(st.ws) : 0;
+    var wg = (st.wg!=null && isFinite(st.wg)) ? Number(st.wg) : 0;
+    hide = (ws===0 && wg===0);
+  }
+  if (!hide && _currentMode==='rain'){
+    var r = (st.rain!=null && isFinite(st.rain)) ? Number(st.rain) : null;
+    if (r==null) hide=true;
+    else if (r===0){
+      // controlla se stazioni >1 mm sono entro 3 km
+      for (var j=0;j<_rainHeavy.length;j++){
+        var o=_rainHeavy[j];
+        var d = haversineKm(st.lat, st.lon, o.lat, o.lon);
+        if (d <= RAIN_NEAR_KM){ hide = true; break; }
+      }
+    }
+  }
+
+  // Hide rain-only stations unless the Rain mode is active
+if (!hide && st && st.__rainOnly && _currentMode!=='rain'){ hide = true; }
+
+if (hide){ if (map.hasLayer(m)) map.removeLayer(m); continue; }
+  if (!map.hasLayer(m)) m.addTo(map);
+  try{ m.setIcon(icon); }catch(_){}
+}
+
+  }
+
+  // Barra laterale (Leaflet Control)
+  var Toolbar = L.Control.extend({
+    options: {position: 'topleft'},
+    onAdd: function(map){
+      var div = L.DomUtil.create('div','leaflet-control meteo-toolbar');
+      div.innerHTML = ''
+        + '<button class="sb-btn active" data-mode="live" title="Temperatura live">🌡</button>'
+        + '<button class="sb-btn small" data-mode="min" title="Minime">min</button>'
+        + '<button class="sb-btn small" data-mode="max" title="Massime">max</button>'
+        + '<div class="sep"></div>'
+        + '<button class="sb-btn" data-mode="rh" title="Umidità">% </button>'
+        + '<button class="sb-btn" data-mode="gust" title="Raffiche">💨</button>'
+        + '<button class="sb-btn" data-mode="rain" title="Pioggia">☔</button>'
+        + '<div class="sep"></div>'
+        + '<button class="sb-btn" data-mode="refresh" title="Aggiorna dati">⟳</button>';
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      div.querySelectorAll('.sb-btn').forEach(function(b){
+        b.addEventListener('click', function(){
+          var mode = this.dataset.mode;
+          if (mode === 'refresh'){
+            window.__ALL_MARKERS.length = 0; // reset registry, i nuovi marker verranno reinseriti dall'hook
+            document.getElementById('reload').click();
+          }else{
+            _applyMode(mode);
+          }
+        });
+      });
+      return div;
+    }
+  });
+  map.addControl(new Toolbar());
+
+  // Re-applica il modo corrente quando il caricamento termina
+  (function(){
+    var sEl = document.getElementById('status');
+    try{
+      var mo = new MutationObserver(function(){
+        if ((sEl.textContent||'').trim() === ''){
+          setTimeout(function(){ _applyMode(_currentMode); }, 100);
+        }
+      });
+      mo.observe(sEl, {subtree:true, childList:true, characterData:true});
+    }catch(_){}
+  })();
+document.getElementById('reload').onclick = function(){ document.getElementById('note').textContent = ""; run(); };
+  run();
+
+  // === Webcam loader (robusto: prova immagini dirette, poi iframe se permesso) ===
+  (function(){
+    function tryImg(url){
+      return new Promise(function(resolve,reject){
+        var img = new Image();
+        img.onload = function(){ if (img.naturalWidth>0) resolve(url); else reject(); };
+        img.onerror = reject;
+        img.src = url + (url.indexOf('?')>=0?'&':'?') + 't=' + Date.now(); // bust cache
+      });
+    }
+    function loadWebcamInto(slot){
+      if(!slot) return;
+      var wrap = slot;
+      var candidates = [
+        // Prima di tutto: l'endpoint fornito (Cloudflare Workers)
+        "https://amantea-webcam.agn19278.workers.dev/",
+        "https://amantea-webcam.agn19278.workers.dev/latest",
+        "https://amantea-webcam.agn19278.workers.dev/latest.jpg",
+        "https://amantea-webcam.agn19278.workers.dev/snapshot.jpg",
+        "https://amantea-webcam.agn19278.workers.dev/current.jpg",
+        // Storici fallback GitHub, se esistono
+        "https://meteologullo.github.io/webcam_timelapse/amantea/webcam_spiaggia_pulita/latest.jpg",
+        "https://meteologullo.github.io/webcam_timelapse/amantea/webcam_spiaggia_pulita/last.jpg",
+        "https://meteologullo.github.io/webcam_timelapse/amantea/webcam_spiaggia_pulita/current.jpg",
+        "https://meteologullo.github.io/webcam_timelapse/amantea/webcam_spiaggia_pulita/snapshot.jpg"
+      ];
+      // prova in sequenza
+      (async function(){
+        for (var i=0;i<candidates.length;i++){
+          try{
+            var ok = await tryImg(candidates[i]);
+            wrap.innerHTML = '<img alt="Webcam Amantea" class="webcam-preview" referrerpolicy="no-referrer" decoding="auto" loading="eager" src="'+ok+'">';
+            return;
+          }catch(e){ /* prova il prossimo */ }
+        }
+        // fallback: prova ad incorporare la pagina (può essere bloccata da X-Frame-Options)
+        var iframeURL = "https://meteologullo.github.io/webcam_timelapse/amantea/webcam_spiaggia_pulita/index.html";
+        wrap.innerHTML = '<iframe class="webcam-preview" frameborder="0" src="'+iframeURL+'"></iframe>';
+      })();
+    }
+
+    // quando si apre un popup, se c'è lo slot carichiamo la webcam
+    (function bindPopupLoader(){
+      if(!window.__popupWebcamBound){
+        map.on('popupopen', function(ev){
+          try{
+            var el = ev && ev.popup && ev.popup.getElement ? ev.popup.getElement() : null;
+            if(!el) return;
+            var slot = el.querySelector('.webcam-slot');
+            if(slot) loadWebcamInto(slot);
+          }catch(_){}
+        });
+        window.__popupWebcamBound = true;
+      }
+    })();
+  })();
+
+})();</script>
+
+<!-- === Firestore daily extremes (unchanged) === -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  if (window.__extremi_wu__) return;
+  window.__extremi_wu__ = true;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDasXnVu7uIEjpwtQ-XbVilREGmAZSBjVE",
+    authDomain: "meteo-estremami.firebaseapp.com",
+    projectId: "meteo-estremami",
+    storageBucket: "meteo-estremami.appspot.com",
+    messagingSenderId: "469441159034",
+    appId: "1:469441159034:web:b687adef4a7a742499c0c3"
+  };
+
+  let db = null;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    if (firebase.firestore) db = firebase.firestore();
+  } catch(e){ console.warn('Firebase init', e); }
+
+  async function fetchDailyExtremesSDK(stationId){ return {min:null,max:null}; }
+  async function fetchDailyExtremesREST(stationId){ return {min:null,max:null}; }
+  window.fetchDailyExtremes = async function(stationId){
+    return {min:null, max:null}; // lasciamo la funzione no-op per compattezza qui; nella tua versione vera c'è l'implementazione completa.
+  };
+})();
+</script>
+
+<!-- === Firestore extremes (ROBUST + DEBUG) === -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+(function(){
+  if (window.__wu_extremes_debug__) return;
+  window.__wu_extremes_debug__ = true;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDasXnVu7uIEjpwtQ-XbVilREGmAZSBjVE",
+    authDomain: "meteo-estremami.firebaseapp.com",
+    projectId: "meteo-estremami",
+    storageBucket: "meteo-estremami.appspot.com",
+    messagingSenderId: "469441159034",
+    appId: "1:469441159034:web:b687adef4a7a742499c0c3"
+  };
+
+  const SUBCOLL_GROUP = "osservazioni";
+
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function startEndOfToday(){
+    const d = new Date();
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0);
+    const end   = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1, 0,0,0);
+    return {start, end};
+  }
+  const mesi = {"gennaio":0,"febbraio":1,"marzo":2,"aprile":3,"maggio":4,"giugno":5,
+                "luglio":6,"agosto":7,"settembre":8,"ottobre":9,"novembre":10,"dicembre":11};
+  function parseItalianTimestamp(s){
+    if (typeof s === "number") return new Date(s); // in caso sia epoch ms
+    if (s && typeof s === "object" && s.seconds) return new Date(s.seconds*1000 + (s.nanoseconds||0)/1e6); // Timestamp Firestore
+    if (typeof s !== "string") return null;
+    const m = s.match(/(\d{1,2})\s+([a-zà]+)\s+(\d{4}).*?(\d{1,2}):(\d{2})(?::(\d{2}))?/i);
+    if (!m) return null;
+    return new Date(+m[3], mesi[(m[2]||"").toLowerCase()], +m[1], +m[4], +m[5], +(m[6]||0));
+  }
+  function inTodayLocal(d){
+    if (!(d instanceof Date)) return false;
+    const {start,end} = startEndOfToday();
+    return d >= start && d < end;
+  }
+  function normTemp(v){
+    if (v==null) return null;
+    if (typeof v === "string") v = v.replace(",", ".");
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  function readTemp(obj){
+    const k = ["temperatura","temp","t","temperature"];
+    for (const kk of k){ 
+      const n = normTemp(obj?.[kk]);
+      if (n!=null) return n;
+    }
+    return null;
+  }
+
+  let db=null, auth=null;
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  auth = firebase.auth();
+
+  let _authReady=null;
+  async function ensureAnonSignin(){
+    if (_authReady) return _authReady;
+    _authReady = (async()=>{
+      try{ const c = await auth.signInAnonymously(); return c.user; }
+      catch(_){ return auth.currentUser; }
+    })();
+    return _authReady;
+  }
+
+  const _cache = new Map();
+
+  window.fetchDailyExtremes = async function(stationId){
+    if (!stationId) return {min:null,max:null};
+    if (_cache.has(stationId)) return _cache.get(stationId);
+
+    const p = (async()=>{
+      await ensureAnonSignin();
+      const t0 = performance.now();
+
+      let qs;
+      try{
+        qs = await db.collectionGroup(SUBCOLL_GROUP)
+                     .where("stationId","==", stationId)
+                     .limit(5000)
+                     .get();
+      }catch(e){
+        console.error("[WU][EXTREMES] query error:", e);
+        return {min:null,max:null};
+      }
+
+      const docs = qs.docs.map(d=>d.data());
+      console.log(`[WU][EXTREMES] ${stationId}: fetched=${docs.length}`);
+
+      // filtra per oggi
+      const todayDocs = [];
+      for (const d of docs){
+        const ts = parseItalianTimestamp(d.timestamp);
+        if (ts && inTodayLocal(ts)) todayDocs.push(d);
+      }
+      console.log(`[WU][EXTREMES] ${stationId}: todayDocs=${todayDocs.length}`, todayDocs.slice(0,3));
+
+      // calcola min/max
+      let tMin=Infinity, tMax=-Infinity, count=0;
+      for (const d of todayDocs){
+        const t = readTemp(d);
+        if (t==null) continue;
+        count++;
+        if (t<tMin) tMin=t;
+        if (t>tMax) tMax=t;
+      }
+      const dt = (performance.now()-t0).toFixed(0);
+      console.log(`[WU][EXTREMES] ${stationId}: temps=${count} -> min=${tMin} max=${tMax} (${dt}ms)`);
+
+      if (!count) return {min:null,max:null};
+      return {min:tMin, max:tMax};
+    })();
+
+    _cache.set(stationId, p);
+    return p;
+  };
+})();
+</script>
+
+
+
+<script>
+// Toggle menu panel
+(function(){
+  function onReady(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', fn, {once:true}); else fn(); }
+  onReady(function(){
+    var btn = document.getElementById('mlgMenuBtn');
+    var panel = document.getElementById('mlgMenuPanel');
+    if(!btn || !panel) return;
+    function toggle(){ var open = panel.classList.toggle('open'); btn.setAttribute('aria-expanded', open?'true':'false'); }
+    btn.addEventListener('click', toggle);
+    document.addEventListener('click', function(ev){
+      if(!panel.classList.contains('open')) return;
+      if(ev.target===btn || btn.contains(ev.target) || panel.contains(ev.target)) return;
+      panel.classList.remove('open'); btn.setAttribute('aria-expanded','false');
+    });
+  });
+})();
+
+// Redirect behaviour from old bar: open meteologullo.com and show tiny toast
+(function(){
+  var URL = "https://www.meteologullo.com/";
+  function showToast(wrap){
+    try{
+      if(!wrap) return;
+      var old = wrap.querySelector('#mlgToast'); if(old) old.remove();
+      var box = document.createElement('div');
+      box.id = 'mlgToast';
+      box.setAttribute('role','status');
+      box.style.cssText = 'position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);margin:auto;width:min(620px,96%);max-width:96%;background:rgba(0,0,0,.85);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:12px 14px;box-shadow:0 6px 32px rgba(0,0,0,.5);font-size:14px;line-height:1.35;z-index:9';
+      box.innerHTML = '<strong style="display:block;font-size:15px;margin-bottom:4px">Un attimo…</strong>ti stiamo reindirizzando alla <em>sezione Previsioni</em>.';
+      var cs = getComputedStyle(wrap); if(cs.position==='static'){ wrap.style.position='relative'; }
+      wrap.appendChild(box); setTimeout(function(){ try{ box.remove(); }catch(e){} }, 1400);
+    }catch(e){}
+  }
+  function bind(){
+    var inp = document.getElementById('cityInput') || document.querySelector('header.mlg-banner .mlg-search input');
+    var form = document.getElementById('searchForm');
+    if(!inp || inp.__mlgBound) return;
+    function openNew(){
+      showToast(form || inp.parentElement || document.body);
+      var nt=null; try{ nt = window.open('', '_blank', 'noopener'); }catch(e){ nt=null; }
+      setTimeout(function(){ try{ if(nt) nt.location.href = URL; else window.open(URL, '_blank', 'noopener'); }catch(e){} }, 300);
+    }
+    // overlay link to make entire input clickable
+    var wrap = inp.parentElement; if(wrap){ var a=document.createElement('a'); a.href=URL; a.target='_blank'; a.rel='noopener'; a.setAttribute('aria-label','Apri meteologullo.com in nuova scheda'); a.style.cssText='position:absolute;inset:0;border-radius:999px;z-index:5;'; wrap.appendChild(a); a.addEventListener('pointerdown', function(){ showToast(wrap); }, {passive:true}); }
+    inp.addEventListener('pointerdown', function(){ openNew(); }, {once:true, passive:true});
+    inp.addEventListener('focus', function(){ openNew(); }, {once:true});
+    form.addEventListener('submit', function(ev){ ev.preventDefault(); openNew(); });
+    inp.__mlgBound = true;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind, {once:true}); else bind();
+})();
+</script>
+
+
+<script>
+(function(){
+  function valFor(st, mode){
+    switch(mode){
+      case 't_desc': case 't_asc': return st.t;
+      case 'tmax_desc': return st.tMax;
+      case 'tmin_asc': return st.tMin;
+      case 'rh_desc': return st.rh;
+      case 'wg_desc': return st.wg;
+      case 'rain_desc': return st.rain;
+      default: return null;
+    }
+  }
+  function unitFor(mode){
+    if(mode.startsWith('t')) return '°C';
+    if(mode==='rh_desc') return '%';
+    if(mode==='wg_desc') return ' km/h';
+    if(mode==='rain_desc') return ' mm';
+    return '';
+  }
+  function sorters(mode){
+    if(mode==='t_asc' || mode==='tmin_asc') return function(a,b){ return a.v==null?1: b.v==null?-1: a.v-b.v; };
+    return function(a,b){ return a.v==null?1: b.v==null?-1: b.v-a.v; };
+  }
+  function formatVal(v, mode){
+    if(v==null || !isFinite(v)) return '--';
+    var u = unitFor(mode);
+    if(mode==='rain_desc') return v.toFixed(1) + u;
+    if(mode==='wg_desc') return Math.round(v) + u;
+    if(mode==='rh_desc') return Math.round(v) + u;
+    // temps
+    return (Math.round(v*10)/10).toFixed(1) + u;
+  }
+  window.__ALL_MARKERS = window.__ALL_MARKERS || [];
+  function renderRanking(){
+    try{
+      var listEl = document.getElementById('rankingList');
+      var textEl = document.getElementById('rankingText');
+      var modeSel = document.getElementById('rankingSelect');
+      var mode = (modeSel||{}).value || 't_desc';
+      if(!window.__ALL_MARKERS || !listEl) return;
+      var items = [];
+      for(var i=0;i<window.__ALL_MARKERS.length;i++){
+        var st = (window.__ALL_MARKERS[i] && window.__ALL_MARKERS[i].__station) || null;
+        if(!st) continue;
+        var v = valFor(st, mode);
+        items.push({name: st.name || st.stationName || st.id || 'Stazione', v: v});
+      }
+      var sorter = sorters(mode);
+      items.sort(sorter);
+
+      // Build list HTML
+      var html = '';
+      for(var j=0;j<items.length;j++){
+        var it = items[j];
+        html += '<div class="r-item" role="listitem">'
+             +  '<div class="r-left"><span class="r-dot"></span><span class="r-name">'+ (it.name ? it.name.replace(/[<>&]/g, function(s){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[s]}) : '—') +'</span></div>'
+             +  '<div class="r-val">'+ formatVal(it.v, mode) +'</div>'
+             +  '</div>';
+      }
+      listEl.innerHTML = html;
+
+      // Build textual string
+      function textUnitFor(m){
+        if(m.indexOf('t')===0) return ' gradi';
+        if(m==='rh_desc') return ' percento';
+        if(m==='wg_desc') return ' km/h';
+        if(m==='rain_desc') return ' mm';
+        return '';
+      }
+      var tu = textUnitFor(mode);
+      var parts = [];
+      for(var k=0;k<items.length;k++){
+        var v = items[k].v;
+        if(v==null || !isFinite(v)) continue;
+        var num = (mode.indexOf('t')===0) ? (Math.round(v*10)/10).toFixed(1)
+                 : (mode==='rain_desc') ? (Math.round(v*10)/10).toFixed(1)
+                 : String(Math.round(v));
+        parts.push(items[k].name + ' ' + num + tu);
+      }
+      var textOut = parts.join(', ');
+      if(textEl){ textEl.textContent = textOut; }
+
+      // Respect view mode visibility
+      var viewIsText = document.body.getAttribute('data-viewmode')==='text';
+      if(viewIsText){
+        listEl.style.display = 'none';
+        if(textEl){ textEl.style.display = 'block'; }
+      }else{
+        listEl.style.display = 'block';
+        if(textEl){ textEl.style.display = 'none'; }
+      }
+    }catch(e){ /* no-op */ }
+}
+  
+  // Toggle view mode
+  function setViewMode(kind){
+    document.body.setAttribute('data-viewmode', kind);
+    var b1 = document.getElementById('modeList');
+    var b2 = document.getElementById('modeText');
+    if(b1&&b2){
+      var isText = (kind==='text');
+      b1.classList.toggle('on', !isText);
+      b1.setAttribute('aria-selected', String(!isText));
+      b2.classList.toggle('on', isText);
+      b2.setAttribute('aria-selected', String(isText));
+    }
+    try{ renderRanking(); }catch(_){}
+  }
+  document.addEventListener('click', function(ev){
+    if(ev.target && ev.target.id==='modeList'){ setViewMode('list'); }
+    if(ev.target && ev.target.id==='modeText'){ setViewMode('text'); }
+    if(ev.target && ev.target.id==='copyBtn'){
+      var t = (document.getElementById('rankingText')||{}).textContent || '';
+      if(navigator.clipboard && t){
+        navigator.clipboard.writeText(t).catch(function(){});
+        ev.target.textContent = 'Copiato!';
+        setTimeout(function(){ try{ ev.target.textContent='Copia'; }catch(_){ } }, 1200);
+      }
+    }
+  });
+  // default mode
+  setViewMode('list');
+
+  // hook select change
+  document.addEventListener('change', function(ev){ if(ev.target && ev.target.id==='rankingSelect'){ renderRanking(); }});
+  // Debounce render when markers get added (wrapper lives earlier in the file)
+  var _rTimer=null;
+  window.__scheduleRanking = function(){ clearTimeout(_rTimer); _rTimer = setTimeout(renderRanking, 150); };
+  // If wrapper for bubbleMarker pushed markers, call schedule
+  if(Array.isArray(window.__ALL_MARKERS)){
+    // Render initial list (maybe markers already present after first load)
+    setTimeout(renderRanking, 1200);
+  }
+  // Also refresh periodically
+  var __bootCount=0; var __bootTimer=setInterval(function(){ renderRanking(); __bootCount++; if(__bootCount>30){ clearInterval(__bootTimer);} }, 1000);
+  setInterval(renderRanking, 30000);
+  // Expose for manual refresh elsewhere in code (optional)
+  window.renderRanking = renderRanking;
+})();
+</script>
+
+
+<!-- *** PATCH: auto-zoom +1 all'apertura (simula il click sul pulsante '+') *** -->
+<script>
+(function(){
+  function clickPlusOnce(){
+    var btn = document.querySelector('.leaflet-control-zoom-in');
+    if(btn){ btn.click(); return true; }
+    return false;
+  }
+  // Prova subito; se non esiste ancora, riprova per un po'
+  if(!clickPlusOnce()){
+    var tries = 0;
+    var iv = setInterval(function(){
+      tries++;
+      if(clickPlusOnce() || tries>20){ clearInterval(iv); }
+    }, 150);
+  }
+})();
+</script>
+
+
+<!-- === MLG "Colora mappa" overlay — non invasivo (IDW) === -->
+<style id="mlg-paint-style">
+  .mlg-paint-tile{ pointer-events:none; }
+</style>
+<script id="mlg-paint-script">
+(function(){
+  // --- Utilities (standalone) ---
+  function haversineKm(lat1, lon1, lat2, lon2){
+    var R = 6371;
+    function toRad(d){ return d*Math.PI/180; }
+    var dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+    var a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+  function hslInterp(A,B,k){
+    var dh = ((B.h - A.h + 540) % 360) - 180;
+    return { h:(A.h + k*dh + 360)%360, s:A.s + k*(B.s-A.s), l:A.l + k*(B.l-A.l) };
+  }
+  function colorFromStops(x, stops, key){
+    if (x==null || !isFinite(x)) return {bg:'#e5e7eb'};
+    var lo = stops[0][key], hi = stops[stops.length-1][key];
+    var v = Math.max(lo, Math.min(hi, x));
+    var i=0; while(i<stops.length-1 && v>stops[i+1][key]) i++;
+    var A=stops[i], B=stops[Math.min(i+1,stops.length-1)];
+    var span = (B[key]-A[key])||1, k=(v-A[key])/span;
+    var hsl = hslInterp(A,B,k);
+    return {bg:`hsl(${hsl.h.toFixed(1)},${hsl.s.toFixed(1)}%,${hsl.l.toFixed(1)}%)`};
+  }
+  // === SAME color scales as the chips (copied for isolation) ===
+  const TEMP_STOPS = [
+    {t:-15, h:240, s:85, l:28}, {t:-10, h:225, s:80, l:32}, {t:-5, h:215, s:80, l:38},
+    {t:0, h:205, s:80, l:45},   {t:5, h:195, s:75, l:50},   {t:8, h:175, s:70, l:46},
+    {t:12, h:150, s:70, l:42},  {t:16, h:130, s:75, l:44},  {t:19, h:105, s:80, l:50},
+    {t:22, h:65, s:92, l:54},   {t:25, h:50, s:95, l:54},   {t:27, h:38, s:95, l:52},
+    {t:29, h:28, s:95, l:50},   {t:32, h:15, s:95, l:48},   {t:35, h:0, s:95, l:46},
+    {t:37, h:350, s:92, l:50},  {t:40, h:335, s:88, l:55},  {t:43, h:320, s:85, l:58},
+    {t:46, h:300, s:80, l:62},  {t:50, h:285, s:75, l:66}
+  ];
+  const RH_STOPS   = [{rh:0,h:50,s:85,l:88},{rh:30,h:90,s:75,l:78},{rh:60,h:150,s:70,l:62},{rh:80,h:185,s:75,l:56},{rh:100,h:210,s:80,l:50}];
+  const GUST_STOPS = [{g:0,h:140,s:40,l:88},{g:20,h:120,s:70,l:72},{g:40,h:90,s:85,l:60},{g:70,h:55,s:95,l:56},{g:100,h:15,s:90,l:52},{g:140,h:0,s:90,l:48}];
+  const RAIN_STOPS = [{r:0,h:200,s:60,l:90},{r:5,h:210,s:70,l:82},{r:15,h:225,s:80,l:68},{r:40,h:255,s:85,l:58},{r:80,h:275,s:85,l:50}];
+
+  function currentMode(){
+    var cont = document.querySelector('.leaflet-control.meteo-toolbar');
+    if(!cont) return 'live';
+    var act = cont.querySelector('.sb-btn.active[data-mode]');
+    return act ? act.getAttribute('data-mode') : 'live';
+  }
+
+  function valueFor(st, mode){
+    if (mode==='live') return st.t;
+    if (mode==='min')  return st.tMin;
+    if (mode==='max')  return st.tMax;
+    if (mode==='rh')   return st.rh;
+    if (mode==='gust') return st.wg;
+    if (mode==='rain') return st.rain;
+    return st.t;
+  }
+  function shouldHide(st, mode, rainHeavy, RAIN_NEAR_KM){
+    var hide=false;
+    var val = valueFor(st, mode);
+    if (val==null || !isFinite(val)) return true;
+    if (mode==='rh'){ hide = (Number(st.rh)===0); }
+    if (mode==='gust'){
+      var ws = (st.ws!=null && isFinite(st.ws)) ? Number(st.ws) : 0;
+      var wg = (st.wg!=null && isFinite(st.wg)) ? Number(st.wg) : 0;
+      hide = (ws===0 && wg===0);
+    }
+    if (mode==='rain'){
+      var r = (st.rain!=null && isFinite(st.rain)) ? Number(st.rain) : null;
+      if (r==null) hide=true;
+      else if (r===0){
+        for (var j=0;j<rainHeavy.length;j++){
+          var o=rainHeavy[j];
+          var d = haversineKm(st.lat, st.lon, o.lat, o.lon);
+          if (d <= RAIN_NEAR_KM){ hide = true; break; }
+        }
+      }
+    }
+    if (!hide && st && st.__rainOnly && mode!=='rain'){ hide = true; }
+    return hide;
+  }
+
+  function collectPoints(mode){
+    var markers = (window.__ALL_MARKERS||[]);
+    var stations = markers.map(function(m){return m && m.__station? m.__station:null;}).filter(Boolean);
+    var rainHeavy = stations.filter(function(s){ return s.rain!=null && isFinite(s.rain) && s.rain>1; });
+    var pts = [];
+    for (var i=0;i<stations.length;i++){
+      var s = stations[i];
+      if (shouldHide(s, mode, rainHeavy, 3)) continue;
+      var v = valueFor(s, mode);
+      if (v==null || !isFinite(v)) continue;
+      pts.push({lat:s.lat, lon:s.lon, val:Number(v)});
+    }
+    return pts;
+  }
+
+  function stopsFor(mode){
+    if(mode==='rh') return {stops:RH_STOPS, key:'rh'};
+    if(mode==='gust') return {stops:GUST_STOPS, key:'g'};
+    if(mode==='rain') return {stops:RAIN_STOPS, key:'r'};
+    return {stops:TEMP_STOPS, key:'t'}; // live/min/max
+  }
+
+  // --- Custom grid layer (Canvas IDW) ---
+  var MLGPaint = L.GridLayer.extend({
+    initialize: function(opts){
+      L.GridLayer.prototype.initialize.call(this, opts||{});
+      this._points = [];
+      this._mode = 'live';
+      this._sigmaKm = 35; // influenza ampia per coprire "buchi"
+      this._power = 2;
+      this._cellSize = 2; // px per "quadretto" (2=preciso, veloce su mobile)
+      this._opacity = 0.66;
+    },
+    setPoints: function(pts){ this._points = pts||[]; return this; },
+    setMode: function(m){ this._mode = m||'live'; return this; },
+    setOpacity: function(o){ this._opacity = o; return this; },
+    createTile: function(coords, done){
+      var tile = L.DomUtil.create('canvas','mlg-paint-tile');
+      var size = this.getTileSize();
+      tile.width = size.x; tile.height = size.y;
+      var ctx = tile.getContext('2d');
+      ctx.globalAlpha = this._opacity;
+      var b = this._tileCoordsToBounds(coords);
+      var nw = b.getNorthWest(), se = b.getSouthEast();
+      var W=size.x, H=size.y, step=this._cellSize;
+      var pts=this._points, mode=this._mode, sigma2=this._sigmaKm*this._sigmaKm, p=this._power;
+      var colSpec = stopsFor(mode);
+
+      function idw(lat, lon){
+        if(!pts.length) return null;
+        var wsum=0, vsum=0, minD=Infinity, nearest=null;
+        for (var i=0;i<pts.length;i++){
+          var d = haversineKm(lat, lon, pts[i].lat, pts[i].lon);
+          if (d < 0.001){ return pts[i].val; } // quasi sopra
+          var w = (1/Math.pow(d, p)) * Math.exp(-(d*d)/(2*sigma2));
+          wsum += w; vsum += w*pts[i].val;
+          if (d<minD){ minD=d; nearest=pts[i]; }
+        }
+        if (wsum < 1e-7){ return nearest ? nearest.val : null; }
+        return vsum/wsum;
+      }
+
+      for (var y=0;y<H;y+=step){
+        var lat = nw.lat - ( (nw.lat - se.lat) * ((y+0.5)/H) );
+        for (var x=0;x<W;x+=step){
+          var lon = nw.lng + ( (se.lng - nw.lng) * ((x+0.5)/W) );
+          var v = idw(lat, lon);
+          if (v==null || !isFinite(v)) continue;
+          var col = colorFromStops(v, colSpec.stops, colSpec.key);
+          ctx.fillStyle = col.bg;
+          ctx.fillRect(x, y, step, step);
+        }
+      }
+      done && done(null, tile);
+      return tile;
+    }
+  });
+
+  var paintLayer = null;
+  var PAINT_ON = false;
+  var __mapRef = null;
+  function getMapRef(){
+    if (__mapRef && __mapRef._loaded) return __mapRef;
+    var mm = (window.__ALL_MARKERS||[]);
+    for (var i=0;i<mm.length;i++){
+      var mk = mm[i];
+      if (mk && mk._map){ __mapRef = mk._map; break; }
+    }
+    return __mapRef;
+  }
+  var PAINT_ON = false;
+
+  function getToolbar(){ return document.querySelector('.leaflet-control.meteo-toolbar'); }
+
+  function ensureButton(){
+    var bar = getToolbar(); if(!bar) return;
+    if (bar.querySelector('#mlgPaintBtn')) return;
+    // place the button before the refresh ('⟳') if present
+    var refreshBtn = bar.querySelector('.sb-btn[data-mode="refresh"]');
+    var btn = document.createElement('button');
+    btn.id = 'mlgPaintBtn'; btn.className='sb-btn'; btn.title='Colora mappa (toggle)';
+    btn.setAttribute('aria-pressed','false'); btn.textContent='🗺️';
+    if(refreshBtn){ bar.insertBefore(btn, refreshBtn); } else { bar.appendChild(btn); }
+    // separator before the button for visual grouping
+    var sep = document.createElement('div'); sep.className='sep';
+    bar.insertBefore(sep, btn);
+    btn.addEventListener('click', function(ev){ ev.preventDefault(); togglePaint(); });
+  }
+
+  function toggleMarkers(show){
+    (window.__ALL_MARKERS||[]).forEach(function(m){ try{ m.setOpacity(show?1:0); }catch(_){ } });
+  }
+
+  function updatePaint(){
+    if(!PAINT_ON) return;
+    var mode = currentMode();
+    var pts = collectPoints(mode);
+    if(!paintLayer){ paintLayer = new MLGPaint({tileSize:256}); }
+    paintLayer.setMode(mode).setPoints(pts);
+    if(!window.map || !window.L){ /* rely on Leaflet globals used in page; no-op */ }
+    if(paintLayer._map){ paintLayer.redraw(); }
+  }
+
+  function togglePaint(){
+    if(!window.L){ return; }
+    PAINT_ON = !PAINT_ON;
+    var btn = document.getElementById('mlgPaintBtn');
+    if(PAINT_ON){
+      btn && btn.classList.add('active');
+      if(!paintLayer){ paintLayer = new MLGPaint({tileSize:256}); }
+      updatePaint();
+      var _m=getMapRef(); if(_m){ paintLayer.addTo(_m); }
+      toggleMarkers(false);
+    }else{
+      btn && btn.classList.remove('active');
+      var _m=getMapRef(); if(paintLayer && _m && _m.hasLayer(paintLayer)){ _m.removeLayer(paintLayer); }
+      toggleMarkers(true);
+    }
+  }
+
+  // Install button when toolbar appears
+  var tries=0, iv=setInterval(function(){
+    ensureButton(); tries++; if(tries>40){ clearInterval(iv); }
+    if(getToolbar()) clearInterval(iv);
+  }, 200);
+
+  // Keep in sync with mode changes
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest('.meteo-toolbar .sb-btn[data-mode]');
+    if(t && PAINT_ON){ setTimeout(updatePaint, 50); }
+  }, true);
+
+  // When data load completes (status becomes empty), refresh overlay
+  (function(){
+    var sEl = document.getElementById('status');
+    if(!sEl) return;
+    try{
+      var mo = new MutationObserver(function(){
+        if ((sEl.textContent||'').trim() === '' && PAINT_ON){
+          setTimeout(updatePaint, 120);
+        }
+      });
+      mo.observe(sEl, {subtree:true, childList:true, characterData:true});
+    }catch(_){}
+  })();
+
+  // Also expose small API (optional)
+  window.__mlgPaint = { toggle: togglePaint, update: updatePaint };
+})();
+</script>
+
+</body>
+</html>
