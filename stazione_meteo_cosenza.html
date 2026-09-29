@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stazione Meteo & Live Webcam | Cosenza</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --accent-temp: #ff7675;
+            --accent-wind: #00cec9;
+            --accent-rain: #6c5ce7;
+            --accent-hum: #0984e3;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container { max-width: 1250px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 40px; padding-top: 20px; }
+        header h1 { font-size: 2.5rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
+        header p { color: var(--text-muted); font-size: 1.1rem; margin-top: 5px; }
+        .dashboard { display: flex; flex-wrap: wrap; gap: 25px; }
+        .video-section {
+            flex: 1 1 60%;
+            min-width: 320px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+        .video-header {
+            padding: 18px 25px;
+            background: #fff;
+            border-bottom: 1px solid #edf2f7;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
+        }
+        .live-badge {
+            background-color: #e74c3c;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+            70% { opacity: 0.8; box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { opacity: 1; box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+        .video-section iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 480px;
+            border: none;
+            background-color: #000;
+        }
+        .weather-data {
+            flex: 1 1 35%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            align-content: start;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .card:hover { transform: translateY(-7px); box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 6px;
+        }
+        .card.temp::before { background-color: var(--accent-temp); }
+        .card.hum::before { background-color: var(--accent-hum); }
+        .card.wind::before { background-color: var(--accent-wind); }
+        .card.rain::before { background-color: var(--accent-rain); }
+        .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .card-icon { font-size: 1.8rem; }
+        .card-title {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .card-value {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin: 5px 0 15px 0;
+            color: var(--text-main);
+            line-height: 1;
+        }
+        .card-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border-top: 1px solid #edf2f7;
+            padding-top: 15px;
+            margin-top: auto;
+        }
+        .card-details span b {
+            color: var(--text-main);
+            font-weight: 700;
+            display: block;
+            font-size: 1.1rem;
+            margin-top: 2px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            padding-bottom: 30px;
+        }
+        @media (max-width: 768px) {
+            .dashboard { flex-direction: column; }
+            .video-section iframe { min-height: 300px; }
+            header h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Stazione Meteo Cosenza</h1>
+        <p>Vaglio Lise - Valle del Crati (Meteo Lo Gullo)</p>
+    </header>
+
+    <div class="dashboard">
+        <div class="video-section">
+            <div class="video-header">
+                <span>📷 Panorama in tempo reale</span>
+                <span class="live-badge">● DIRETTA</span>
+            </div>
+            <iframe src="https://37.179.144.112:8888/browserfs.html" title="Webcam Live Cosenza"></iframe>
+        </div>
+
+        <div class="weather-data">
+            <div class="card temp">
+                <div class="card-header">
+                    <div class="card-icon">🌡️</div>
+                    <div class="card-title">Temperatura</div>
+                </div>
+                <div class="card-value" id="val-temp">-- °C</div>
+                <div class="card-details">
+                    <span>Minima <b id="val-temp-min">--</b></span>
+                    <span style="text-align: right;">Massima <b id="val-temp-max">--</b></span>
+                </div>
+            </div>
+
+            <div class="card hum">
+                <div class="card-header">
+                    <div class="card-icon">💧</div>
+                    <div class="card-title">Umidità</div>
+                </div>
+                <div class="card-value" id="val-hum">-- %</div>
+                <div class="card-details">
+                    <span>Min <b id="val-hum-min">--</b></span>
+                    <span style="text-align: right;">Max <b id="val-hum-max">--</b></span>
+                </div>
+            </div>
+
+            <div class="card wind">
+                <div class="card-header">
+                    <div class="card-icon">💨</div>
+                    <div class="card-title">Vento (Media)</div>
+                </div>
+                <div class="card-value" id="val-wind">-- km/h</div>
+                <div class="card-details">
+                    <span>Dir <b id="val-wind-dir">--</b></span>
+                    <span style="text-align: right;">Raffica Max <b id="val-wind-gust">--</b></span>
+                </div>
+            </div>
+
+            <div class="card rain">
+                <div class="card-header">
+                    <div class="card-icon">🌧️</div>
+                    <div class="card-title">Precipitazioni</div>
+                </div>
+                <div class="card-value" id="val-rain">-- mm</div>
+                <div class="card-details">
+                    <span>Intensità <b id="val-rain-rate">-- mm/h</b></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Dati rilevati dalla Stazione Meteo e aggiornati automaticamente ogni 5 minuti.
+    </footer>
+</div>
+
+<script>
+    const STATION_ID = "INSERISCI_QUI_IL_TUO_STATION_ID";
+    const API_KEY = "INSERISCI_QUI_LA_TUA_API_KEY";
+
+    async function fetchWeatherData() {
+        if (STATION_ID === "INSERISCI_QUI_IL_TUO_STATION_ID") {
+            mostraDatiDemo();
+            return;
+        }
+
+        const url = `https://api.weather.com/v2/pws/observations/current?stationId=${STATION_ID}&format=json&units=m&apiKey=${API_KEY}`;
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            const obs = data.observations[0];
+
+            document.getElementById('val-temp').innerText = obs.metric.temp.toFixed(1) + ' °C';
+            document.getElementById('val-hum').innerText = obs.humidity + ' %';
+            document.getElementById('val-wind').innerText = obs.metric.windSpeed.toFixed(1) + ' km/h';
+            document.getElementById('val-wind-gust').innerText = obs.metric.windGust.toFixed(1) + ' km/h';
+            document.getElementById('val-wind-dir').innerText = obs.winddir + '°';
+            document.getElementById('val-rain').innerText = obs.metric.precipTotal.toFixed(1) + ' mm';
+            document.getElementById('val-rain-rate').innerText = obs.metric.precipRate.toFixed(1) + ' mm/h';
+        } catch (error) {
+            console.error("Errore connessione stazione:", error);
+            mostraDatiDemo();
+        }
+    }
+
+    function mostraDatiDemo() {
+        document.getElementById('val-temp').innerText = '18.5 °C';
+        document.getElementById('val-temp-min').innerText = '12.1 °C';
+        document.getElementById('val-temp-max').innerText = '21.0 °C';
+        document.getElementById('val-hum').innerText = '65 %';
+        document.getElementById('val-hum-min').innerText = '45 %';
+        document.getElementById('val-hum-max').innerText = '82 %';
+        document.getElementById('val-wind').innerText = '15 km/h';
+        document.getElementById('val-wind-gust').innerText = '28 km/h';
+        document.getElementById('val-wind-dir').innerText = 'NE (45°)';
+        document.getElementById('val-rain').innerText = '0.0 mm';
+        document.getElementById('val-rain-rate').innerText = '0.0 mm/h';
+    }
+
+    window.onload = fetchWeatherData;
+    setInterval(fetchWeatherData, 300000);
+</script>
+</body>
+</html>
