@@ -314,7 +314,7 @@
     <!-- VIDEO WEBCAM -->
     <div class="mlgl-video">
 
-        <iframe src="https://www.ipcamlive.com/player/player.php?alias=6aba69ed19839&autoplay=1" title="Webcam Meteo Cosenza Vaglio Lise" allow="autoplay; fullscreen" loading="lazy">
+        <iframe src="https://iframe.ipcamlive.com/player/player.php?alias=6aba69ed19839" title="Webcam Meteo Cosenza Vaglio Lise" allow="autoplay; fullscreen" loading="lazy">
         </iframe>
 
         <div id="mlgl-api-status" class="mlgl-api-status"></div>
@@ -392,6 +392,72 @@ async function mlglAggiornaDati() {
 
     const url =
         "https://api.weather.com/v2/pws/observations/current" +
+        "?stationId=" + encodeURIComponent(MLGL_STATION_ID) +
+        "&format=json" +
+        "&units=m" +
+        "&apiKey=" + encodeURIComponent(MLGL_API_KEY);
+
+    try {
+
+        const response = await fetch(url, {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        const data = await response.json();
+
+        if (!data.observations || !data.observations.length) {
+            throw new Error("Nessuna osservazione disponibile");
+        }
+
+        const obs = data.observations[0];
+
+        const set = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        if (obs.metric && obs.metric.temp != null)
+            set("mlgl-temp", obs.metric.temp.toFixed(1) + " °C");
+
+        if (obs.humidity != null)
+            set("mlgl-humidity", obs.humidity + " %");
+
+        if (obs.metric && obs.metric.windSpeed != null)
+            set("mlgl-wind", obs.metric.windSpeed.toFixed(1) + " km/h");
+
+        if (obs.winddir != null)
+            set("mlgl-dir", obs.winddir + "°");
+
+        if (obs.metric && obs.metric.precipTotal != null)
+            set("mlgl-rain", obs.metric.precipTotal.toFixed(1) + " mm");
+
+    } catch (error) {
+
+        console.error("Errore dati stazione Meteo Lo Gullo:", error);
+
+        const status = document.getElementById("mlgl-api-status");
+
+        if (status) {
+            status.textContent = "Dati meteo temporaneamente non disponibili";
+            status.style.display = "block";
+
+            setTimeout(() => {
+                status.style.display = "none";
+            }, 5000);
+        }
+    }
+}
+
+
+/* Prima lettura + aggiornamento ogni 5 minuti */
+window.addEventListener("load", mlglAggiornaDati);
+setInterval(mlglAggiornaDati, 300000);
+</script>
+https://api.weather.com/v2/pws/observations/current" +
         "?stationId=" + encodeURIComponent(MLGL_STATION_ID) +
         "&format=json" +
         "&units=m" +
