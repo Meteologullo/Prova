@@ -1,0 +1,459 @@
+<!-- =========================================================
+     WEBCAM PROFESSIONALE - METEO LO GULLO
+     INCOLLA QUESTO BLOCCO NELLA TUA PAGINA SUBITO SOTTO LA WEBCAM
+     ========================================================= -->
+
+<style>
+/* =========================================================
+   METEO LO GULLO — WEBCAM RESPONSIVE
+   Il riquadro occupa sempre il 100% della larghezza disponibile.
+   Non usa larghezze fisse e riduce automaticamente gli elementi
+   in base allo spazio realmente disponibile.
+   ========================================================= */
+
+.mlgl-webcam-card {
+    width: 100%;
+    max-width: 1200px;
+    margin: 18px auto 0;
+    border-radius: clamp(10px, 1.5vw, 18px);
+    overflow: hidden;
+    background: #071521;
+    box-shadow:
+        0 10px 30px rgba(0,0,0,.20),
+        0 2px 8px rgba(0,0,0,.10);
+    font-family: Inter, Arial, Helvetica, sans-serif;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.10);
+    box-sizing: border-box;
+}
+
+/* Tutto il contenuto rispetta i bordi del riquadro */
+.mlgl-webcam-card *,
+.mlgl-webcam-card *::before,
+.mlgl-webcam-card *::after {
+    box-sizing: border-box;
+}
+
+/* Fascia superiore */
+.mlgl-header {
+    min-height: clamp(54px, 5.5vw, 68px);
+    padding: clamp(8px, 1.4vw, 12px) clamp(10px, 1.8vw, 18px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(8px, 1.5vw, 14px);
+    background:
+        linear-gradient(135deg, #071521 0%, #0b2334 55%, #102f43 100%);
+}
+
+.mlgl-brand {
+    display: flex;
+    align-items: center;
+    gap: clamp(7px, 1vw, 11px);
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.mlgl-logo-mark {
+    width: clamp(30px, 3.4vw, 40px);
+    height: clamp(30px, 3.4vw, 40px);
+    flex: 0 0 auto;
+    border-radius: clamp(8px, 1vw, 11px);
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #f39c12, #ffb52e);
+    color: #071521;
+    font-size: clamp(15px, 1.7vw, 20px);
+    font-weight: 900;
+    box-shadow: 0 4px 12px rgba(243,156,18,.25);
+}
+
+.mlgl-title {
+    line-height: 1.05;
+    min-width: 0;
+}
+
+.mlgl-title strong {
+    display: block;
+    font-size: clamp(13px, 1.5vw, 18px);
+    letter-spacing: -.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mlgl-title span {
+    display: block;
+    margin-top: 4px;
+    font-size: clamp(9px, 1vw, 12px);
+    color: rgba(255,255,255,.66);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Indicatore LIVE */
+.mlgl-live {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: clamp(4px, .7vw, 7px);
+    padding: clamp(5px, .7vw, 7px) clamp(7px, 1vw, 11px);
+    border-radius: 999px;
+    background: rgba(255,255,255,.09);
+    border: 1px solid rgba(255,255,255,.12);
+    font-size: clamp(8px, .9vw, 11px);
+    font-weight: 800;
+    letter-spacing: .4px;
+    white-space: nowrap;
+}
+
+.mlgl-live-dot {
+    width: clamp(6px, .7vw, 8px);
+    height: clamp(6px, .7vw, 8px);
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #22d276;
+    box-shadow: 0 0 0 4px rgba(34,210,118,.13);
+}
+
+/* =========================================================
+   AREA WEBCAM
+   16:9 mantiene le proporzioni della webcam e impedisce
+   qualsiasi deformazione. La larghezza, invece, è sempre
+   quella realmente disponibile nel dispositivo/contenitore.
+   ========================================================= */
+.mlgl-video {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #02070b;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.mlgl-video iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    margin: 0;
+    padding: 0;
+}
+
+/* Stato errore API */
+.mlgl-api-status {
+    display: none;
+    position: absolute;
+    z-index: 20;
+    top: 12px;
+    right: 12px;
+    max-width: calc(100% - 24px);
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(0,0,0,.72);
+    color: #fff;
+    font-size: 10px;
+}
+
+/* =========================================================
+   FASCIA DATI
+   La località duplicata è stata rimossa.
+   La pressione è stata rimossa.
+   I dati rimasti possono andare a capo se lo spazio è
+   insufficiente: niente sovrapposizioni e niente tagli.
+   ========================================================= */
+.mlgl-data-bar {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: clamp(48px, 5.5vw, 62px);
+    padding: clamp(6px, 1vw, 9px) clamp(8px, 1.5vw, 14px);
+    display: flex;
+    align-items: center;
+    background: linear-gradient(
+        to top,
+        rgba(2,12,20,.97) 0%,
+        rgba(2,12,20,.88) 70%,
+        rgba(2,12,20,.48) 100%
+    );
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.mlgl-stats {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(7px, 1.4vw, 14px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mlgl-stats::-webkit-scrollbar {
+    display: none;
+}
+
+.mlgl-stat {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: clamp(4px, .6vw, 6px);
+    white-space: nowrap;
+}
+
+.mlgl-icon {
+    width: clamp(20px, 2.1vw, 25px);
+    height: clamp(20px, 2.1vw, 25px);
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: clamp(5px, .7vw, 8px);
+    background: rgba(255,255,255,.09);
+    font-size: clamp(10px, 1.1vw, 13px);
+}
+
+.mlgl-value {
+    font-size: clamp(10px, 1.15vw, 14px);
+    font-weight: 800;
+}
+
+.mlgl-label {
+    margin-left: 2px;
+    font-size: clamp(7px, .75vw, 9px);
+    color: rgba(255,255,255,.52);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.mlgl-stat.temp .mlgl-value {
+    font-size: clamp(14px, 1.55vw, 19px);
+}
+
+.mlgl-stat.temp .mlgl-icon {
+    background: rgba(243,156,18,.16);
+}
+
+/* =========================================================
+   CONTENITORI MOLTO STRETTI
+   Non riduciamo la webcam e non tagliamo i dati:
+   la barra può scorrere orizzontalmente.
+   ========================================================= */
+@media (max-width: 430px) {
+    .mlgl-webcam-card {
+        margin-top: 10px;
+        border-radius: 10px;
+    }
+
+    .mlgl-header {
+        padding: 8px 9px;
+        gap: 7px;
+    }
+
+    .mlgl-title span {
+        max-width: 48vw;
+    }
+
+    .mlgl-live {
+        padding: 5px 7px;
+        font-size: 8px;
+    }
+
+    .mlgl-data-bar {
+        min-height: 48px;
+        padding: 6px 8px;
+    }
+
+    .mlgl-stats {
+        justify-content: flex-start;
+    }
+}
+
+/* Smartphone estremamente stretti */
+@media (max-width: 340px) {
+    .mlgl-title span {
+        display: none;
+    }
+
+    .mlgl-live {
+        font-size: 7px;
+    }
+}
+</style>
+
+
+<div class="mlgl-webcam-card">
+
+    <!-- TESTATA -->
+    <div class="mlgl-header">
+        <div class="mlgl-brand">
+            <div class="mlgl-logo-mark">☁</div>
+
+            <div class="mlgl-title">
+                <strong>Meteo Lo Gullo</strong>
+                <span>Webcam Cosenza Vaglio Lise · Valle del Crati</span>
+            </div>
+        </div>
+
+        <div class="mlgl-live">
+            <span class="mlgl-live-dot"></span>
+            WEBCAM LIVE
+        </div>
+    </div>
+
+
+    <!-- VIDEO WEBCAM -->
+    <div class="mlgl-video">
+
+        <iframe src="https://www.ipcamlive.com/player/player.php?alias=6aba69ed19839&autoplay=1" title="Webcam Meteo Cosenza Vaglio Lise" allow="autoplay; fullscreen" loading="lazy">
+        </iframe>
+
+        <div id="mlgl-api-status" class="mlgl-api-status"></div>
+
+
+        <!-- DATI METEO SOVRAPPOSTI AL VIDEO -->
+        <div class="mlgl-data-bar">
+<div class="mlgl-stats">
+
+                <div class="mlgl-stat temp">
+                    <div class="mlgl-icon">🌡️</div>
+                    <div>
+                        <span id="mlgl-temp" class="mlgl-value">-- °C</span>
+                        <span class="mlgl-label">Temp.</span>
+                    </div>
+                </div>
+
+                <div class="mlgl-stat">
+                    <div class="mlgl-icon">💧</div>
+                    <div>
+                        <span id="mlgl-humidity" class="mlgl-value">-- %</span>
+                        <span class="mlgl-label">Umidità</span>
+                    </div>
+                </div>
+
+                <div class="mlgl-stat">
+                    <div class="mlgl-icon">💨</div>
+                    <div>
+                        <span id="mlgl-wind" class="mlgl-value">-- km/h</span>
+                        <span class="mlgl-label">Vento</span>
+                    </div>
+                </div>
+
+                <div class="mlgl-stat">
+                    <div class="mlgl-icon">🧭</div>
+                    <div>
+                        <span id="mlgl-dir" class="mlgl-value">--°</span>
+                        <span class="mlgl-label">Direzione</span>
+                    </div>
+                </div>
+
+                <div class="mlgl-stat">
+                    <div class="mlgl-icon">🌧️</div>
+                    <div>
+                        <span id="mlgl-rain" class="mlgl-value">-- mm</span>
+                        <span class="mlgl-label">Pioggia</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+/* =========================================================
+   COLLEGAMENTO ALLA STAZIONE WEATHER UNDERGROUND
+
+   Inserisci qui i dati della tua stazione.
+   ========================================================= */
+
+const MLGL_STATION_ID = "INSERISCI_QUI_IL_TUO_STATION_ID";
+const MLGL_API_KEY = "INSERISCI_QUI_LA_TUA_API_KEY";
+
+
+async function mlglAggiornaDati() {
+
+    if (
+        MLGL_STATION_ID === "INSERISCI_QUI_IL_TUO_STATION_ID" ||
+        MLGL_API_KEY === "INSERISCI_QUI_LA_TUA_API_KEY"
+    ) {
+        return;
+    }
+
+    const url =
+        "https://api.weather.com/v2/pws/observations/current" +
+        "?stationId=" + encodeURIComponent(MLGL_STATION_ID) +
+        "&format=json" +
+        "&units=m" +
+        "&apiKey=" + encodeURIComponent(MLGL_API_KEY);
+
+    try {
+
+        const response = await fetch(url, {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        const data = await response.json();
+
+        if (!data.observations || !data.observations.length) {
+            throw new Error("Nessuna osservazione disponibile");
+        }
+
+        const obs = data.observations[0];
+
+        const set = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        if (obs.metric && obs.metric.temp != null)
+            set("mlgl-temp", obs.metric.temp.toFixed(1) + " °C");
+
+        if (obs.humidity != null)
+            set("mlgl-humidity", obs.humidity + " %");
+
+        if (obs.metric && obs.metric.windSpeed != null)
+            set("mlgl-wind", obs.metric.windSpeed.toFixed(1) + " km/h");
+
+        if (obs.winddir != null)
+            set("mlgl-dir", obs.winddir + "°");
+
+        if (obs.metric && obs.metric.precipTotal != null)
+            set("mlgl-rain", obs.metric.precipTotal.toFixed(1) + " mm");
+
+    } catch (error) {
+
+        console.error("Errore dati stazione Meteo Lo Gullo:", error);
+
+        const status = document.getElementById("mlgl-api-status");
+
+        if (status) {
+            status.textContent = "Dati meteo temporaneamente non disponibili";
+            status.style.display = "block";
+
+            setTimeout(() => {
+                status.style.display = "none";
+            }, 5000);
+        }
+    }
+}
+
+
+/* Prima lettura + aggiornamento ogni 5 minuti */
+window.addEventListener("load", mlglAggiornaDati);
+setInterval(mlglAggiornaDati, 300000);
+</script>
